@@ -13,8 +13,10 @@ async function loadAppConfig() {
   try {
     const res = await fetch("/api/config");
     appConfig = await res.json();
-    const version = appConfig.version ? ` v${appConfig.version}` : "";
-    document.querySelector("header h1").textContent = `Agent Triage${version}`;
+    document.querySelector("header h1").textContent = "Agent Triage";
+    if (appConfig.version) {
+      document.querySelector(".app-version").textContent = `v${appConfig.version}`;
+    }
     // Hide tabs for disabled features
     for (const tab of ["loops", "tickets", "pulls"]) {
       const btn = document.querySelector(`.tab[data-tab="${tab}"]`);

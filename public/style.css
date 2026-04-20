@@ -36,10 +36,22 @@ header {
   z-index: 10;
 }
 
+.header-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+
 header h1 {
   font-size: 15px;
   font-weight: 600;
-  margin-bottom: 4px;
+}
+
+.app-version {
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--text-dim);
 }
 
 .btn-new-workspace {

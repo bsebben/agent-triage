@@ -1,10 +1,10 @@
 # Agent Triage
 
-A live dashboard for monitoring and triaging parallel Claude Code agents running in [cmux](https://cmux.dev). See all your agent workspaces at a glance, respond to prompts, approve permissions, and track PR and ticket status — without switching contexts.
+A live dashboard for monitoring and triaging parallel Claude Code agents running in [cmux](https://cmux.dev). See all your agent workspaces at a glance, track long-running Claude Loop tasks, and monitor PR and ticket status — without switching contexts.
 
 ## Prerequisites
 
-- [cmux](https://cmux.dev) installed and running
+- [cmux](https://cmux.dev) installed and running — download from [cmux.dev](https://cmux.dev), open the app, and it starts automatically. cmux provides a Unix socket that the dashboard connects to for real-time workspace data.
 - Node.js 20+
 - [`gh` CLI](https://cli.github.com/) authenticated (for Pull Requests tab)
 
@@ -36,8 +36,8 @@ See [CONFIG.md](CONFIG.md) for the full reference of every field.
 
 | Tab | What it shows |
 |-----|---------------|
-| **Workspaces** | All cmux agent workspaces. Click to focus, respond to questions, approve permissions, dismiss or close. |
-| **Loops** | Status of Claude Loops (autonomous background agents). Shows schedule, run count, and whether each loop is running, idle, or errored. |
+| **Workspaces** | All cmux agent workspaces. Click to focus, dismiss, or close. |
+| **Loops** | Long-running Claude Loop tasks. Shows schedule, run count, and whether each loop is running, idle, or errored. |
 | **Pull Requests** | Your open PRs (with CI status) and incoming review requests, grouped by repo. Sub-tabs for "Mine" and "Reviews". |
 | **Tickets** | Your assigned Jira tickets grouped by parent story, with status badges. |
 
@@ -59,8 +59,62 @@ npm run dev    # Start with auto-reload on file changes
 npm test       # Run tests
 ```
 
+## Auto-Start as a Service (macOS)
+
+To keep the dashboard running automatically across reboots, set up a launchd service:
+
+1. Create `~/Library/LaunchAgents/com.agent-triage.plist`:
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.agent-triage</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/usr/local/bin/node</string>
+    <string>/path/to/agent-triage/src/server.js</string>
+  </array>
+  <key>WorkingDirectory</key>
+  <string>/path/to/agent-triage</string>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>KeepAlive</key>
+  <true/>
+  <key>StandardOutPath</key>
+  <string>/tmp/agent-triage.log</string>
+  <key>StandardErrorPath</key>
+  <string>/tmp/agent-triage.log</string>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>PATH</key>
+    <string>/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+  </dict>
+</dict>
+</plist>
+```
+
+2. Update the paths: replace `/usr/local/bin/node` with your Node.js path (`which node`) and `/path/to/agent-triage` with your clone location.
+
+3. Load the service:
+
+```bash
+launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.agent-triage.plist
+```
+
+The dashboard will now start automatically at login and restart if it crashes. Logs go to `/tmp/agent-triage.log`.
+
+To stop or restart:
+
+```bash
+launchctl bootout gui/$(id -u) ~/Library/LaunchAgents/com.agent-triage.plist
+launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.agent-triage.plist
+```
+
 ## Installing via Claude Code
 
 You can ask Claude Code to set this up for you:
 
-> Clone agent-triage, install dependencies, copy the example config, and start the server. Then open localhost:7777 in my browser.
+> Clone agent-triage, install dependencies, copy the example config, set up the launchd service for auto-start, and open localhost:7777 in my browser.
