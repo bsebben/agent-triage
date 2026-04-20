@@ -1,0 +1,23 @@
+{
+  "port": 7777,
+  "cmux": {
+    "binary": null,
+    "socket": null
+  },
+  "loops": {
+    "enabled": true,
+    "dataDir": null,
+    "installUrl": "https://silver-adventure-o3qwg53.pages.github.io/plugin.html?name=claude-loops"
+  },
+  "tickets": {
+    "enabled": false,
+    "cloudId": "",
+    "jiraSite": "",
+    "jql": "project = MYPROJECT AND assignee = currentUser() AND status != Done ORDER BY status ASC",
+    "mcpTool": ""
+  },
+  "pulls": {
+    "enabled": true,
+    "orgFilter": null
+  }
+}

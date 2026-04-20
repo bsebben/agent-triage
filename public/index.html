@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Agent Triage</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header>
+    <h1>Agent Triage</h1>
+    <nav class="tabs">
+      <button class="tab active" data-tab="workspaces">Workspaces</button>
+      <button class="tab" data-tab="loops">Loops</button>
+      <button class="tab" data-tab="pulls">Pull Requests</button>
+      <button class="tab" data-tab="tickets">Tickets</button>
+    </nav>
+  </header>
+  <main id="queue"></main>
+  <script src="tab-workspaces.js"></script>
+  <script src="tab-loops.js"></script>
+  <script src="tab-pulls.js"></script>
+  <script src="tab-tickets.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
