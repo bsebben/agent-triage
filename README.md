@@ -59,62 +59,16 @@ npm run dev    # Start with auto-reload on file changes
 npm test       # Run tests
 ```
 
-## Auto-Start as a Service (macOS)
+## Auto-Start (macOS)
 
-To keep the dashboard running automatically across reboots, set up a launchd service:
+The dashboard can run as a launchd service that starts at login and restarts on crash. Ask Claude Code to set it up:
 
-1. Create `~/Library/LaunchAgents/com.agent-triage.plist`:
+> Set up agent-triage as a launchd service for auto-start.
 
-```xml
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-  <key>Label</key>
-  <string>com.agent-triage</string>
-  <key>ProgramArguments</key>
-  <array>
-    <string>/usr/local/bin/node</string>
-    <string>/path/to/agent-triage/src/server.js</string>
-  </array>
-  <key>WorkingDirectory</key>
-  <string>/path/to/agent-triage</string>
-  <key>RunAtLoad</key>
-  <true/>
-  <key>KeepAlive</key>
-  <true/>
-  <key>StandardOutPath</key>
-  <string>/tmp/agent-triage.log</string>
-  <key>StandardErrorPath</key>
-  <string>/tmp/agent-triage.log</string>
-  <key>EnvironmentVariables</key>
-  <dict>
-    <key>PATH</key>
-    <string>/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
-  </dict>
-</dict>
-</plist>
-```
-
-2. Update the paths: replace `/usr/local/bin/node` with your Node.js path (`which node`) and `/path/to/agent-triage` with your clone location.
-
-3. Load the service:
-
-```bash
-launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.agent-triage.plist
-```
-
-The dashboard will now start automatically at login and restart if it crashes. Logs go to `/tmp/agent-triage.log`.
-
-To stop or restart:
-
-```bash
-launchctl bootout gui/$(id -u) ~/Library/LaunchAgents/com.agent-triage.plist
-launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.agent-triage.plist
-```
+See [CLAUDE.md](CLAUDE.md) for the full setup instructions Claude Code follows.
 
 ## Installing via Claude Code
 
-You can ask Claude Code to set this up for you:
+You can ask Claude Code to handle the entire setup:
 
 > Clone agent-triage, install dependencies, copy the example config, set up the launchd service for auto-start, and open localhost:7777 in my browser.
