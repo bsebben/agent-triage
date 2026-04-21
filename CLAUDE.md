@@ -33,11 +33,24 @@ For a clean full-screen experience (no tab bar or address bar), install as a Chr
 
 After installing, the user can reopen it from Spotlight (search "Agent Triage"), Launchpad, or the Dock. Suggest they pin it to the Dock for quick access.
 
+## Versioning
+
+This project uses semantic versioning. **Before pushing, run `npm run version-check`** to verify the version was bumped.
+
+- **Patch** (x.y.Z): bug fixes, config tweaks, docs-only changes to code files
+- **Minor** (x.Y.0): new features, new tabs, new config fields
+- **Major** (X.0.0): breaking config changes, removed features, incompatible API changes
+
+The check compares `package.json` version against `origin/master`. If code in `src/`, `public/`, or `test/` changed without a version bump, it fails.
+
+When bumping, update the version in `package.json`. The server reads it at startup and exposes it via `/api/config`.
+
 ## Development
 
 ```bash
-npm run dev    # Start with auto-reload on file changes
-npm test       # Run tests
+npm run dev           # Start with auto-reload on file changes
+npm test              # Run tests
+npm run version-check # Verify version bump before pushing
 ```
 
 ## Architecture
