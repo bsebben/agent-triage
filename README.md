@@ -43,12 +43,26 @@ See [CONFIG.md](CONFIG.md) for the full reference of every field.
 
 ## Recommended Layout
 
-For the best experience, run cmux and the dashboard side-by-side on the same monitor:
+For the best experience, install the dashboard as a PWA and run it side-by-side with cmux:
 
-1. Open cmux and full-screen it on the **right half** of your screen
-2. Open `http://localhost:7777` in a browser and full-screen it on the **left half**
+### Install as a PWA (recommended)
 
-On macOS, use [Rectangle](https://rectangleapp.com/) or the built-in window tiling (drag to screen edge) to snap each window to half the screen. This gives you the dashboard for quick triage on the left, and the full cmux terminal for deep work on the right.
+Installing as a PWA removes the browser tab bar and address bar, giving you a clean full-screen dashboard.
+
+1. Open `http://localhost:7777` in Chrome
+2. Click the three-dot menu → **Cast, save, and share** → **Install page as app...**
+3. Click Install
+
+To reopen after closing: search **"Agent Triage"** in Spotlight, find it in Launchpad, or pin it to your Dock (right-click dock icon → Options → Keep in Dock).
+
+For a completely clean full-screen view with no toolbar, uncheck **View → "Always Show Toolbar in Full Screen"** in the PWA window.
+
+### Side-by-side with cmux
+
+1. Open cmux and snap it to the **right half** of your screen
+2. Open the dashboard (PWA or browser) and snap it to the **left half**
+
+On macOS, use [Rectangle](https://rectangleapp.com/) or built-in window tiling (drag to screen edge) to snap each window. This gives you the dashboard for quick triage on the left, and the full cmux terminal for deep work on the right.
 
 When you click a workspace card in the dashboard, it automatically focuses that workspace in cmux.
 
@@ -59,16 +73,18 @@ npm run dev    # Start with auto-reload on file changes
 npm test       # Run tests
 ```
 
-## Auto-Start (macOS)
+## Running the Server
 
-The dashboard can run as a launchd service that starts at login and restarts on crash. Ask Claude Code to set it up:
+The server must run from a terminal inside cmux (not as a launchd service) because it connects to cmux's Unix socket, which requires the calling process to be in cmux's session context.
 
-> Set up agent-triage as a launchd service for auto-start.
+Start it in a dedicated cmux workspace and leave it running:
 
-See [CLAUDE.md](CLAUDE.md) for the full setup instructions Claude Code follows.
+```bash
+npm start
+```
 
 ## Installing via Claude Code
 
 You can ask Claude Code to handle the entire setup:
 
-> Clone agent-triage, install dependencies, copy the example config, set up the launchd service for auto-start, and open localhost:7777 in my browser.
+> Clone agent-triage, install dependencies, copy the example config, start the server, and open localhost:7777 in my browser.

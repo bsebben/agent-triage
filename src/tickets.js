@@ -5,7 +5,6 @@ import { promisify } from "node:util";
 import config from "./config.js";
 
 const execFileAsync = promisify(execFile);
-const CLOUD_ID = config.tickets.cloudId;
 const JIRA_SITE = config.tickets.jiraSite;
 const JQL = config.tickets.jql;
 const MCP_TOOL = config.tickets.mcpTool;
@@ -20,7 +19,7 @@ export async function getMyTickets() {
       [
         "call", "tool-read",
         "-t", MCP_TOOL,
-        "-j", JSON.stringify({ cloudId: CLOUD_ID, jql: JQL, fields: FIELDS }),
+        "-j", JSON.stringify({ cloudId: config.tickets.cloudId, jql: JQL, fields: FIELDS }),
         "-o", "json",
       ],
       { timeout: 30000, maxBuffer: 1024 * 1024 },
@@ -58,8 +57,6 @@ function unescapeJsonString(escaped) {
 }
 
 function extractIssues(text) {
-  // mcpproxy wraps the Jira response in Go map notation with nested JSON escaping.
-  // The response may also be truncated at ~20K chars. This parser handles both cases.
   const marker = '"text":"';
   let pos = text.indexOf(marker);
   while (pos !== -1) {
@@ -78,13 +75,11 @@ function extractIssues(text) {
 
     const unescaped = unescapeJsonString(escaped);
 
-    // Try full parse first (response not truncated)
     try {
       const parsed = JSON.parse(unescaped);
       if (parsed.issues) return parsed.issues;
-    } catch { /* truncated — fall through to partial extraction */ }
+    } catch { /* truncated */ }
 
-    // Extract individual issue objects from truncated JSON
     const issuesStart = unescaped.indexOf('"issues"');
     if (issuesStart === -1) return [];
     const arrayStart = unescaped.indexOf("[", issuesStart);

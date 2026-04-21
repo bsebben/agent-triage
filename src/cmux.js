@@ -7,7 +7,6 @@ import config from "./config.js";
 const execFileAsync = promisify(execFile);
 const CMUX = config.cmux.binary;
 const SOCKET_PATH = config.cmux.socket;
-const CLEAN_ENV = { HOME: process.env.HOME, PATH: "/usr/bin:/bin:/usr/sbin:/sbin" };
 
 // --- Persistent socket RPC ---
 
@@ -102,7 +101,6 @@ async function socketRpc(method, params = {}) {
 async function runCli(args) {
   const { stdout } = await execFileAsync(CMUX, args, {
     timeout: 10000,
-    env: CLEAN_ENV,
   });
   return { stdout };
 }

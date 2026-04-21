@@ -38,7 +38,10 @@ function detectLoopsDataDir() {
   const pluginsData = join(HOME, ".claude", "plugins", "data");
   if (!existsSync(pluginsData)) return null;
   const entries = readdirSync(pluginsData);
-  const match = entries.find((e) => e.startsWith("claude-loops"));
+  const matches = entries.filter((e) => e.startsWith("claude-loops"));
+  // Prefer the directory that has a state/ subdirectory with loop data
+  const withState = matches.find((e) => existsSync(join(pluginsData, e, "state")));
+  const match = withState || matches[0];
   return match ? join(pluginsData, match) : null;
 }
 
