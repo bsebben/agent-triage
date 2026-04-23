@@ -19,7 +19,7 @@ cat >> "$ZSHRC" << EOF
 $MARKER
 if [[ -n "\$CMUX_WORKSPACE_ID" && -z "\$_AGENT_TRIAGE_CHECKED" ]]; then
   export _AGENT_TRIAGE_CHECKED=1
-  $AUTOSTART &>/dev/null &
+  ( $AUTOSTART &>/dev/null & )
 fi
 EOF
 
