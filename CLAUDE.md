@@ -32,7 +32,7 @@ Install the shell hook so the dashboard starts automatically when cmux launches:
 bin/install.sh
 ```
 
-This adds a block to `~/.zshrc` that starts the server as a background process the first time a shell opens inside cmux. The check is idempotent, uses a lockfile to prevent races, and adds no visible delay to shell startup. Logs go to `/tmp/agent-triage.log`.
+This adds a block to `~/.zshrc` that creates an "Agent Triage Dashboard Host" cmux workspace the first time a shell opens inside cmux. The check is idempotent and uses a lockfile to prevent races. Logs go to `/tmp/agent-triage.log`.
 
 To remove:
 
