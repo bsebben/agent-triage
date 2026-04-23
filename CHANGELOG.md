@@ -16,6 +16,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - Changelog guidelines in CLAUDE.md
 - Dynamic version reading from package.json at runtime
 
+### Fixed
+
+- Race condition where multiple cmux shells could each create a Dashboard workspace
+
 ### Removed
 
 - cmux `set-hook` based auto-start (hooks were stored but never fired by cmux)
