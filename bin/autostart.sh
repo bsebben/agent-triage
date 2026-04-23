@@ -1,5 +1,5 @@
 #!/bin/bash
-# Auto-start Agent Triage dashboard in a cmux workspace.
+# Auto-start Agent Triage server in the background.
 # Called from ~/.zshrc when a shell opens inside cmux.
 # Idempotent: uses a lockfile to prevent races across multiple shells.
 
@@ -17,14 +17,7 @@ if curl -sf --connect-timeout 1 http://localhost:7777/api/config >/dev/null 2>&1
 fi
 
 SCRIPT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+LOGFILE="/tmp/agent-triage.log"
 
-# Remove stale Dashboard workspace if it exists but the server isn't running
-if cmux list-workspaces 2>/dev/null | grep -q "Dashboard"; then
-  cmux close-workspace --name "Dashboard" 2>/dev/null
-  sleep 1
-fi
-
-cmux new-workspace \
-  --name "Dashboard" \
-  --cwd "$SCRIPT_DIR" \
-  --command "npm start"
+cd "$SCRIPT_DIR"
+nohup node src/server.js > "$LOGFILE" 2>&1 &
