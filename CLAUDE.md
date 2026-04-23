@@ -7,6 +7,7 @@ Dashboard for monitoring parallel Claude Code agents in cmux.
 ```bash
 npm install
 cp config.example.json config.json
+bin/install.sh   # adds auto-start hook to ~/.zshrc
 ```
 
 Edit `config.json` as needed. See CONFIG.md for field reference. The server auto-detects cmux paths and loops data directory when fields are set to `null`.
@@ -22,6 +23,22 @@ npm start
 ```
 
 Verify: `curl -s http://localhost:7777/api/config` should return JSON.
+
+## Auto-start with cmux
+
+Install the shell hook so the dashboard starts automatically when cmux launches:
+
+```bash
+bin/install.sh
+```
+
+This adds a block to `~/.zshrc` that creates a "Dashboard" workspace the first time a shell opens inside cmux. The check is idempotent and runs in the background, adding no visible delay to shell startup.
+
+To remove:
+
+```bash
+bin/uninstall.sh
+```
 
 ## Installing as a PWA
 
@@ -44,6 +61,15 @@ This project uses semantic versioning. **Before pushing, run `npm run version-ch
 The check compares `package.json` version against `origin/master`. If code in `src/`, `public/`, or `test/` changed without a version bump, it fails.
 
 When bumping, update the version in `package.json`. The server reads it at startup and exposes it via `/api/config`.
+
+## Changelog
+
+Maintain `CHANGELOG.md` using [Keep a Changelog](https://keepachangelog.com/) format. Update the changelog per **pull request**, not per commit.
+
+- Add an `## [Unreleased]` section at the top for in-progress work
+- When bumping the version for a PR, move unreleased entries under a new `## [x.y.z] - YYYY-MM-DD` heading
+- Group changes under: `Added`, `Changed`, `Fixed`, `Removed` (only include sections that apply)
+- Each entry should be a concise one-liner describing the user-visible change
 
 ## Development
 
