@@ -26,14 +26,16 @@ Open `http://localhost:7777` in your browser. After the install, the server will
 
 ### Upgrading
 
-After pulling new changes:
+Ask Claude Code:
+
+> Pull the latest agent-triage changes, read the CHANGELOG for anything new, and run any setup steps needed.
+
+Or manually:
 
 ```bash
 git pull
 bin/install.sh   # safe to re-run, idempotent
 ```
-
-No `npm install` needed unless the changelog mentions new dependencies.
 
 ## Configuration
 
