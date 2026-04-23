@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.2.1] - 2026-04-23
+
+### Fixed
+
+- Auto-start shell hook now uses zsh `precmd` instead of running during shell init, fixing broken-pipe failures when cmux socket isn't ready yet
+- Replaced env-var guard (`_AGENT_TRIAGE_CHECKED`) with file-based marker keyed to cmux socket birth time, so the hook reliably fires after cmux restarts
+- Stale lockfile detection — autostart now checks if the lock holder PID is alive and reclaims dead locks
+- Stale server cleanup — detects and kills orphaned servers from previous cmux sessions before starting a new one
+
+### Changed
+
+- Dashboard now runs in a dedicated cmux workspace ("Agent Triage Dashboard Host") instead of a background `nohup` process
+- Autostart reads port from `config.json` instead of hardcoding 7777
+- Monitor filters out the dashboard's own workspace from notification cards
+
 ## [1.2.0] - 2026-04-23
 
 ### Added

@@ -1,5 +1,7 @@
 import * as cmux from "./cmux.js";
 
+const DASHBOARD_WS_NAME = "Agent Triage Dashboard Host";
+
 export function parseScreenForQuestion(screen) {
   if (!screen) return null;
   const lines = screen.split("\n");
@@ -99,15 +101,21 @@ export class Monitor {
 
       const currentIds = new Set();
 
+      // Find the Dashboard workspace ID so we can exclude its notifications
+      const dashboardWsId = workspaces.find((w) => w.title === DASHBOARD_WS_NAME)?.id;
+
       for (const n of notifications) {
+        if (n.workspaceId === dashboardWsId) continue;
         currentIds.add(n.id);
         const enriched = await enrichNotification(n, workspaces, terminals);
         this.#queue.upsert(enriched);
       }
 
       // Add synthetic "running" items for workspaces without notifications.
+      // Skip the Dashboard workspace — it runs this server and shouldn't appear as a card.
       const notifiedWorkspaceIds = new Set(notifications.map((n) => n.workspaceId));
       for (const ws of workspaces) {
+        if (ws.title === DASHBOARD_WS_NAME) continue;
         if (!notifiedWorkspaceIds.has(ws.id)) {
           const syntheticId = `running-${ws.id}`;
           currentIds.add(syntheticId);
