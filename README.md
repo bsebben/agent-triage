@@ -15,10 +15,11 @@ git clone <repo-url> agent-triage
 cd agent-triage
 npm install
 cp config.example.json config.json
-npm start
+bin/install.sh   # auto-start when cmux launches
+npm start        # start now
 ```
 
-Open `http://localhost:7777` in your browser.
+Open `http://localhost:7777` in your browser. After the install, the server will start automatically whenever cmux launches — no manual `npm start` needed.
 
 ## Configuration
 
