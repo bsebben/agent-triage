@@ -24,6 +24,17 @@ npm start        # start now
 
 Open `http://localhost:7777` in your browser. After the install, the server will start automatically whenever cmux launches — no manual `npm start` needed.
 
+### Upgrading
+
+After pulling new changes:
+
+```bash
+git pull
+bin/install.sh   # safe to re-run, idempotent
+```
+
+No `npm install` needed unless the changelog mentions new dependencies.
+
 ## Configuration
 
 Edit `config.json` to customize. The defaults work out of the box if cmux is installed — the server auto-detects paths.
