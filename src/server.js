@@ -1,4 +1,5 @@
 import { createServer } from "node:http";
+import { readFileSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { join, extname } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -93,7 +94,7 @@ const server = createServer(async (req, res) => {
 
     if (req.url === "/api/config" && req.method === "GET") {
       return jsonResponse(res, {
-        version: "1.0.0",
+        version: JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf-8")).version,
         loops: { enabled: config.loops.enabled, installUrl: config.loops.installUrl },
         tickets: { enabled: config.tickets.enabled },
         pulls: { enabled: config.pulls.enabled },
