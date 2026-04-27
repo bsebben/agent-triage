@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-04-27
+
+### Added
+
+- "Terminal" category for plain shell workspaces — dimmed gray cards with `>_` icon, sorted below running agents
+- Notification history tracking to distinguish Claude Code sessions from plain terminals
+
+### Fixed
+
+- Workspace tab badge now only counts items needing attention (excludes running and terminal)
+
 ## [1.2.1] - 2026-04-23
 
 ### Fixed
