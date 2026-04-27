@@ -36,7 +36,7 @@ function renderWorkspaces() {
 }
 
 function categoryIcon(cat) {
-  const icons = { error: "!", permission: "\u{1f512}", question: "?", waiting: "\u{26a1}", completion: "\u{2713}", running: "\u{27f3}" };
+  const icons = { error: "!", permission: "\u{1f512}", question: "?", waiting: "\u{26a1}", completion: "\u{2713}", running: "\u{27f3}", terminal: ">_" };
   return icons[cat] || "?";
 }
 

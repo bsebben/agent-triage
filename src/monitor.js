@@ -75,11 +75,14 @@ export class Monitor {
   #interval = null;
   #onUpdate = null;
   #pollIntervalMs;
+  #knownAgentWorkspaces = new Set();
+  #cmux;
 
-  constructor(queue, { pollIntervalMs = 5000, onUpdate = null } = {}) {
+  constructor(queue, { pollIntervalMs = 5000, onUpdate = null, cmuxApi = null } = {}) {
     this.#queue = queue;
     this.#pollIntervalMs = pollIntervalMs;
     this.#onUpdate = onUpdate;
+    this.#cmux = cmuxApi || cmux;
   }
 
   start() {
@@ -94,9 +97,9 @@ export class Monitor {
   async poll() {
     try {
       const [notifications, workspaces, terminals] = await Promise.all([
-        cmux.listNotifications(),
-        cmux.listWorkspaces(),
-        cmux.listTerminals(),
+        this.#cmux.listNotifications(),
+        this.#cmux.listWorkspaces(),
+        this.#cmux.listTerminals(),
       ]);
 
       const currentIds = new Set();
@@ -106,25 +109,25 @@ export class Monitor {
 
       for (const n of notifications) {
         if (n.workspaceId === dashboardWsId) continue;
+        this.#knownAgentWorkspaces.add(n.workspaceId);
         currentIds.add(n.id);
         const enriched = await enrichNotification(n, workspaces, terminals);
         this.#queue.upsert(enriched);
       }
 
-      // Add synthetic "running" items for workspaces without notifications.
-      // Skip the Dashboard workspace — it runs this server and shouldn't appear as a card.
       const notifiedWorkspaceIds = new Set(notifications.map((n) => n.workspaceId));
       for (const ws of workspaces) {
         if (ws.title === DASHBOARD_WS_NAME) continue;
         if (!notifiedWorkspaceIds.has(ws.id)) {
-          const syntheticId = `running-${ws.id}`;
+          const category = this.#knownAgentWorkspaces.has(ws.id) ? "running" : "terminal";
+          const syntheticId = `synthetic-${ws.id}`;
           currentIds.add(syntheticId);
           const terminal = terminals?.find((t) => t.workspaceId === ws.id);
           this.#queue.upsert({
             id: syntheticId,
             workspaceId: ws.id,
             surfaceId: null,
-            category: "running",
+            category,
             body: "",
             workspaceTitle: ws.title || null,
             workspaceDir: terminal?.directory || ws.directory || null,
