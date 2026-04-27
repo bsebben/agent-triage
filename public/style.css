@@ -596,6 +596,25 @@ main { padding: 8px; }
   white-space: nowrap;
 }
 
+.pulls-filter-bar {
+  display: flex;
+  gap: 6px;
+  padding: 0 8px 8px;
+}
+
+.pulls-filter-select {
+  padding: 3px 6px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--surface);
+  color: var(--text);
+  font-family: inherit;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.pulls-filter-select:hover { border-color: var(--text-dim); }
+
 .pulls-repo-group { margin-bottom: 8px; }
 
 .pulls-repo-name {

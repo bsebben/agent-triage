@@ -1,6 +1,24 @@
 // public/tab-pulls.js
 
 let pullsSubTab = "mine";
+let pullsAuthorFilter = "";
+
+function collectAuthors(groups) {
+  const authors = new Set();
+  for (const g of groups) {
+    for (const pr of g.prs) {
+      if (pr.author) authors.add(pr.author);
+    }
+  }
+  return [...authors].sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }));
+}
+
+function filterGroupsByAuthor(groups, author) {
+  if (!author) return groups;
+  return groups
+    .map((g) => ({ ...g, prs: g.prs.filter((pr) => pr.author === author) }))
+    .filter((g) => g.prs.length > 0);
+}
 
 function renderPulls() {
   const pulls = state.pulls || { mine: [], reviews: [] };
@@ -22,14 +40,37 @@ function renderPulls() {
       html += pulls.mine.map((g) => renderPullGroup(g, false)).join("");
     }
   } else {
-    if (reviewCount === 0) {
+    const authors = collectAuthors(pulls.reviews);
+    if (authors.length > 1) {
+      html += renderAuthorFilter(authors);
+    }
+    const filtered = filterGroupsByAuthor(pulls.reviews, pullsAuthorFilter);
+    const filteredCount = filtered.reduce((n, g) => n + g.prs.length, 0);
+    if (filteredCount === 0) {
       html += `<div class="empty-state">No review requests</div>`;
     } else {
-      html += pulls.reviews.map((g) => renderPullGroup(g, true)).join("");
+      html += filtered.map((g) => renderPullGroup(g, true)).join("");
     }
   }
 
   queue.innerHTML = html;
+}
+
+function renderAuthorFilter(authors) {
+  const options = authors
+    .map((a) => `<option value="${escapeHtml(a)}"${a === pullsAuthorFilter ? " selected" : ""}>${escapeHtml(a)}</option>`)
+    .join("");
+  return `<div class="pulls-filter-bar">
+    <select class="pulls-filter-select" onchange="setPullsAuthorFilter(this.value)">
+      <option value="">All authors</option>
+      ${options}
+    </select>
+  </div>`;
+}
+
+function setPullsAuthorFilter(author) {
+  pullsAuthorFilter = author;
+  renderPulls();
 }
 
 function switchPullsTab(tab) {
