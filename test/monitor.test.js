@@ -1,6 +1,7 @@
-import { describe, it, mock } from "node:test";
+import { describe, it, mock, beforeEach } from "node:test";
 import assert from "node:assert/strict";
-import { enrichNotification, parseScreenForQuestion } from "../src/monitor.js";
+import { enrichNotification, parseScreenForQuestion, Monitor } from "../src/monitor.js";
+import { Queue } from "../src/queue.js";
 
 describe("parseScreenForQuestion", () => {
   it("extracts question text and options from screen content", () => {
@@ -45,5 +46,77 @@ describe("enrichNotification", () => {
     assert.equal(result.workspaceDir, "/home/testuser/workspace/zenpayroll");
     assert.equal(result.gitBranch, "main");
     assert.ok(result.screenContent);
+  });
+});
+
+describe("Monitor terminal detection", () => {
+  let queue;
+
+  function makeCmux({ notifications = [], workspaces = [], terminals = [] }) {
+    return {
+      listNotifications: async () => notifications,
+      listWorkspaces: async () => workspaces,
+      listTerminals: async () => terminals,
+      readScreen: async () => null,
+    };
+  }
+
+  beforeEach(() => {
+    queue = new Queue();
+  });
+
+  it("marks workspace without notification history as terminal", async () => {
+    const cmuxApi = makeCmux({
+      workspaces: [{ id: "W1", title: "my-terminal", directory: "/home/user" }],
+    });
+    const monitor = new Monitor(queue, { cmuxApi });
+    await monitor.poll();
+    const items = queue.items();
+    assert.equal(items.length, 1);
+    assert.equal(items[0].category, "terminal");
+    assert.equal(items[0].workspaceId, "W1");
+  });
+
+  it("marks workspace with notification history as running", async () => {
+    // Poll 1: workspace has a notification (Claude Code session)
+    const cmuxApi = makeCmux({
+      notifications: [{ id: "N1", workspaceId: "W1", surfaceId: "S1", category: "permission", body: "approve?" }],
+      workspaces: [{ id: "W1", title: "claude-session", directory: "/home/user/project" }],
+      terminals: [{ workspaceId: "W1", paneId: "P1", directory: "/home/user/project", gitBranch: "main" }],
+    });
+    const monitor = new Monitor(queue, { cmuxApi });
+    await monitor.poll();
+
+    // Poll 2: notification is gone, but workspace remains
+    cmuxApi.listNotifications = async () => [];
+    await monitor.poll();
+
+    const items = queue.items();
+    assert.equal(items.length, 1);
+    assert.equal(items[0].category, "running");
+  });
+
+  it("distinguishes terminal and agent workspaces in same poll", async () => {
+    // First, establish W1 as a known agent workspace
+    const cmuxApi = makeCmux({
+      notifications: [{ id: "N1", workspaceId: "W1", surfaceId: "S1", category: "completion", body: "done" }],
+      workspaces: [
+        { id: "W1", title: "agent", directory: "/home/user/project" },
+        { id: "W2", title: "plain-shell", directory: "/home/user" },
+      ],
+    });
+    const monitor = new Monitor(queue, { cmuxApi });
+    await monitor.poll();
+
+    // Now both workspaces have no notifications
+    cmuxApi.listNotifications = async () => [];
+    await monitor.poll();
+
+    const items = queue.items();
+    assert.equal(items.length, 2);
+    const w1 = items.find((i) => i.workspaceId === "W1");
+    const w2 = items.find((i) => i.workspaceId === "W2");
+    assert.equal(w1.category, "running");
+    assert.equal(w2.category, "terminal");
   });
 });

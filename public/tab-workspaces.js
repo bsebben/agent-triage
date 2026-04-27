@@ -36,7 +36,7 @@ function renderWorkspaces() {
 }
 
 function categoryIcon(cat) {
-  const icons = { error: "!", permission: "\u{1f512}", question: "?", waiting: "\u{26a1}", completion: "\u{2713}", running: "\u{27f3}" };
+  const icons = { error: "!", permission: "\u{1f512}", question: "?", waiting: "\u{26a1}", completion: "\u{2713}", running: "\u{27f3}", terminal: ">_" };
   return icons[cat] || "?";
 }
 
@@ -82,7 +82,7 @@ function renderCard(item, { isDismissed = false } = {}) {
       <div class="card-title-row"><span class="card-title-group"><span class="card-title">${escapeHtml(cardTitle)}</span><a class="card-edit" onclick="event.stopPropagation();startRename(this,'${item.workspaceId}','${escapeHtml(cardTitle)}')">&#9998;</a></span></div>
     <span class="card-actions-right">${dismissBtn}${closeBtn}</span>
       <div class="card-header">
-        <span class="card-category ${escapeHtml(item.category)}">${categoryIcon(item.category)} ${escapeHtml(item.category)}</span>
+        <span class="card-category ${escapeHtml(item.category)}"><span class="card-icon">${categoryIcon(item.category)}</span> ${escapeHtml(item.category)}</span>
       </div>
     ${subtitle ? `<div class="card-subtitle">${escapeHtml(subtitle)}</div>` : ""}
     ${hasQuestion ? `<div class="card-question">"${escapeHtml(item.parsedQuestion.question)}"</div>` : ""}
