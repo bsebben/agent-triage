@@ -5,7 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
-## [Unreleased]
+## [1.3.0] - 2026-04-27
+
+### Added
+
+- Author filter dropdown on the PR Reviews tab, auto-populated from review request authors
+- Status filter dropdown on both Mine and Reviews PR tabs (open, draft, comments, approved)
 
 ## [1.2.1] - 2026-04-23
 
