@@ -36,6 +36,26 @@ describe("Queue", () => {
     assert.equal(items[2].category, "completion");
   });
 
+  it("sorts terminal items below running", () => {
+    queue.upsert({ id: "T1", category: "terminal", workspaceId: "W1", body: "" });
+    queue.upsert({ id: "R1", category: "running", workspaceId: "W2", body: "" });
+    queue.upsert({ id: "P1", category: "permission", workspaceId: "W3", body: "approve?" });
+    const items = queue.items();
+    assert.equal(items[0].category, "permission");
+    assert.equal(items[1].category, "running");
+    assert.equal(items[2].category, "terminal");
+  });
+
+  it("excludes running and terminal from pending count", () => {
+    queue.upsert({ id: "T1", category: "terminal", workspaceId: "W1", body: "" });
+    queue.upsert({ id: "R1", category: "running", workspaceId: "W2", body: "" });
+    queue.upsert({ id: "P1", category: "permission", workspaceId: "W3", body: "approve?" });
+    queue.upsert({ id: "C1", category: "completion", workspaceId: "W4", body: "done" });
+    const stats = queue.stats();
+    assert.equal(stats.pending, 1);
+    assert.equal(stats.total, 4);
+  });
+
   it("groups items by directory path", () => {
     queue.upsert({ id: "A", category: "waiting", workspaceId: "W1", workspaceDir: `${HOME}/workspace/zenpayroll`, body: "q1" });
     queue.upsert({ id: "B", category: "waiting", workspaceId: "W2", workspaceDir: `${HOME}/workspace/web`, body: "q2" });
