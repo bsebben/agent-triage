@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.3.1] - 2026-04-28
+
+### Fixed
+
+- `runCli` no longer passes `execFile`'s `timeout` option, which was sending SIGTERM to the cmux helper mid-write and causing it to crash with an unhandled `NSFileHandleOperationException` (SIGABRT). A JS-level timer rejects on slow invocations without killing the child process.
+
 ## [1.3.0] - 2026-04-27
 
 ### Added

@@ -98,11 +98,21 @@ async function socketRpc(method, params = {}) {
 
 // --- CLI fallback for commands not available via RPC ---
 
-async function runCli(args) {
-  const { stdout } = await execFileAsync(CMUX, args, {
-    timeout: 10000,
-  });
-  return { stdout };
+// SIGTERM mid-write crashes cmux's helper (unhandled NSFileHandleOperationException),
+// taking down every workspace's socket. Reject on a JS timer without killing the child.
+async function runCli(args, timeoutMs = 10000) {
+  let timer;
+  try {
+    return await new Promise((resolve, reject) => {
+      timer = setTimeout(() => reject(new Error(`cmux ${args[0]} timed out`)), timeoutMs);
+      execFileAsync(CMUX, args).then(
+        (r) => resolve({ stdout: r.stdout }),
+        reject,
+      );
+    });
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 // --- Public API ---
