@@ -1,6 +1,43 @@
 // public/tab-pulls.js
 
 let pullsSubTab = "mine";
+let pullsAuthorFilter = "";
+let pullsStatusFilter = "";
+
+function collectAuthors(groups) {
+  const authors = new Set();
+  for (const g of groups) {
+    for (const pr of g.prs) {
+      if (pr.author) authors.add(pr.author);
+    }
+  }
+  return [...authors].sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }));
+}
+
+function collectStatuses(groups) {
+  const statuses = new Set();
+  for (const g of groups) {
+    for (const pr of g.prs) {
+      if (pr.status) statuses.add(pr.status);
+    }
+  }
+  const order = ["open", "draft", "comments", "approved"];
+  return order.filter((s) => statuses.has(s));
+}
+
+function filterGroupsByAuthor(groups, author) {
+  if (!author) return groups;
+  return groups
+    .map((g) => ({ ...g, prs: g.prs.filter((pr) => pr.author === author) }))
+    .filter((g) => g.prs.length > 0);
+}
+
+function filterGroupsByStatus(groups, status) {
+  if (!status) return groups;
+  return groups
+    .map((g) => ({ ...g, prs: g.prs.filter((pr) => pr.status === status) }))
+    .filter((g) => g.prs.length > 0);
+}
 
 function renderPulls() {
   const pulls = state.pulls || { mine: [], reviews: [] };
@@ -16,24 +53,74 @@ function renderPulls() {
   </div>`;
 
   if (pullsSubTab === "mine") {
-    if (mineCount === 0) {
+    const statuses = collectStatuses(pulls.mine);
+    if (statuses.length > 1) {
+      html += `<div class="pulls-filter-bar">${renderStatusFilter(statuses)}</div>`;
+    }
+    const filtered = filterGroupsByStatus(pulls.mine, pullsStatusFilter);
+    const filteredCount = filtered.reduce((n, g) => n + g.prs.length, 0);
+    if (filteredCount === 0) {
       html += `<div class="empty-state">No open pull requests</div>`;
     } else {
-      html += pulls.mine.map((g) => renderPullGroup(g, false)).join("");
+      html += filtered.map((g) => renderPullGroup(g, false)).join("");
     }
   } else {
-    if (reviewCount === 0) {
+    const authors = collectAuthors(pulls.reviews);
+    const statuses = collectStatuses(pulls.reviews);
+    const hasFilters = authors.length > 1 || statuses.length > 1;
+    if (hasFilters) {
+      html += `<div class="pulls-filter-bar">`;
+      if (authors.length > 1) html += renderAuthorFilter(authors);
+      if (statuses.length > 1) html += renderStatusFilter(statuses);
+      html += `</div>`;
+    }
+    let filtered = filterGroupsByAuthor(pulls.reviews, pullsAuthorFilter);
+    filtered = filterGroupsByStatus(filtered, pullsStatusFilter);
+    const filteredCount = filtered.reduce((n, g) => n + g.prs.length, 0);
+    if (filteredCount === 0) {
       html += `<div class="empty-state">No review requests</div>`;
     } else {
-      html += pulls.reviews.map((g) => renderPullGroup(g, true)).join("");
+      html += filtered.map((g) => renderPullGroup(g, true)).join("");
     }
   }
 
   queue.innerHTML = html;
 }
 
+function renderAuthorFilter(authors) {
+  const options = authors
+    .map((a) => `<option value="${escapeHtml(a)}"${a === pullsAuthorFilter ? " selected" : ""}>${escapeHtml(a)}</option>`)
+    .join("");
+  return `<select class="pulls-filter-select" onchange="setPullsAuthorFilter(this.value)">
+    <option value="">All authors</option>
+    ${options}
+  </select>`;
+}
+
+function renderStatusFilter(statuses) {
+  const options = statuses
+    .map((s) => `<option value="${escapeHtml(s)}"${s === pullsStatusFilter ? " selected" : ""}>${escapeHtml(s)}</option>`)
+    .join("");
+  return `<select class="pulls-filter-select" onchange="setPullsStatusFilter(this.value)">
+    <option value="">All statuses</option>
+    ${options}
+  </select>`;
+}
+
+function setPullsStatusFilter(status) {
+  pullsStatusFilter = status;
+  renderPulls();
+}
+
+function setPullsAuthorFilter(author) {
+  pullsAuthorFilter = author;
+  renderPulls();
+}
+
 function switchPullsTab(tab) {
   pullsSubTab = tab;
+  pullsAuthorFilter = "";
+  pullsStatusFilter = "";
   renderPulls();
 }
 
