@@ -1,5 +1,5 @@
 import { createServer } from "node:http";
-import { readFileSync } from "node:fs";
+import { readFileSync, existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { join, extname } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -11,7 +11,7 @@ import { execFile } from "node:child_process";
 import { getLoopStatuses } from "./loops.js";
 import { getMyPulls } from "./pulls.js";
 import { getMyTickets } from "./tickets.js";
-import config from "./config.js";
+import config, { HOME } from "./config.js";
 
 const __dirname = fileURLToPath(new URL(".", import.meta.url));
 const PUBLIC_DIR = join(__dirname, "..", "public");
@@ -56,6 +56,17 @@ function getQueueData() {
 
 function getFullData() {
   return { ...getQueueData(), loops: loopsData, pulls: pullsData, tickets: ticketsData };
+}
+
+function resolveCwd(repo) {
+  const workspace = join(HOME, "workspace");
+  if (repo) {
+    const repoName = repo.split("/").pop();
+    const repoPath = join(workspace, repoName);
+    if (existsSync(repoPath)) return repoPath;
+  }
+  if (existsSync(workspace)) return workspace;
+  return HOME;
 }
 
 async function readBody(req) {
@@ -158,7 +169,22 @@ const server = createServer(async (req, res) => {
     }
 
     if (req.url === "/api/new-workspace" && req.method === "POST") {
-      await cmux.createWorkspace();
+      const body = await readBody(req).catch(() => ({}));
+      await cmux.createWorkspace({ cwd: body.cwd, command: body.command });
+      await monitor.poll();
+      return jsonResponse(res, { ok: true });
+    }
+
+    if (req.url === "/api/agent-workspace" && req.method === "POST") {
+      const { prompt, repo } = await readBody(req);
+      if (!prompt || typeof prompt !== "string") {
+        return jsonResponse(res, { error: "prompt required" }, 400);
+      }
+      const escaped = "'" + prompt.replace(/'/g, "'\\''") + "'";
+      await cmux.createWorkspace({
+        cwd: resolveCwd(repo),
+        command: `claude ${escaped}`,
+      });
       await monitor.poll();
       return jsonResponse(res, { ok: true });
     }

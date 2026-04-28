@@ -134,6 +134,10 @@ function escapeHtml(str) {
   return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
+function claudeIcon() {
+  return `<svg class="claude-icon" viewBox="0 0 16 16" fill="currentColor" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M8 1c.3 1.7 1.4 5.2 6 7-4.6 1.8-5.7 5.3-6 7-.3-1.7-1.4-5.2-6-7 4.6-1.8 5.7-5.3 6-7z"/></svg>`;
+}
+
 function timeAgo(ts) {
   const s = Math.floor((Date.now() - ts) / 1000);
   if (s < 60) return `${s}s ago`;

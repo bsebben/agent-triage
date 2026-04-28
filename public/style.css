@@ -540,10 +540,17 @@ main { padding: 8px; }
   letter-spacing: 0.5px;
 }
 
-.pulls-table th:last-child,
-.pulls-table td:last-child {
+.pulls-table th:nth-last-child(2),
+.pulls-table td:nth-last-child(2) {
   width: 90px;
   text-align: center;
+}
+
+.pulls-table th:last-child,
+.pulls-table td:last-child {
+  width: 36px;
+  text-align: center;
+  padding: 6px 4px;
 }
 
 .pulls-table td {
@@ -678,10 +685,17 @@ main { padding: 8px; }
   letter-spacing: 0.5px;
 }
 
-.tickets-table th:last-child,
-.tickets-table td:last-child {
+.tickets-table th:nth-last-child(2),
+.tickets-table td:nth-last-child(2) {
   width: 100px;
   text-align: center;
+}
+
+.tickets-table th:last-child,
+.tickets-table td:last-child {
+  width: 36px;
+  text-align: center;
+  padding: 6px 4px;
 }
 
 .tickets-table td {
@@ -718,3 +732,31 @@ main { padding: 8px; }
 .ticket-badge.status-backlog { background: color-mix(in srgb, var(--text-dim) 15%, var(--card)); color: var(--text-dim); }
 .ticket-badge.status-todo { background: color-mix(in srgb, var(--clr-question) 20%, var(--card)); color: var(--clr-question); }
 .ticket-badge.status-default { background: color-mix(in srgb, var(--text-dim) 15%, var(--card)); color: var(--text-dim); }
+
+.agent-btn {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+  border-radius: 4px;
+  width: 24px;
+  height: 24px;
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.agent-btn:hover {
+  background: var(--card);
+  color: var(--text);
+  border-color: var(--text-dim);
+}
+
+.claude-icon {
+  width: 14px;
+  height: 14px;
+  display: block;
+}
