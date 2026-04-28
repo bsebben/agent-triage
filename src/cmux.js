@@ -213,14 +213,14 @@ export async function createWorkspace({ cwd, command } = {}) {
     if (cwd) args.push("--cwd", cwd);
     if (command) args.push("--command", command);
     const { stdout } = await runCli(args);
-    const id = stdout.match(/workspace:(\d+)/)?.[1];
-    if (id) {
-      const result = await socketRpc("workspace.select", { workspace_id: id });
+    const ref = stdout.match(/workspace:\d+/)?.[0];
+    if (ref) {
+      const result = await socketRpc("workspace.select", { workspace_id: ref });
       if (result?.window_id) {
         await socketRpc("window.focus", { window_id: result.window_id });
       }
     }
-    return id ? { workspace_id: id } : null;
+    return ref ? { workspace_id: ref } : null;
   }
   const result = await socketRpc("workspace.create", {});
   if (result?.workspace_id) {
