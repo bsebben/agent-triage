@@ -86,7 +86,7 @@ When you click a workspace card in the dashboard, it automatically focuses that 
 ## Development
 
 ```bash
-npm run dev    # Start with auto-reload on file changes
+npm start      # Start the server (auto-reloads on file changes)
 npm test       # Run tests
 ```
 

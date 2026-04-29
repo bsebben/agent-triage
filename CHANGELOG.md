@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.7.1] - 2026-04-29
+
+### Changed
+
+- `npm start` now runs the server with `node --watch`, so backend changes pulled from master take effect on the next file change without a manual restart. The redundant `npm run dev` script was removed.
+
 ## [1.7.0] - 2026-04-29
 
 ### Changed

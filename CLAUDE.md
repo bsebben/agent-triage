@@ -74,7 +74,7 @@ Maintain `CHANGELOG.md` using [Keep a Changelog](https://keepachangelog.com/) fo
 ## Development
 
 ```bash
-npm run dev           # Start with auto-reload on file changes
+npm start             # Start the server (auto-reloads on file changes via --watch)
 npm test              # Run tests
 npm run version-check # Verify version bump before pushing
 ```
