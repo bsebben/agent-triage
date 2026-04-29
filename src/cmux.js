@@ -207,7 +207,21 @@ export async function sendKey(workspaceId, surfaceId, key) {
   await socketRpc("surface.send_key", { surface_id: surfaceId, key });
 }
 
-export async function createWorkspace() {
+export async function createWorkspace({ cwd, command } = {}) {
+  if (cwd || command) {
+    const args = ["new-workspace"];
+    if (cwd) args.push("--cwd", cwd);
+    if (command) args.push("--command", command);
+    const { stdout } = await runCli(args);
+    const ref = stdout.match(/workspace:\d+/)?.[0];
+    if (ref) {
+      const result = await socketRpc("workspace.select", { workspace_id: ref });
+      if (result?.window_id) {
+        await socketRpc("window.focus", { window_id: result.window_id });
+      }
+    }
+    return ref ? { workspace_id: ref } : null;
+  }
   const result = await socketRpc("workspace.create", {});
   if (result?.workspace_id) {
     await socketRpc("workspace.select", { workspace_id: result.workspace_id });

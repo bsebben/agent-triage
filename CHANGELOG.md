@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.5.0] - 2026-04-28
+
+### Added
+
+- Per-row action drawer on Pull Requests and Tickets tabs — clicking the Claude icon opens a side drawer with item metadata and a vertical action menu (status, review, address comments, update description for PRs; investigate, start work for tickets)
+- Skill-backed actions fall back to plain-language instructions when the relevant plugin or skill isn't installed
+
+## [1.4.0] - 2026-04-28
+
+### Added
+
+- Per-row Claude-icon button on Pull Requests and Tickets tabs that opens a new cmux workspace and launches Claude with the PR or ticket as initial context
+- For PR rows, the new workspace opens in `~/workspace/<repo>` if cloned locally, falling back to `~/workspace` then `~`
+- New workspaces are auto-selected and focused after creation
+
+### Fixed
+
+- Dismiss button on workspace cards no longer un-dismisses items on the next poll (`Queue.upsert` was unconditionally resetting `dismissed: false`)
+
 ## [1.3.1] - 2026-04-28
 
 ### Fixed

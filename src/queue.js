@@ -22,8 +22,8 @@ export class Queue {
     this.#items.set(item.id, {
       ...existing,
       ...item,
-      dismissed: false,
-      dismissedAt: null,
+      dismissed: existing?.dismissed || false,
+      dismissedAt: existing?.dismissedAt || null,
       updatedAt: Date.now(),
       createdAt: existing?.createdAt || Date.now(),
     });
