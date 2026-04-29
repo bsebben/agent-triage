@@ -141,23 +141,14 @@ function ciIndicator(ci) {
 }
 
 function renderPullRow(pr, showAuthor, repo) {
-  const prompt = `Give me a quick status update on this PR: ${pr.url}\n\nDon't review or analyze the code — just summarize the current state (open/draft/merged, CI, review status, recent activity, my role on it).\n\nThen ask what I'd like to do next. Suggest options based on my role: if I'm the author, I might want to update the description, push fixes, address review comments, or mark ready for review; if I'm a reviewer, I might want to leave comments or run a review skill from the review-artisan plugin (e.g. \`/review-artisan:polish\` for a guided review). Don't pick for me — list a few likely actions and wait.`;
   return `<tr class="pull-row" onclick="openExternal('${escapeHtml(pr.url)}')">
     <td class="pull-title"><span class="pull-number">#${pr.number}</span> ${escapeHtml(pr.title)}</td>
     ${showAuthor ? `<td class="pull-author">${escapeHtml(pr.author)}</td>` : ""}
     <td><span class="pull-badge status-${pr.status}">${pr.status}${ciIndicator(pr.ci)}</span></td>
-    <td class="row-action"><button class="agent-btn" title="Open in new agent workspace" data-prompt="${escapeHtml(prompt)}" data-repo="${escapeHtml(repo)}" onclick="event.stopPropagation(); openInAgentFromBtn(this)">${claudeIcon()}</button></td>
+    <td class="row-action"><button class="agent-btn" title="Actions" data-pr-url="${escapeHtml(pr.url)}" onclick="event.stopPropagation(); openActionDrawerFromBtn(this)">${claudeIcon()}</button></td>
   </tr>`;
 }
 
 async function openExternal(url) {
   await apiPost("open-external", { url });
-}
-
-async function openInAgent(prompt, repo) {
-  await apiPost("agent-workspace", { prompt, repo });
-}
-
-function openInAgentFromBtn(btn) {
-  openInAgent(btn.dataset.prompt, btn.dataset.repo || undefined);
 }

@@ -34,10 +34,9 @@ function ticketStatusClass(status) {
 }
 
 function renderTicketRow(ticket) {
-  const prompt = `Take a look at this ticket: ${ticket.key} - ${ticket.summary}\n\n${ticket.url}`;
   return `<tr class="ticket-row" onclick="openExternal('${escapeHtml(ticket.url)}')">
     <td class="ticket-title"><span class="ticket-key">${escapeHtml(ticket.key)}</span> ${escapeHtml(ticket.summary)}</td>
     <td><span class="ticket-badge status-${ticketStatusClass(ticket.status)}">${escapeHtml(ticket.status)}</span></td>
-    <td class="row-action"><button class="agent-btn" title="Open in new agent workspace" data-prompt="${escapeHtml(prompt)}" onclick="event.stopPropagation(); openInAgentFromBtn(this)">${claudeIcon()}</button></td>
+    <td class="row-action"><button class="agent-btn" title="Actions" data-ticket-key="${escapeHtml(ticket.key)}" onclick="event.stopPropagation(); openActionDrawerFromBtn(this)">${claudeIcon()}</button></td>
   </tr>`;
 }
