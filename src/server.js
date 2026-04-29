@@ -112,6 +112,17 @@ const server = createServer(async (req, res) => {
       });
     }
 
+    if (req.url === "/api/changelog" && req.method === "GET") {
+      try {
+        const content = await readFile(join(__dirname, "..", "CHANGELOG.md"), "utf-8");
+        res.writeHead(200, { "Content-Type": "text/plain; charset=utf-8" });
+        return res.end(content);
+      } catch (err) {
+        res.writeHead(404, { "Content-Type": "text/plain" });
+        return res.end("Changelog not found");
+      }
+    }
+
     if (req.url === "/api/respond" && req.method === "POST") {
       const { surfaceId, workspaceId, text } = await readBody(req);
       await cmux.sendText(workspaceId, surfaceId, text);

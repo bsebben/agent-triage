@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.6.0] - 2026-04-29
+
+### Added
+
+- Clicking the version number in the header opens a modal displaying the project's changelog
+- `GET /api/changelog` endpoint that serves `CHANGELOG.md` as plain text
+
 ## [1.5.0] - 2026-04-28
 
 ### Added
