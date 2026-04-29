@@ -65,4 +65,17 @@ describe("Queue", () => {
     const zp = grouped.find((g) => g.title === "~/workspace/zenpayroll");
     assert.equal(zp.items.length, 2);
   });
+
+  it("sorts groups alphabetically regardless of item priority", () => {
+    queue.upsert({ id: "Z1", category: "running", workspaceId: "W1", workspaceDir: `${HOME}/workspace/zenpayroll`, body: "" });
+    queue.upsert({ id: "A1", category: "terminal", workspaceId: "W2", workspaceDir: `${HOME}/workspace/agent-triage`, body: "" });
+    queue.upsert({ id: "M1", category: "error", workspaceId: "W3", workspaceDir: `${HOME}/workspace/middle`, body: "boom" });
+    const initial = queue.grouped().map((g) => g.title);
+    assert.deepEqual(initial, ["~/workspace/agent-triage", "~/workspace/middle", "~/workspace/zenpayroll"]);
+
+    queue.upsert({ id: "M1", category: "completion", workspaceId: "W3", workspaceDir: `${HOME}/workspace/middle`, body: "done" });
+    queue.upsert({ id: "A1", category: "permission", workspaceId: "W2", workspaceDir: `${HOME}/workspace/agent-triage`, body: "approve?" });
+    const after = queue.grouped().map((g) => g.title);
+    assert.deepEqual(after, ["~/workspace/agent-triage", "~/workspace/middle", "~/workspace/zenpayroll"]);
+  });
 });
