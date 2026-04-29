@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.7.0] - 2026-04-29
+
+### Changed
+
+- Workspace groups on the Workspaces tab now sort alphabetically by directory and stay in that order — previously they reordered as item categories changed.
+
 ## [1.6.0] - 2026-04-29
 
 ### Added

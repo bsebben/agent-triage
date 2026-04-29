@@ -73,7 +73,9 @@ export class Queue {
       }
       groups.get(label).items.push(item);
     }
-    return [...groups.values()];
+    return [...groups.values()].sort((a, b) =>
+      a.title.localeCompare(b.title, undefined, { sensitivity: "base" })
+    );
   }
 
   stats() {
