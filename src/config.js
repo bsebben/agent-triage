@@ -12,6 +12,32 @@ const __dirname = fileURLToPath(new URL(".", import.meta.url));
 const PROJECT_ROOT = join(__dirname, "..");
 const HOME = homedir();
 
+const DEFAULTS = {
+  port: 7777,
+  cmux: { binary: null, socket: null },
+  loops: {
+    enabled: true,
+    dataDir: null,
+    installUrl: "https://silver-adventure-o3qwg53.pages.github.io/plugin.html?name=claude-loops",
+  },
+  tickets: { enabled: true },
+  pulls: { enabled: true, orgFilter: null },
+};
+
+function merge(defaults, overrides) {
+  const result = {};
+  for (const key of Object.keys(defaults)) {
+    const def = defaults[key];
+    const val = overrides?.[key];
+    if (def !== null && typeof def === "object" && !Array.isArray(def)) {
+      result[key] = { ...def, ...val };
+    } else {
+      result[key] = val ?? def;
+    }
+  }
+  return result;
+}
+
 function loadConfigFile() {
   const configPath = join(PROJECT_ROOT, "config.json");
   if (!existsSync(configPath)) {
@@ -21,6 +47,8 @@ function loadConfigFile() {
   }
   return JSON.parse(readFileSync(configPath, "utf-8"));
 }
+
+// --- Auto-detection ---
 
 function detectCmuxBinary() {
   try {
@@ -42,7 +70,6 @@ function detectLoopsDataDir() {
   if (!existsSync(pluginsData)) return null;
   const entries = readdirSync(pluginsData);
   const matches = entries.filter((e) => e.startsWith("claude-loops"));
-  // Prefer the directory that has a state/ subdirectory with loop data
   const withState = matches.find((e) => existsSync(join(pluginsData, e, "state")));
   const match = withState || matches[0];
   return match ? join(pluginsData, match) : null;
@@ -57,27 +84,15 @@ function detectGhCli() {
   }
 }
 
+// --- Resolve ---
+
 function resolve(raw) {
-  const config = {
-    port: raw.port || 7777,
-    cmux: {
-      binary: raw.cmux?.binary || detectCmuxBinary(),
-      socket: raw.cmux?.socket || detectCmuxSocket(),
-    },
-    loops: {
-      enabled: raw.loops?.enabled !== false,
-      dataDir: raw.loops?.dataDir || detectLoopsDataDir(),
-      installUrl: raw.loops?.installUrl || "https://silver-adventure-o3qwg53.pages.github.io/plugin.html?name=claude-loops",
-    },
-    tickets: {
-      enabled: raw.tickets?.enabled !== false,
-    },
-    pulls: {
-      enabled: raw.pulls?.enabled !== false,
-      orgFilter: raw.pulls?.orgFilter || null,
-      ghAvailable: detectGhCli(),
-    },
-  };
+  const config = merge(DEFAULTS, raw);
+
+  config.cmux.binary ??= detectCmuxBinary();
+  config.cmux.socket ??= detectCmuxSocket();
+  config.loops.dataDir ??= detectLoopsDataDir();
+  config.pulls.ghAvailable = detectGhCli();
 
   if (!config.cmux.binary) {
     console.error("Could not find cmux. Set cmux.binary in config.json.");
@@ -95,6 +110,8 @@ function resolve(raw) {
 
   return Object.freeze(config);
 }
+
+// --- Jira ticket detection ---
 
 const DEFAULT_JQL = "assignee = currentUser() AND status != Done ORDER BY status ASC";
 
