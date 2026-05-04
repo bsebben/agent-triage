@@ -4,7 +4,7 @@
     "binary": null,
     "socket": null
   },
-  "loops": {},
-  "tickets": {},
-  "pulls": {}
+  "loops": { "enabled": true },
+  "tickets": { "enabled": true },
+  "pulls": { "enabled": true }
 }
