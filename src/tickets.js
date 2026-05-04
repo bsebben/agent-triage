@@ -1,14 +1,52 @@
-// src/tickets.js
+// src/tickets.js — Tab module for Jira ticket integration
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-
-import { ticketConfig } from "./config.js";
+import config from "./config.js";
 
 const execFileAsync = promisify(execFile);
+const DEFAULT_JQL = "assignee = currentUser() AND status != Done ORDER BY status ASC";
 const FIELDS = ["summary", "status", "issuetype", "parent"];
 
-export async function getMyTickets() {
-  const { cloudId, jiraSite, jql, mcpTool } = ticketConfig;
+export const status = {
+  enabled: config.tickets.enabled,
+  available: false,
+  hint: null,
+};
+
+const detected = {
+  cloudId: null,
+  jiraSite: null,
+  jql: DEFAULT_JQL,
+  mcpTool: null,
+};
+
+export const pollInterval = 3 * 60 * 1000;
+
+export async function init() {
+  if (!status.enabled) return;
+
+  try {
+    const server = await detectJiraServer();
+    if (!server) {
+      status.hint = "No Jira server found. Make sure your Jira MCP server is authenticated and running.";
+      console.log("Config: tickets enabled (no Jira server found)");
+      return;
+    }
+
+    const { cloudId, jiraSite } = await detectCloudInfo(server.name);
+    status.available = true;
+    detected.cloudId = cloudId;
+    detected.jiraSite = jiraSite.replace(/\/$/, "");
+    detected.mcpTool = `${server.name}:searchJiraIssuesUsingJql`;
+    console.log(`Config: tickets enabled (${detected.jiraSite})`);
+  } catch (err) {
+    status.hint = `Jira auto-detection failed: ${err.message}`;
+    console.log(`Config: tickets enabled (auto-detect failed: ${err.message})`);
+  }
+}
+
+export async function poll() {
+  const { cloudId, jiraSite, jql, mcpTool } = detected;
 
   try {
     const { stdout } = await execFileAsync(
@@ -34,6 +72,37 @@ export async function getMyTickets() {
     return [];
   }
 }
+
+// --- Jira server detection ---
+
+async function detectJiraServer() {
+  const { stdout } = await execFileAsync("mcpproxy", ["upstream", "list", "--json"], { timeout: 5000 });
+  const servers = JSON.parse(stdout);
+  return servers.find((s) =>
+    /jira/i.test(s.name) && s.connected === true && s.health?.level === "healthy"
+  );
+}
+
+async function detectCloudInfo(serverName) {
+  const tool = `${serverName}:getAccessibleAtlassianResources`;
+  const { stdout } = await execFileAsync(
+    "mcpproxy",
+    ["call", "tool-read", "-t", tool, "-j", "{}", "-o", "json"],
+    { timeout: 10000 },
+  );
+  // mcpproxy wraps responses in { content: [{ text: "..." }] }
+  const jsonStart = stdout.indexOf("{");
+  if (jsonStart === -1) throw new Error("No JSON in getAccessibleResources response");
+  const raw = JSON.parse(stdout.slice(jsonStart));
+  const text = raw?.content?.[0]?.text;
+  if (!text) throw new Error("Empty getAccessibleResources response");
+  const resources = JSON.parse(text);
+  if (!Array.isArray(resources) || !resources.length) throw new Error("No accessible Atlassian resources found");
+  const site = resources[0];
+  return { cloudId: site.id, jiraSite: site.url };
+}
+
+// --- Response parsing ---
 
 function unescapeJsonString(escaped) {
   let out = "";

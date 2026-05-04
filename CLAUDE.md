@@ -81,12 +81,23 @@ npm run version-check # Verify version bump before pushing
 
 ## Architecture
 
-- `src/server.js` - HTTP + WebSocket server, polls data sources on intervals
-- `src/config.js` - Config loader with auto-detection
+- `src/server.js` - HTTP + WebSocket server, tab registry, polling
+- `src/config.js` - Config loader (DEFAULTS + merge + cmux detection)
 - `src/cmux.js` - Persistent socket RPC to cmux
 - `src/monitor.js` - Polls cmux for workspace/notification state
 - `src/queue.js` - In-memory queue with dismiss/restore
-- `src/loops.js` - Reads Claude Loops plugin data directory
-- `src/pulls.js` - Fetches PRs via `gh` CLI
-- `src/tickets.js` - Fetches Jira tickets via MCP (auto-detected at startup)
+- `src/loops.js` - Tab module: Claude Loops integration
+- `src/pulls.js` - Tab module: GitHub PR monitoring via `gh` CLI
+- `src/tickets.js` - Tab module: Jira tickets via MCP (auto-detected)
+- `config.schema.json` - JSON Schema for config.json (editor autocomplete)
 - `public/` - Vanilla JS frontend, no build step
+
+### Tab Module Interface
+
+Each tab module (`loops.js`, `pulls.js`, `tickets.js`) exports:
+- `status` — `{ enabled, available, hint, ...extra }` served via `/api/config`
+- `pollInterval` — milliseconds between polls
+- `init()` — async, detects dependencies, populates status
+- `poll()` — async, fetches and returns data
+
+To add a new tab: create a module with this interface, import it in `server.js`, and add it to the `tabs` registry.

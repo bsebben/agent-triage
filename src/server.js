@@ -8,10 +8,10 @@ import { Queue } from "./queue.js";
 import { Monitor } from "./monitor.js";
 import * as cmux from "./cmux.js";
 import { execFile } from "node:child_process";
-import { getLoopStatuses } from "./loops.js";
-import { getMyPulls } from "./pulls.js";
-import { getMyTickets } from "./tickets.js";
-import config, { HOME, initTickets, ticketConfig } from "./config.js";
+import config, { HOME } from "./config.js";
+import * as loops from "./loops.js";
+import * as pulls from "./pulls.js";
+import * as tickets from "./tickets.js";
 
 const __dirname = fileURLToPath(new URL(".", import.meta.url));
 const PUBLIC_DIR = join(__dirname, "..", "public");
@@ -24,6 +24,15 @@ const MIME_TYPES = {
   ".js": "application/javascript",
   ".json": "application/json",
 };
+
+// --- Tab registry ---
+// Each tab module exports: status, pollInterval, init(), poll()
+// To add a new tab: create a module, import it, add it here.
+
+const tabs = { loops, pulls, tickets };
+const tabData = { loops: [], pulls: { mine: [], reviews: [] }, tickets: [] };
+
+// --- Queue + WebSocket ---
 
 const queue = new Queue();
 await queue.load(join(DATA_DIR, "queue.json"));
@@ -40,10 +49,6 @@ function broadcastUpdate() {
   broadcast();
 }
 
-let loopsData = [];
-let pullsData = { mine: [], reviews: [] };
-let ticketsData = [];
-
 const monitor = new Monitor(queue, { onUpdate: broadcastUpdate });
 
 function getQueueData() {
@@ -55,7 +60,7 @@ function getQueueData() {
 }
 
 function getFullData() {
-  return { ...getQueueData(), loops: loopsData, pulls: pullsData, tickets: ticketsData };
+  return { ...getQueueData(), ...tabData };
 }
 
 function resolveCwd(repo) {
@@ -104,24 +109,13 @@ const server = createServer(async (req, res) => {
     }
 
     if (req.url === "/api/config" && req.method === "GET") {
+      const tabStatuses = {};
+      for (const [name, tab] of Object.entries(tabs)) {
+        tabStatuses[name] = tab.status;
+      }
       return jsonResponse(res, {
         version: JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf-8")).version,
-        loops: {
-          enabled: config.loops.enabled,
-          available: !!config.loops.dataDir,
-          installUrl: config.loops.installUrl,
-          hint: config.loops.dataDir ? null : "Claude Loops plugin not found.",
-        },
-        tickets: {
-          enabled: config.tickets.enabled,
-          available: ticketConfig.available,
-          hint: ticketConfig.hint,
-        },
-        pulls: {
-          enabled: config.pulls.enabled,
-          available: config.pulls.ghAvailable,
-          hint: config.pulls.ghAvailable ? null : "GitHub CLI (gh) not found. Install it with: brew install gh",
-        },
+        ...tabStatuses,
       });
     }
 
@@ -244,49 +238,30 @@ wss.on("connection", (ws) => {
   ws.send(JSON.stringify({ type: "update", data: getFullData() }));
 });
 
-async function pollLoops() {
-  try {
-    loopsData = await getLoopStatuses();
-    broadcast();
-  } catch (err) {
-    console.error("Loops poll error:", err.message);
-  }
-}
+// --- Init + polling ---
 
-async function pollPulls() {
-  try {
-    pullsData = await getMyPulls();
-    broadcast();
-  } catch (err) {
-    console.error("Pulls poll error:", err.message);
-  }
+for (const [name, tab] of Object.entries(tabs)) {
+  await tab.init();
 }
-
-async function pollTickets() {
-  try {
-    const result = await getMyTickets();
-    if (result.length > 0) ticketsData = result;
-    broadcast();
-  } catch (err) {
-    console.error("Tickets poll error:", err.message);
-  }
-}
-
-await initTickets();
 
 server.listen(PORT, () => {
   console.log(`Agent Triage running at http://localhost:${PORT}`);
   monitor.start();
-  if (config.loops.enabled && config.loops.dataDir) {
-    pollLoops();
-    setInterval(pollLoops, 5 * 60 * 1000);
-  }
-  if (config.pulls.enabled && config.pulls.ghAvailable) {
-    pollPulls();
-    setInterval(pollPulls, 2 * 60 * 1000);
-  }
-  if (config.tickets.enabled && ticketConfig.available) {
-    pollTickets();
-    setInterval(pollTickets, 3 * 60 * 1000);
+
+  for (const [name, tab] of Object.entries(tabs)) {
+    if (!tab.status.enabled || !tab.status.available) continue;
+
+    const doPoll = async () => {
+      try {
+        const result = await tab.poll();
+        if (result != null) tabData[name] = result;
+        broadcast();
+      } catch (err) {
+        console.error(`${name} poll error:`, err.message);
+      }
+    };
+
+    doPoll();
+    setInterval(doPoll, tab.pollInterval);
   }
 });

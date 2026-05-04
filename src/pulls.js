@@ -1,12 +1,34 @@
-// src/pulls.js
+// src/pulls.js — Tab module for GitHub PR monitoring
 import { execFile } from "node:child_process";
+import { execFileSync } from "node:child_process";
 import { promisify } from "node:util";
 import config from "./config.js";
 
 const execFileAsync = promisify(execFile);
 const PR_FIELDS = "number,title,isDraft,reviewDecision,latestReviews,statusCheckRollup,createdAt,url,headRefName,author";
 
-export async function getMyPulls() {
+const ghAvailable = (() => {
+  try {
+    execFileSync("which", ["gh"], { encoding: "utf-8" });
+    return true;
+  } catch {
+    return false;
+  }
+})();
+
+export const status = {
+  enabled: config.pulls.enabled,
+  available: ghAvailable,
+  hint: ghAvailable ? null : "GitHub CLI (gh) not found. Install it with: brew install gh",
+};
+
+export const pollInterval = 2 * 60 * 1000;
+
+export async function init() {
+  console.log(`Config: pulls ${status.enabled ? "enabled" : "disabled"}${ghAvailable ? "" : " (gh CLI not found)"}`);
+}
+
+export async function poll() {
   try {
     const [mine, reviews] = await Promise.all([
       fetchAuthoredPrs(),
@@ -118,7 +140,6 @@ function prPriority(pr) {
   return PRIORITY[pr.status] ?? 5;
 }
 
-// Review requests: CI passing first (ready to review), then running, then failing
 const CI_ORDER = { passing: 0, running: 1, none: 2, failing: 3 };
 function reviewPriority(pr) {
   return CI_ORDER[pr.ci] ?? 2;

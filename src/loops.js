@@ -1,18 +1,31 @@
-// src/loops.js
+// src/loops.js — Tab module for Claude Loops integration
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import yaml from "js-yaml";
-import appConfig from "./config.js";
+import config from "./config.js";
 
-const DATA_DIR = appConfig.loops.dataDir;
+const DATA_DIR = config.loops.dataDir;
 const CONFIG_PATH = DATA_DIR ? join(DATA_DIR, "config.yml") : null;
 const STATE_DIR = DATA_DIR ? join(DATA_DIR, "state") : null;
 
-export async function getLoopStatuses() {
-  const config = await loadConfig();
+export const status = {
+  enabled: config.loops.enabled,
+  available: !!DATA_DIR,
+  hint: DATA_DIR ? null : "Claude Loops plugin not found.",
+  installUrl: config.loops.installUrl,
+};
+
+export const pollInterval = 5 * 60 * 1000;
+
+export async function init() {
+  console.log(`Config: loops ${status.enabled ? "enabled" : "disabled"}${DATA_DIR ? ` (${DATA_DIR})` : " (plugin not found)"}`);
+}
+
+export async function poll() {
+  const loopConfig = await loadConfig();
   const loops = [];
 
-  for (const loop of config.loops || []) {
+  for (const loop of loopConfig.loops || []) {
     const state = await loadState(loop.name);
     const schedule = loop.interval || loop.schedule || "—";
     const enabled = loop.enabled !== false;
