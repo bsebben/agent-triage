@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { homedir } from "node:os";
 import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
+import * as tabDefaults from "./tabs/defaults.js";
 
 const __dirname = fileURLToPath(new URL(".", import.meta.url));
 const PROJECT_ROOT = join(__dirname, "..");
@@ -12,28 +13,7 @@ const HOME = homedir();
 const DEFAULTS = {
   port: 7777,
   cmux: { binary: null, socket: null },
-  loops: {
-    enabled: true,
-    dataDir: null,
-    installUrl: "https://silver-adventure-o3qwg53.pages.github.io/plugin.html?name=claude-loops",
-  },
-  tickets: { enabled: true },
-  pulls: { enabled: true, orgFilter: null },
 };
-
-function merge(defaults, overrides) {
-  const result = {};
-  for (const key of Object.keys(defaults)) {
-    const def = defaults[key];
-    const val = overrides?.[key];
-    if (def !== null && typeof def === "object" && !Array.isArray(def)) {
-      result[key] = { ...def, ...val };
-    } else {
-      result[key] = val ?? def;
-    }
-  }
-  return result;
-}
 
 function loadConfigFile() {
   const configPath = join(PROJECT_ROOT, "config.json");
@@ -71,7 +51,13 @@ function detectLoopsDataDir() {
 }
 
 function resolve(raw) {
-  const config = merge(DEFAULTS, raw);
+  const config = {
+    port: raw.port ?? DEFAULTS.port,
+    cmux: { ...DEFAULTS.cmux, ...raw.cmux },
+    loops: { ...tabDefaults.loops, ...raw.loops },
+    tickets: { ...tabDefaults.tickets, ...raw.tickets },
+    pulls: { ...tabDefaults.pulls, ...raw.pulls },
+  };
 
   config.cmux.binary ??= detectCmuxBinary();
   config.cmux.socket ??= detectCmuxSocket();
