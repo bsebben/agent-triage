@@ -7,10 +7,12 @@ const execFileAsync = promisify(execFile);
 const DEFAULT_JQL = "assignee = currentUser() AND status != Done ORDER BY status ASC";
 const FIELDS = ["summary", "status", "issuetype", "parent"];
 
-const status = {
+const tab = {
   enabled: config.tickets.enabled,
   available: false,
   hint: null,
+  get data() { return data; },
+  init,
 };
 
 const detected = {
@@ -51,24 +53,24 @@ async function poll() {
 }
 
 async function init(onUpdate) {
-  if (!status.enabled) return;
+  if (!tab.enabled) return;
 
   try {
     const server = await detectJiraServer();
     if (!server) {
-      status.hint = "No Jira server found. Make sure your Jira MCP server is authenticated and running.";
+      tab.hint = "No Jira server found. Make sure your Jira MCP server is authenticated and running.";
       console.log("Config: tickets enabled (no Jira server found)");
       return;
     }
 
     const { cloudId, jiraSite } = await detectCloudInfo(server.name);
-    status.available = true;
+    tab.available = true;
     detected.cloudId = cloudId;
     detected.jiraSite = jiraSite.replace(/\/$/, "");
     detected.mcpTool = `${server.name}:searchJiraIssuesUsingJql`;
     console.log(`Config: tickets enabled (${detected.jiraSite})`);
   } catch (err) {
-    status.hint = `Jira auto-detection failed: ${err.message}`;
+    tab.hint = `Jira auto-detection failed: ${err.message}`;
     console.log(`Config: tickets enabled (auto-detect failed: ${err.message})`);
     return;
   }
@@ -245,4 +247,4 @@ function groupByParent(issues, jiraSite) {
   return result;
 }
 
-export default { status, get data() { return data; }, init };
+export default tab;

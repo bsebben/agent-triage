@@ -11,10 +11,12 @@ const ghAvailable = (() => {
   catch { return false; }
 })();
 
-const status = {
+const tab = {
   enabled: config.pulls.enabled,
   available: ghAvailable,
   hint: ghAvailable ? null : "GitHub CLI (gh) not found. Install it with: brew install gh",
+  get data() { return data; },
+  init,
 };
 
 let data = { mine: [], reviews: [] };
@@ -29,8 +31,8 @@ async function poll() {
 }
 
 async function init(onUpdate) {
-  console.log(`Config: pulls ${status.enabled ? "enabled" : "disabled"}${ghAvailable ? "" : " (gh CLI not found)"}`);
-  if (!status.enabled || !status.available) return;
+  console.log(`Config: pulls ${tab.enabled ? "enabled" : "disabled"}${ghAvailable ? "" : " (gh CLI not found)"}`);
+  if (!tab.enabled || !tab.available) return;
 
   const doPoll = async () => {
     try { await poll(); onUpdate(); }
@@ -130,4 +132,4 @@ function ciStatus(checks) {
   return "passing";
 }
 
-export default { status, get data() { return data; }, init };
+export default tab;

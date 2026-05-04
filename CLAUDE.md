@@ -94,9 +94,12 @@ npm run version-check # Verify version bump before pushing
 
 ### Tab Module Interface
 
-Each tab module in `src/tabs/` exports a single default object:
-- `status` — `{ enabled, available, hint, ...extra }` served via `/api/config`
+Each tab module in `src/tabs/` exports a single flat default object:
+- `enabled` — boolean, from config
+- `available` — boolean, set during init based on dependency detection
+- `hint` — string or null, shown in the UI when not available
 - `data` — getter returning current poll data
 - `init(onUpdate)` — async, detects dependencies, starts polling, calls `onUpdate` on each poll
+- Plus any tab-specific properties (e.g. `installUrl` for loops)
 
 Modules manage their own polling internally. To add a new tab: create a module in `src/tabs/`, import it in `server.js`, and add it to the `tabs` object.

@@ -105,13 +105,14 @@ const server = createServer(async (req, res) => {
     }
 
     if (req.url === "/api/config" && req.method === "GET") {
-      const tabStatuses = {};
+      const tabConfigs = {};
       for (const [name, tab] of Object.entries(tabs)) {
-        tabStatuses[name] = tab.status;
+        const { data, init, ...tabConfig } = tab;
+        tabConfigs[name] = tabConfig;
       }
       return jsonResponse(res, {
         version: JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf-8")).version,
-        ...tabStatuses,
+        ...tabConfigs,
       });
     }
 
