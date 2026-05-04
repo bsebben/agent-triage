@@ -1,14 +1,33 @@
 // src/tabs/loops.js — Tab module: Claude Loops integration
 import { readFile } from "node:fs/promises";
+import { existsSync, readdirSync } from "node:fs";
 import { join } from "node:path";
+import { homedir } from "node:os";
 import yaml from "js-yaml";
 import { startPolling } from "../utils.js";
+
+export const defaults = {
+  enabled: true,
+  dataDir: null,
+  installUrl: "https://silver-adventure-o3qwg53.pages.github.io/plugin.html?name=claude-loops",
+};
+
+function detectDataDir() {
+  const pluginsData = join(homedir(), ".claude", "plugins", "data");
+  if (!existsSync(pluginsData)) return null;
+  const entries = readdirSync(pluginsData);
+  const matches = entries.filter((e) => e.startsWith("claude-loops"));
+  const withState = matches.find((e) => existsSync(join(pluginsData, e, "state")));
+  const match = withState || matches[0];
+  return match ? join(pluginsData, match) : null;
+}
 
 let cfg;
 let data = [];
 
 async function init(tabConfig, onUpdate) {
-  cfg = tabConfig;
+  cfg = { ...defaults, ...tabConfig };
+  cfg.dataDir ??= detectDataDir();
   const dataDir = cfg.dataDir;
 
   tab.enabled = cfg.enabled;

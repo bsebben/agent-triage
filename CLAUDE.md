@@ -82,7 +82,8 @@ npm run version-check # Verify version bump before pushing
 ## Architecture
 
 - `src/server.js` - HTTP + WebSocket server, tab registry, polling
-- `src/config.js` - Config loader (DEFAULTS + merge + cmux detection)
+- `src/config.js` - Config loader (DEFAULTS + cmux detection, passes `config.tabs` to modules)
+- `src/utils.js` - Shared utilities (startPolling)
 - `src/cmux.js` - Persistent socket RPC to cmux
 - `src/monitor.js` - Polls cmux for workspace/notification state
 - `src/queue.js` - In-memory queue with dismiss/restore
@@ -94,12 +95,10 @@ npm run version-check # Verify version bump before pushing
 
 ### Tab Module Interface
 
-Each tab module in `src/tabs/` exports a single flat default object:
-- `enabled` — boolean, from config
-- `available` — boolean, set during init based on dependency detection
-- `hint` — string or null, shown in the UI when not available
-- `data` — getter returning current poll data
-- `init(onUpdate)` — async, detects dependencies, starts polling, calls `onUpdate` on each poll
-- Plus any tab-specific properties (e.g. `installUrl` for loops)
+Each tab module in `src/tabs/` exports:
+- `defaults` — named export, the tab's default config values
+- `default` — the tab object with: `enabled`, `available`, `hint`, `data` (getter), `init(tabConfig, onUpdate)`
 
-Modules manage their own polling internally. To add a new tab: create a module in `src/tabs/`, import it in `server.js`, and add it to the `tabs` object.
+Modules define their own defaults, merge them with the config passed to `init()`, detect dependencies, and manage their own polling. Config.js has no tab-specific knowledge.
+
+To add a new tab: create a module in `src/tabs/`, import it in `server.js`, add it to the `tabs` object, and add its config under `tabs` in `config.schema.json`.

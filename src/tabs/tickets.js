@@ -14,11 +14,16 @@ const detected = {
   mcpTool: null,
 };
 
+export const defaults = {
+  enabled: true,
+};
+
 let data = [];
 
 async function init(tabConfig, onUpdate) {
-  tab.enabled = tabConfig.enabled;
-  if (!tabConfig.enabled) return;
+  const cfg = { ...defaults, ...tabConfig };
+  tab.enabled = cfg.enabled;
+  if (!cfg.enabled) return;
 
   try {
     const server = await detectJiraServer();

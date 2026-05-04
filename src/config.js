@@ -1,10 +1,9 @@
 // src/config.js
-import { readFileSync, existsSync, readdirSync } from "node:fs";
+import { readFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import { homedir } from "node:os";
 import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
-import * as tabDefaults from "./tabs/defaults.js";
 
 const __dirname = fileURLToPath(new URL(".", import.meta.url));
 const PROJECT_ROOT = join(__dirname, "..");
@@ -40,28 +39,15 @@ function detectCmuxSocket() {
   return existsSync(sock) ? sock : null;
 }
 
-function detectLoopsDataDir() {
-  const pluginsData = join(HOME, ".claude", "plugins", "data");
-  if (!existsSync(pluginsData)) return null;
-  const entries = readdirSync(pluginsData);
-  const matches = entries.filter((e) => e.startsWith("claude-loops"));
-  const withState = matches.find((e) => existsSync(join(pluginsData, e, "state")));
-  const match = withState || matches[0];
-  return match ? join(pluginsData, match) : null;
-}
-
 function resolve(raw) {
   const config = {
     port: raw.port ?? DEFAULTS.port,
     cmux: { ...DEFAULTS.cmux, ...raw.cmux },
-    loops: { ...tabDefaults.loops, ...raw.loops },
-    tickets: { ...tabDefaults.tickets, ...raw.tickets },
-    pulls: { ...tabDefaults.pulls, ...raw.pulls },
+    tabs: raw.tabs || {},
   };
 
   config.cmux.binary ??= detectCmuxBinary();
   config.cmux.socket ??= detectCmuxSocket();
-  config.loops.dataDir ??= detectLoopsDataDir();
 
   if (!config.cmux.binary) {
     console.error("Could not find cmux. Set cmux.binary in config.json.");

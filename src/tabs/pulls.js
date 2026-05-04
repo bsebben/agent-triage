@@ -11,11 +11,16 @@ const ghAvailable = (() => {
   catch { return false; }
 })();
 
+export const defaults = {
+  enabled: true,
+  orgFilter: null,
+};
+
 let cfg;
 let data = { mine: [], reviews: [] };
 
 async function init(tabConfig, onUpdate) {
-  cfg = tabConfig;
+  cfg = { ...defaults, ...tabConfig };
 
   tab.enabled = cfg.enabled;
   tab.available = ghAvailable;

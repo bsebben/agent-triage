@@ -17,9 +17,11 @@ Most fields have sensible defaults. A minimal config only needs cmux paths (auto
   "$schema": "./config.schema.json",
   "port": 7777,
   "cmux": { "binary": null, "socket": null },
-  "loops": { "enabled": true },
-  "tickets": { "enabled": true },
-  "pulls": { "enabled": true }
+  "tabs": {
+    "loops": { "enabled": true },
+    "tickets": { "enabled": true },
+    "pulls": { "enabled": true }
+  }
 }
 ```
 
@@ -27,7 +29,7 @@ Fields set to `null` are auto-detected at startup. The server logs what it found
 
 ## Tabs
 
-All tabs are enabled by default and auto-detect their dependencies at startup. If a dependency is missing, the tab stays visible with a helpful message. Set `enabled: false` to hide a tab entirely.
+All tabs live under the `tabs` key and are enabled by default. Each tab auto-detects its dependencies at startup. If a dependency is missing, the tab stays visible with a helpful message. Set `enabled: false` to hide a tab entirely.
 
 | Tab | Dependency | What happens when missing |
 |-----|-----------|--------------------------|

@@ -5,7 +5,9 @@
     "binary": null,
     "socket": null
   },
-  "loops": { "enabled": true },
-  "tickets": { "enabled": true },
-  "pulls": { "enabled": true }
+  "tabs": {
+    "loops": { "enabled": true },
+    "tickets": { "enabled": true },
+    "pulls": { "enabled": true }
+  }
 }
