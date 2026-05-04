@@ -8,8 +8,6 @@ const execFileAsync = promisify(execFile);
 const FIELDS = ["summary", "status", "issuetype", "parent"];
 
 export async function getMyTickets() {
-  if (!ticketConfig.enabled) return [];
-
   const { cloudId, jiraSite, jql, mcpTool } = ticketConfig;
 
   try {

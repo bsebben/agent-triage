@@ -1,6 +1,12 @@
 // public/tab-tickets.js
 
 function renderTickets() {
+  const ticketsCfg = appConfig.tickets || {};
+  if (!ticketsCfg.available) {
+    const hint = escapeHtml(ticketsCfg.hint || "Jira not detected. Make sure mcpproxy is running with a Jira MCP server.");
+    queue.innerHTML = `<div class="empty-state">${hint}</div>`;
+    return;
+  }
   const groups = state.tickets || [];
   const totalTickets = groups.reduce((n, g) => n + g.tickets.length, 0);
   if (totalTickets === 0) {

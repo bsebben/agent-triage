@@ -7,7 +7,6 @@ const execFileAsync = promisify(execFile);
 const PR_FIELDS = "number,title,isDraft,reviewDecision,latestReviews,statusCheckRollup,createdAt,url,headRefName,author";
 
 export async function getMyPulls() {
-  if (!config.pulls.enabled) return { mine: [], reviews: [] };
   try {
     const [mine, reviews] = await Promise.all([
       fetchAuthoredPrs(),

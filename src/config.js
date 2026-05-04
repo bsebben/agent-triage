@@ -48,6 +48,15 @@ function detectLoopsDataDir() {
   return match ? join(pluginsData, match) : null;
 }
 
+function detectGhCli() {
+  try {
+    execFileSync("which", ["gh"], { encoding: "utf-8" });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 function resolve(raw) {
   const config = {
     port: raw.port || 7777,
@@ -56,16 +65,17 @@ function resolve(raw) {
       socket: raw.cmux?.socket || detectCmuxSocket(),
     },
     loops: {
-      enabled: raw.loops?.enabled,
+      enabled: raw.loops?.enabled !== false,
       dataDir: raw.loops?.dataDir || detectLoopsDataDir(),
       installUrl: raw.loops?.installUrl || "https://silver-adventure-o3qwg53.pages.github.io/plugin.html?name=claude-loops",
     },
     tickets: {
-      enabled: raw.tickets?.enabled,
+      enabled: raw.tickets?.enabled !== false,
     },
     pulls: {
-      enabled: raw.pulls?.enabled,
+      enabled: raw.pulls?.enabled !== false,
       orgFilter: raw.pulls?.orgFilter || null,
+      ghAvailable: detectGhCli(),
     },
   };
 
@@ -78,31 +88,10 @@ function resolve(raw) {
     process.exit(1);
   }
 
-  if (config.loops.enabled === false) {
-    console.log("Config: loops disabled (explicit)");
-  } else if (config.loops.dataDir) {
-    config.loops.enabled = true;
-    console.log(`Config: loops enabled (${config.loops.dataDir})`);
-  } else {
-    config.loops.enabled = false;
-    console.log("Config: loops disabled (claude-loops plugin not found)");
-  }
-
-  if (config.pulls.enabled === false) {
-    console.log("Config: pulls disabled (explicit)");
-  } else {
-    try {
-      execFileSync("which", ["gh"], { encoding: "utf-8" });
-      config.pulls.enabled = true;
-      console.log(`Config: pulls enabled${config.pulls.orgFilter ? ` (orgs: ${config.pulls.orgFilter.join(", ")})` : ""}`);
-    } catch {
-      config.pulls.enabled = false;
-      console.log("Config: pulls disabled (gh CLI not found)");
-    }
-  }
-
   console.log(`Config: cmux binary = ${config.cmux.binary}`);
   console.log(`Config: cmux socket = ${config.cmux.socket}`);
+  console.log(`Config: loops ${config.loops.enabled ? "enabled" : "disabled"}${config.loops.dataDir ? ` (${config.loops.dataDir})` : " (plugin not found)"}`);
+  console.log(`Config: pulls ${config.pulls.enabled ? "enabled" : "disabled"}${config.pulls.ghAvailable ? "" : " (gh CLI not found)"}`);
 
   return Object.freeze(config);
 }
@@ -110,7 +99,8 @@ function resolve(raw) {
 const DEFAULT_JQL = "assignee = currentUser() AND status != Done ORDER BY status ASC";
 
 export const ticketConfig = {
-  enabled: false,
+  available: false,
+  hint: null,
   cloudId: null,
   jiraSite: null,
   jql: DEFAULT_JQL,
@@ -145,28 +135,25 @@ async function detectCloudInfo(serverName) {
 }
 
 export async function initTickets() {
-  const raw = config.tickets;
-
-  if (raw.enabled === false) {
-    console.log("Config: tickets disabled (explicit)");
-    return;
-  }
+  if (!config.tickets.enabled) return;
 
   try {
     const server = await detectJiraServer();
     if (!server) {
-      console.log("Config: tickets disabled (no healthy Jira server in mcpproxy)");
+      ticketConfig.hint = "No healthy Jira server found. Make sure mcpproxy is running with a Jira MCP server configured.";
+      console.log("Config: tickets enabled (no Jira server found)");
       return;
     }
 
     const { cloudId, jiraSite } = await detectCloudInfo(server.name);
-    ticketConfig.enabled = true;
+    ticketConfig.available = true;
     ticketConfig.cloudId = cloudId;
     ticketConfig.jiraSite = jiraSite.replace(/\/$/, "");
     ticketConfig.mcpTool = `${server.name}:searchJiraIssuesUsingJql`;
-    console.log(`Config: tickets enabled (auto-detected — ${ticketConfig.jiraSite})`);
+    console.log(`Config: tickets enabled (${ticketConfig.jiraSite})`);
   } catch (err) {
-    console.warn(`Config: tickets disabled (auto-detect failed: ${err.message})`);
+    ticketConfig.hint = `Jira auto-detection failed: ${err.message}`;
+    console.log(`Config: tickets enabled (auto-detect failed: ${err.message})`);
   }
 }
 

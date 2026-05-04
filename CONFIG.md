@@ -25,47 +25,39 @@ Connection settings for the cmux terminal multiplexer.
 
 ### loops
 
-Claude Loops integration — monitors autonomous loop agents running in the background. Auto-detected at startup: enabled if the claude-loops plugin data directory is found.
+Claude Loops integration — monitors autonomous loop agents running in the background.
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `loops.enabled` | boolean or null | `null` (auto) | Set `false` to explicitly disable. When null or omitted, enabled if claude-loops plugin is installed. |
+| `loops.enabled` | boolean | `true` | Show the Loops tab. When the tab is shown but the plugin isn't installed, displays an install prompt. |
 | `loops.dataDir` | string or null | Auto-detect | Path to the claude-loops plugin data directory. When null, searches `~/.claude/plugins/data/` for a directory matching `claude-loops-*`. |
 | `loops.installUrl` | string | *(marketplace link)* | URL shown when loops is not installed, linking to the claude-loops plugin installer. |
 
 ### tickets
 
-Jira integration — shows your assigned tickets grouped by parent story. Auto-detected at startup via mcpproxy: enabled if a healthy Jira MCP server is found.
+Jira integration — shows your assigned tickets grouped by parent story.
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `tickets.enabled` | boolean or null | `null` (auto) | Set `false` to explicitly disable. When null or omitted, auto-detects via mcpproxy. |
+| `tickets.enabled` | boolean | `true` | Show the Tickets tab. When the tab is shown but Jira isn't available, displays a setup hint. |
 
 ### pulls
 
-GitHub PR monitoring — shows your open PRs and incoming review requests. Auto-detected at startup: enabled if the `gh` CLI is installed.
+GitHub PR monitoring — shows your open PRs and incoming review requests.
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `pulls.enabled` | boolean or null | `null` (auto) | Set `false` to explicitly disable. When null or omitted, enabled if `gh` CLI is found. |
+| `pulls.enabled` | boolean | `true` | Show the Pull Requests tab. When the tab is shown but `gh` isn't installed, displays a setup hint. |
 | `pulls.orgFilter` | string[] or null | `null` (all orgs) | Limit PR search to specific GitHub organizations. Example: `["MyCompany"]`. When null, searches all orgs you have access to. |
 
 ## Auto-Detection
 
-All tabs (except Workspaces) are auto-detected at startup. Each tab checks for its dependency — if found, the tab is enabled; if not, it's silently disabled. Set `enabled: false` in any section to explicitly disable a tab.
+All tabs are enabled by default and auto-detect their dependencies at startup. If a dependency is missing, the tab stays visible with a helpful message explaining what to install. Set `enabled: false` to hide a tab entirely.
 
-```
-Config: loops enabled (/Users/you/.claude/plugins/data/claude-loops-my-plugin)
-Config: pulls enabled
-Config: tickets enabled (auto-detected — https://yourcompany.atlassian.net)
-Config: cmux binary = /Applications/cmux.app/Contents/Resources/bin/cmux
-Config: cmux socket = /Users/you/Library/Application Support/cmux/cmux.sock
-```
-
-| Tab | Dependency | Detection |
-|-----|-----------|-----------|
-| Loops | claude-loops plugin | Searches `~/.claude/plugins/data/` for `claude-loops-*` directory |
-| Pulls | `gh` CLI | Checks `which gh` |
-| Tickets | mcpproxy + Jira MCP | Runs `mcpproxy upstream list --json`, finds a healthy Jira server, resolves Atlassian Cloud ID |
+| Tab | Dependency | What happens when missing |
+|-----|-----------|--------------------------|
+| Loops | claude-loops plugin | Shows install link |
+| Pulls | `gh` CLI | Shows install instructions |
+| Tickets | mcpproxy + Jira MCP server | Shows setup hint |
 
 If auto-detection fails for cmux (required for the dashboard itself), the server exits with a clear message telling you which config field to set.

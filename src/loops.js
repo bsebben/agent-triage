@@ -9,10 +9,6 @@ const CONFIG_PATH = DATA_DIR ? join(DATA_DIR, "config.yml") : null;
 const STATE_DIR = DATA_DIR ? join(DATA_DIR, "state") : null;
 
 export async function getLoopStatuses() {
-  if (!appConfig.loops.enabled) {
-    return { enabled: false, installUrl: appConfig.loops.installUrl };
-  }
-
   const config = await loadConfig();
   const loops = [];
 

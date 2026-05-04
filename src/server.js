@@ -106,9 +106,22 @@ const server = createServer(async (req, res) => {
     if (req.url === "/api/config" && req.method === "GET") {
       return jsonResponse(res, {
         version: JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf-8")).version,
-        loops: { enabled: config.loops.enabled, installUrl: config.loops.installUrl },
-        tickets: { enabled: ticketConfig.enabled },
-        pulls: { enabled: config.pulls.enabled },
+        loops: {
+          enabled: config.loops.enabled,
+          available: !!config.loops.dataDir,
+          installUrl: config.loops.installUrl,
+          hint: config.loops.dataDir ? null : "Claude Loops plugin not found.",
+        },
+        tickets: {
+          enabled: config.tickets.enabled,
+          available: ticketConfig.available,
+          hint: ticketConfig.hint,
+        },
+        pulls: {
+          enabled: config.pulls.enabled,
+          available: config.pulls.ghAvailable,
+          hint: config.pulls.ghAvailable ? null : "GitHub CLI (gh) not found. Install it with: brew install gh",
+        },
       });
     }
 
@@ -264,15 +277,15 @@ await initTickets();
 server.listen(PORT, () => {
   console.log(`Agent Triage running at http://localhost:${PORT}`);
   monitor.start();
-  if (config.loops.enabled) {
+  if (config.loops.enabled && config.loops.dataDir) {
     pollLoops();
     setInterval(pollLoops, 5 * 60 * 1000);
   }
-  if (config.pulls.enabled) {
+  if (config.pulls.enabled && config.pulls.ghAvailable) {
     pollPulls();
     setInterval(pollPulls, 2 * 60 * 1000);
   }
-  if (ticketConfig.enabled) {
+  if (config.tickets.enabled && ticketConfig.available) {
     pollTickets();
     setInterval(pollTickets, 3 * 60 * 1000);
   }

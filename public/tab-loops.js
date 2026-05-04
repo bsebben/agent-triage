@@ -1,16 +1,18 @@
 // public/tab-loops.js
 
 function renderLoops() {
-  const loops = state.loops || [];
-  if (!Array.isArray(loops)) {
-    const url = loops.installUrl || "#";
+  const loopsCfg = appConfig.loops || {};
+  if (!loopsCfg.available) {
+    const hint = escapeHtml(loopsCfg.hint || "Claude Loops plugin not found.");
+    const url = loopsCfg.installUrl || "#";
     queue.innerHTML = `<div class="empty-state">
-      Claude Loops is not installed.<br><br>
+      ${hint}<br><br>
       <a href="${escapeHtml(url)}" target="_blank" class="btn primary">Install Claude Loops</a>
     </div>`;
     return;
   }
-  if (loops.length === 0) {
+  const loops = state.loops || [];
+  if (!Array.isArray(loops) || loops.length === 0) {
     queue.innerHTML = `<div class="empty-state">No loops configured</div>`;
     return;
   }
