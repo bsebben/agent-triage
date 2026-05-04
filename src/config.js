@@ -62,10 +62,6 @@ function resolve(raw) {
     },
     tickets: {
       enabled: raw.tickets?.enabled,
-      cloudId: raw.tickets?.cloudId || null,
-      jiraSite: raw.tickets?.jiraSite || null,
-      jql: raw.tickets?.jql || null,
-      mcpTool: raw.tickets?.mcpTool || null,
     },
     pulls: {
       enabled: raw.pulls?.enabled !== false,
@@ -139,18 +135,6 @@ export async function initTickets() {
 
   if (raw.enabled === false) {
     console.log("Config: tickets disabled (explicit)");
-    return;
-  }
-
-  if (raw.jql) ticketConfig.jql = raw.jql;
-
-  // Manual overrides: all three fields provided
-  if (raw.cloudId && raw.jiraSite && raw.mcpTool) {
-    ticketConfig.enabled = true;
-    ticketConfig.cloudId = raw.cloudId;
-    ticketConfig.jiraSite = raw.jiraSite;
-    ticketConfig.mcpTool = raw.mcpTool;
-    console.log(`Config: tickets enabled (manual — ${raw.jiraSite})`);
     return;
   }
 

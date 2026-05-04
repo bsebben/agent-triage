@@ -9,9 +9,7 @@
     "dataDir": null,
     "installUrl": "https://silver-adventure-o3qwg53.pages.github.io/plugin.html?name=claude-loops"
   },
-  "tickets": {
-    "jql": null
-  },
+  "tickets": {},
   "pulls": {
     "enabled": true,
     "orgFilter": null

@@ -39,11 +39,7 @@ Jira integration — shows your assigned tickets grouped by parent story. Auto-d
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `tickets.enabled` | boolean or null | `null` (auto) | Set `false` to explicitly disable. When null or omitted, auto-detects via mcpproxy. Set `true` with manual overrides to skip auto-detection. |
-| `tickets.jql` | string or null | `null` | JQL query override. When null, uses `assignee = currentUser() AND status != Done ORDER BY status ASC`. |
-| `tickets.cloudId` | string or null | `null` (auto) | Atlassian Cloud ID. Auto-detected from mcpproxy. Only set for manual override. |
-| `tickets.jiraSite` | string or null | `null` (auto) | Jira site URL. Auto-detected from mcpproxy. Only set for manual override. |
-| `tickets.mcpTool` | string or null | `null` (auto) | mcpproxy tool name for Jira search. Auto-detected from mcpproxy. Only set for manual override. |
+| `tickets.enabled` | boolean or null | `null` (auto) | Set `false` to explicitly disable. When null or omitted, auto-detects via mcpproxy. |
 
 ### pulls
 
