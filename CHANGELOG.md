@@ -131,7 +131,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - cmux workspace and notification monitoring
 - Claude Loops plugin data integration
 - GitHub PR fetching via `gh` CLI
-- Jira ticket fetching via mcpproxy CLI
+- Jira ticket fetching via MCP
 - In-memory notification queue with dismiss/restore
 - Vanilla JS frontend dashboard (no build step)
 - PWA support for full-screen installation
