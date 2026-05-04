@@ -1,13 +1,14 @@
 import { createServer } from "node:http";
 import { readFileSync, existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
-import { join, extname } from "node:path";
+import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { WebSocketServer } from "ws";
 import { Queue } from "./queue.js";
 import { Monitor } from "./monitor.js";
 import * as cmux from "./cmux.js";
 import { execFile } from "node:child_process";
+import { readBody, serveStatic, jsonResponse } from "./utils.js";
 import config, { HOME } from "./config.js";
 import loops from "./tabs/loops.js";
 import pulls from "./tabs/pulls.js";
@@ -17,13 +18,6 @@ const __dirname = fileURLToPath(new URL(".", import.meta.url));
 const PUBLIC_DIR = join(__dirname, "..", "public");
 const DATA_DIR = join(__dirname, "..", "data");
 const PORT = process.env.PORT || config.port;
-
-const MIME_TYPES = {
-  ".html": "text/html",
-  ".css": "text/css",
-  ".js": "application/javascript",
-  ".json": "application/json",
-};
 
 // --- Tab registry ---
 // Each tab module exports: { status, data, init(onUpdate) }
@@ -70,28 +64,6 @@ function resolveCwd(repo) {
   return HOME;
 }
 
-async function readBody(req) {
-  const chunks = [];
-  for await (const chunk of req) chunks.push(chunk);
-  return JSON.parse(Buffer.concat(chunks).toString());
-}
-
-async function serveStatic(res, filePath) {
-  try {
-    const content = await readFile(filePath);
-    const ext = extname(filePath);
-    res.writeHead(200, { "Content-Type": MIME_TYPES[ext] || "text/plain" });
-    res.end(content);
-  } catch {
-    res.writeHead(404);
-    res.end("Not found");
-  }
-}
-
-function jsonResponse(res, data, status = 200) {
-  res.writeHead(status, { "Content-Type": "application/json" });
-  res.end(JSON.stringify(data));
-}
 
 const server = createServer(async (req, res) => {
   res.setHeader("Access-Control-Allow-Origin", "*");

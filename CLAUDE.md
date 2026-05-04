@@ -90,7 +90,6 @@ npm run version-check # Verify version bump before pushing
 - `src/tabs/loops.js` - Tab module: Claude Loops integration
 - `src/tabs/pulls.js` - Tab module: GitHub PR monitoring via `gh` CLI
 - `src/tabs/tickets.js` - Tab module: Jira tickets via MCP (auto-detected)
-- `config.schema.json` - JSON Schema for config.json (editor autocomplete)
 - `public/` - Vanilla JS frontend, no build step
 
 ### Tab Module Interface

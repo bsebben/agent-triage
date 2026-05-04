@@ -6,15 +6,12 @@ Agent Triage is configured via a `config.json` file in the project root. Copy th
 cp config.example.json config.json
 ```
 
-Add `"$schema": "./config.schema.json"` to your config for autocomplete and validation in VS Code.
-
 ## Defaults
 
 Most fields have sensible defaults. A minimal config only needs cmux paths (auto-detected on macOS):
 
 ```json
 {
-  "$schema": "./config.schema.json",
   "port": 7777,
   "cmux": { "binary": null, "socket": null },
   "tabs": {
@@ -37,8 +34,6 @@ All tabs live under the `tabs` key and are enabled by default. Each tab auto-det
 | Pulls | `gh` CLI | Shows install instructions |
 | Tickets | Jira MCP server | Shows setup hint |
 
-## Schema
-
-See [`config.schema.json`](config.schema.json) for the full field reference with types, defaults, and descriptions.
+Each tab module defines its own defaults. See the `defaults` export in each `src/tabs/*.js` file for available options.
 
 If auto-detection fails for cmux (required for the dashboard itself), the server exits with a clear message telling you which config field to set.

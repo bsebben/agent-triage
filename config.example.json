@@ -1,5 +1,4 @@
 {
-  "$schema": "./config.schema.json",
   "port": 7777,
   "cmux": {
     "binary": null,
