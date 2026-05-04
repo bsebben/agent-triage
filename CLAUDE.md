@@ -88,5 +88,5 @@ npm run version-check # Verify version bump before pushing
 - `src/queue.js` - In-memory queue with dismiss/restore
 - `src/loops.js` - Reads Claude Loops plugin data directory
 - `src/pulls.js` - Fetches PRs via `gh` CLI
-- `src/tickets.js` - Fetches Jira tickets via mcpproxy CLI
+- `src/tickets.js` - Fetches Jira tickets via mcpproxy CLI (auto-detected at startup)
 - `public/` - Vanilla JS frontend, no build step

@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.8.0] - 2026-05-04
+
+### Changed
+
+- Jira tickets are now zero-config: auto-detected via mcpproxy at startup, disabled silently when unavailable
+- Simplified ticket config to optional `jql` override; manual overrides still supported for backwards compat
+
 ## [1.7.1] - 2026-04-29
 
 ### Changed

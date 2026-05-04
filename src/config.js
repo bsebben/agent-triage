@@ -2,8 +2,11 @@
 import { readFileSync, existsSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { homedir } from "node:os";
-import { execFileSync } from "node:child_process";
+import { execFileSync, execFile } from "node:child_process";
+import { promisify } from "node:util";
 import { fileURLToPath } from "node:url";
+
+const execFileAsync = promisify(execFile);
 
 const __dirname = fileURLToPath(new URL(".", import.meta.url));
 const PROJECT_ROOT = join(__dirname, "..");
@@ -58,11 +61,11 @@ function resolve(raw) {
       installUrl: raw.loops?.installUrl || "https://silver-adventure-o3qwg53.pages.github.io/plugin.html?name=claude-loops",
     },
     tickets: {
-      enabled: raw.tickets?.enabled === true,
-      cloudId: raw.tickets?.cloudId || "",
-      jiraSite: raw.tickets?.jiraSite || "",
-      jql: raw.tickets?.jql || "",
-      mcpTool: raw.tickets?.mcpTool || "",
+      enabled: raw.tickets?.enabled,
+      cloudId: raw.tickets?.cloudId || null,
+      jiraSite: raw.tickets?.jiraSite || null,
+      jql: raw.tickets?.jql || null,
+      mcpTool: raw.tickets?.mcpTool || null,
     },
     pulls: {
       enabled: raw.pulls?.enabled !== false,
@@ -85,26 +88,84 @@ function resolve(raw) {
     config.loops.enabled = false;
   }
 
-  if (config.tickets.enabled) {
-    const missing = [];
-    if (!config.tickets.cloudId) missing.push("tickets.cloudId");
-    if (!config.tickets.jiraSite) missing.push("tickets.jiraSite");
-    if (!config.tickets.jql) missing.push("tickets.jql");
-    if (!config.tickets.mcpTool) missing.push("tickets.mcpTool");
-    if (missing.length > 0) {
-      console.error(`Tickets enabled but missing required fields: ${missing.join(", ")}`);
-      process.exit(1);
-    }
-  }
-
   // Log what was detected
   console.log(`Config: cmux binary = ${config.cmux.binary}`);
   console.log(`Config: cmux socket = ${config.cmux.socket}`);
   console.log(`Config: loops ${config.loops.enabled ? "enabled" : "disabled"}${config.loops.dataDir ? ` (${config.loops.dataDir})` : ""}`);
-  console.log(`Config: tickets ${config.tickets.enabled ? "enabled" : "disabled"}`);
   console.log(`Config: pulls ${config.pulls.enabled ? "enabled" : "disabled"}${config.pulls.orgFilter ? ` (orgs: ${config.pulls.orgFilter.join(", ")})` : ""}`);
 
   return Object.freeze(config);
+}
+
+const DEFAULT_JQL = "assignee = currentUser() AND status != Done ORDER BY status ASC";
+
+export const ticketConfig = {
+  enabled: false,
+  cloudId: null,
+  jiraSite: null,
+  jql: DEFAULT_JQL,
+  mcpTool: null,
+};
+
+async function detectJiraServer() {
+  const { stdout } = await execFileAsync("mcpproxy", ["upstream", "list", "--json"], { timeout: 5000 });
+  const servers = JSON.parse(stdout);
+  return servers.find((s) =>
+    /jira/i.test(s.name) && s.connected === true && s.health?.level === "healthy"
+  );
+}
+
+async function detectCloudInfo(serverName) {
+  const tool = `${serverName}:getAccessibleResources`;
+  const { stdout } = await execFileAsync(
+    "mcpproxy",
+    ["call", "tool-read", "-t", tool, "-j", "{}", "-o", "json"],
+    { timeout: 10000 },
+  );
+  const jsonStart = stdout.indexOf("[");
+  if (jsonStart === -1) throw new Error("No JSON array in getAccessibleResources response");
+  const resources = JSON.parse(stdout.slice(jsonStart));
+  if (!resources.length) throw new Error("No accessible Atlassian resources found");
+  const site = resources[0];
+  return { cloudId: site.id, jiraSite: site.url };
+}
+
+export async function initTickets() {
+  const raw = config.tickets;
+
+  if (raw.enabled === false) {
+    console.log("Config: tickets disabled (explicit)");
+    return;
+  }
+
+  if (raw.jql) ticketConfig.jql = raw.jql;
+
+  // Manual overrides: all three fields provided
+  if (raw.cloudId && raw.jiraSite && raw.mcpTool) {
+    ticketConfig.enabled = true;
+    ticketConfig.cloudId = raw.cloudId;
+    ticketConfig.jiraSite = raw.jiraSite;
+    ticketConfig.mcpTool = raw.mcpTool;
+    console.log(`Config: tickets enabled (manual — ${raw.jiraSite})`);
+    return;
+  }
+
+  try {
+    const server = await detectJiraServer();
+    if (!server) {
+      console.log("Config: tickets disabled (no healthy Jira server in mcpproxy)");
+      return;
+    }
+
+    const { cloudId, jiraSite } = await detectCloudInfo(server.name);
+    ticketConfig.enabled = true;
+    ticketConfig.cloudId = cloudId;
+    ticketConfig.jiraSite = jiraSite.replace(/\/$/, "");
+    ticketConfig.mcpTool = `${server.name}:searchJiraIssuesUsingJql`;
+    console.log(`Config: tickets enabled (auto-detected — ${ticketConfig.jiraSite})`);
+  } catch (err) {
+    console.warn(`Config: tickets disabled (auto-detect failed: ${err.message})`);
+  }
 }
 
 const config = resolve(loadConfigFile());

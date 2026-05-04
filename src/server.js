@@ -11,7 +11,7 @@ import { execFile } from "node:child_process";
 import { getLoopStatuses } from "./loops.js";
 import { getMyPulls } from "./pulls.js";
 import { getMyTickets } from "./tickets.js";
-import config, { HOME } from "./config.js";
+import config, { HOME, initTickets, ticketConfig } from "./config.js";
 
 const __dirname = fileURLToPath(new URL(".", import.meta.url));
 const PUBLIC_DIR = join(__dirname, "..", "public");
@@ -107,7 +107,7 @@ const server = createServer(async (req, res) => {
       return jsonResponse(res, {
         version: JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf-8")).version,
         loops: { enabled: config.loops.enabled, installUrl: config.loops.installUrl },
-        tickets: { enabled: config.tickets.enabled },
+        tickets: { enabled: ticketConfig.enabled },
         pulls: { enabled: config.pulls.enabled },
       });
     }
@@ -259,8 +259,10 @@ async function pollTickets() {
   }
 }
 
+await initTickets();
+
 server.listen(PORT, () => {
-  console.log(`Agent Triage v1.0.0 running at http://localhost:${PORT}`);
+  console.log(`Agent Triage running at http://localhost:${PORT}`);
   monitor.start();
   if (config.loops.enabled) {
     pollLoops();
@@ -270,7 +272,7 @@ server.listen(PORT, () => {
     pollPulls();
     setInterval(pollPulls, 2 * 60 * 1000);
   }
-  if (config.tickets.enabled) {
+  if (ticketConfig.enabled) {
     pollTickets();
     setInterval(pollTickets, 3 * 60 * 1000);
   }

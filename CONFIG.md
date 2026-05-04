@@ -35,15 +35,15 @@ Claude Loops integration — monitors autonomous loop agents running in the back
 
 ### tickets
 
-Jira integration — shows your assigned tickets grouped by parent story.
+Jira integration — shows your assigned tickets grouped by parent story. Auto-detected at startup via mcpproxy: if a healthy Jira MCP server is found, tickets are enabled with no configuration needed.
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `tickets.enabled` | boolean | `false` | Show the Tickets tab. Requires [mcpproxy](https://github.com/anthropics/mcpproxy) and a Jira MCP server. Leave false if you don't have Jira integration. |
-| `tickets.cloudId` | string | `""` | Your Atlassian Cloud ID (UUID). Find it at `https://yoursite.atlassian.net/_edge/tenant_info`. Required when enabled. |
-| `tickets.jiraSite` | string | `""` | Your Jira site URL, e.g. `https://yourcompany.atlassian.net`. Used to build ticket links. Required when enabled. |
-| `tickets.jql` | string | *(example)* | JQL query for fetching tickets. The default fetches all non-Done tickets assigned to you. Change the project key to match your Jira project. |
-| `tickets.mcpTool` | string | `""` | The mcpproxy tool name for Jira search, e.g. `Jira_Confluence_MyOrg:searchJiraIssuesUsingJql`. Depends on your MCP server naming. |
+| `tickets.enabled` | boolean or null | `null` (auto) | Set `false` to explicitly disable. When null or omitted, auto-detects via mcpproxy. Set `true` with manual overrides to skip auto-detection. |
+| `tickets.jql` | string or null | `null` | JQL query override. When null, uses `assignee = currentUser() AND status != Done ORDER BY status ASC`. |
+| `tickets.cloudId` | string or null | `null` (auto) | Atlassian Cloud ID. Auto-detected from mcpproxy. Only set for manual override. |
+| `tickets.jiraSite` | string or null | `null` (auto) | Jira site URL. Auto-detected from mcpproxy. Only set for manual override. |
+| `tickets.mcpTool` | string or null | `null` (auto) | mcpproxy tool name for Jira search. Auto-detected from mcpproxy. Only set for manual override. |
 
 ### pulls
 
@@ -62,16 +62,10 @@ When a field is set to `null`, the server resolves it at startup and logs the re
 Config: cmux binary = /Applications/cmux.app/Contents/Resources/bin/cmux
 Config: cmux socket = /Users/you/Library/Application Support/cmux/cmux.sock
 Config: loops enabled (/Users/you/.claude/plugins/data/claude-loops-my-plugin)
-Config: tickets disabled
 Config: pulls enabled
+Config: tickets enabled (auto-detected — https://yourcompany.atlassian.net)
 ```
+
+Ticket auto-detection runs `mcpproxy upstream list --json` to find a healthy Jira MCP server, then calls `getAccessibleResources` to resolve the Atlassian Cloud ID and site URL. If mcpproxy isn't available or no Jira server is found, tickets are silently disabled.
 
 If auto-detection fails for a required field (e.g., cmux not found), the server exits with a clear message telling you which config field to set.
-
-## Validation
-
-When a feature is enabled, the server validates that all required fields are present. For example, enabling tickets without setting `cloudId` produces:
-
-```
-Tickets enabled but missing required fields: tickets.cloudId, tickets.jiraSite, tickets.jql, tickets.mcpTool
-```

@@ -2,24 +2,23 @@
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 
-import config from "./config.js";
+import { ticketConfig } from "./config.js";
 
 const execFileAsync = promisify(execFile);
-const JIRA_SITE = config.tickets.jiraSite;
-const JQL = config.tickets.jql;
-const MCP_TOOL = config.tickets.mcpTool;
 const FIELDS = ["summary", "status", "issuetype", "parent"];
 
 export async function getMyTickets() {
-  if (!config.tickets.enabled) return [];
+  if (!ticketConfig.enabled) return [];
+
+  const { cloudId, jiraSite, jql, mcpTool } = ticketConfig;
 
   try {
     const { stdout } = await execFileAsync(
       "mcpproxy",
       [
         "call", "tool-read",
-        "-t", MCP_TOOL,
-        "-j", JSON.stringify({ cloudId: config.tickets.cloudId, jql: JQL, fields: FIELDS }),
+        "-t", mcpTool,
+        "-j", JSON.stringify({ cloudId, jql, fields: FIELDS }),
         "-o", "json",
       ],
       { timeout: 30000, maxBuffer: 1024 * 1024 },
@@ -31,7 +30,7 @@ export async function getMyTickets() {
     if (!textContent) return [];
 
     const issues = extractIssues(textContent);
-    return groupByParent(issues);
+    return groupByParent(issues, jiraSite);
   } catch (err) {
     console.error("Tickets fetch error:", err.message);
     return [];
@@ -116,7 +115,7 @@ function extractIssues(text) {
   return [];
 }
 
-function groupByParent(issues) {
+function groupByParent(issues, jiraSite) {
   const groups = new Map();
   const standalone = [];
 
@@ -127,7 +126,7 @@ function groupByParent(issues) {
       summary: f.summary,
       status: f.status?.name || "Unknown",
       type: f.issuetype?.name || "Task",
-      url: `${JIRA_SITE}/browse/${issue.key}`,
+      url: `${jiraSite}/browse/${issue.key}`,
     };
 
     const parent = f.parent;
@@ -138,7 +137,7 @@ function groupByParent(issues) {
           key: parentKey,
           summary: parent.fields?.summary || parentKey,
           type: parent.fields?.issuetype?.name || "Story",
-          url: `${JIRA_SITE}/browse/${parentKey}`,
+          url: `${jiraSite}/browse/${parentKey}`,
           tickets: [],
         });
       }

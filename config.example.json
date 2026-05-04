@@ -10,11 +10,7 @@
     "installUrl": "https://silver-adventure-o3qwg53.pages.github.io/plugin.html?name=claude-loops"
   },
   "tickets": {
-    "enabled": false,
-    "cloudId": "",
-    "jiraSite": "",
-    "jql": "project = MYPROJECT AND assignee = currentUser() AND status != Done ORDER BY status ASC",
-    "mcpTool": ""
+    "jql": null
   },
   "pulls": {
     "enabled": true,
