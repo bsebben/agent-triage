@@ -9,8 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
-- Jira tickets are now zero-config: auto-detected via mcpproxy at startup, disabled silently when unavailable
-- Simplified ticket config to optional `jql` override; manual overrides still supported for backwards compat
+- All optional tabs (Loops, Pulls, Tickets) are now enabled by default with auto-detection; missing dependencies show a setup hint instead of hiding the tab
+- Jira tickets are zero-config: auto-detected at startup when a Jira MCP server is available
 
 ## [1.7.1] - 2026-04-29
 

@@ -47,7 +47,7 @@ See [CONFIG.md](CONFIG.md) for the full reference of every field.
 
 **Claude Loops** — enabled by default if the plugin is installed. If not, the Loops tab shows an install link. Install via the [Claude Code marketplace](https://silver-adventure-o3qwg53.pages.github.io/plugin.html?name=claude-loops).
 
-**Jira Tickets** — disabled by default. Requires [mcpproxy](https://github.com/anthropics/mcpproxy) with a Jira MCP server. Set `tickets.enabled` to `true` and fill in your Jira cloud ID, site URL, JQL query, and MCP tool name. See [CONFIG.md](CONFIG.md) for details.
+**Jira Tickets** — enabled by default. Automatically detects a running Jira MCP server at startup. If Jira isn't available, the tab shows a setup hint. Set `tickets.enabled` to `false` to hide the tab. See [CONFIG.md](CONFIG.md) for details.
 
 ## Tabs
 

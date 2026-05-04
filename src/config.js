@@ -140,7 +140,7 @@ export async function initTickets() {
   try {
     const server = await detectJiraServer();
     if (!server) {
-      ticketConfig.hint = "No healthy Jira server found. Make sure mcpproxy is running with a Jira MCP server configured.";
+      ticketConfig.hint = "No Jira server found. Make sure your Jira MCP server is authenticated and running.";
       console.log("Config: tickets enabled (no Jira server found)");
       return;
     }

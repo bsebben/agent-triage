@@ -58,6 +58,6 @@ All tabs are enabled by default and auto-detect their dependencies at startup. I
 |-----|-----------|--------------------------|
 | Loops | claude-loops plugin | Shows install link |
 | Pulls | `gh` CLI | Shows install instructions |
-| Tickets | mcpproxy + Jira MCP server | Shows setup hint |
+| Tickets | Jira MCP server | Shows setup hint |
 
 If auto-detection fails for cmux (required for the dashboard itself), the server exits with a clear message telling you which config field to set.
