@@ -116,16 +116,20 @@ async function detectJiraServer() {
 }
 
 async function detectCloudInfo(serverName) {
-  const tool = `${serverName}:getAccessibleResources`;
+  const tool = `${serverName}:getAccessibleAtlassianResources`;
   const { stdout } = await execFileAsync(
     "mcpproxy",
     ["call", "tool-read", "-t", tool, "-j", "{}", "-o", "json"],
     { timeout: 10000 },
   );
-  const jsonStart = stdout.indexOf("[");
-  if (jsonStart === -1) throw new Error("No JSON array in getAccessibleResources response");
-  const resources = JSON.parse(stdout.slice(jsonStart));
-  if (!resources.length) throw new Error("No accessible Atlassian resources found");
+  // mcpproxy wraps responses in { content: [{ text: "..." }] }
+  const jsonStart = stdout.indexOf("{");
+  if (jsonStart === -1) throw new Error("No JSON in getAccessibleResources response");
+  const raw = JSON.parse(stdout.slice(jsonStart));
+  const text = raw?.content?.[0]?.text;
+  if (!text) throw new Error("Empty getAccessibleResources response");
+  const resources = JSON.parse(text);
+  if (!Array.isArray(resources) || !resources.length) throw new Error("No accessible Atlassian resources found");
   const site = resources[0];
   return { cloudId: site.id, jiraSite: site.url };
 }
