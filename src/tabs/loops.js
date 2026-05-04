@@ -1,27 +1,23 @@
-// src/loops.js — Tab module for Claude Loops integration
+// src/loops.js — Tab module: Claude Loops integration
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import yaml from "js-yaml";
-import config from "./config.js";
+import config from "../config.js";
 
 const DATA_DIR = config.loops.dataDir;
 const CONFIG_PATH = DATA_DIR ? join(DATA_DIR, "config.yml") : null;
 const STATE_DIR = DATA_DIR ? join(DATA_DIR, "state") : null;
 
-export const status = {
+const status = {
   enabled: config.loops.enabled,
   available: !!DATA_DIR,
   hint: DATA_DIR ? null : "Claude Loops plugin not found.",
   installUrl: config.loops.installUrl,
 };
 
-export const pollInterval = 5 * 60 * 1000;
+let data = [];
 
-export async function init() {
-  console.log(`Config: loops ${status.enabled ? "enabled" : "disabled"}${DATA_DIR ? ` (${DATA_DIR})` : " (plugin not found)"}`);
-}
-
-export async function poll() {
+async function poll() {
   const loopConfig = await loadConfig();
   const loops = [];
 
@@ -42,7 +38,19 @@ export async function poll() {
     });
   }
 
-  return loops;
+  data = loops;
+}
+
+async function init(onUpdate) {
+  console.log(`Config: loops ${status.enabled ? "enabled" : "disabled"}${DATA_DIR ? ` (${DATA_DIR})` : " (plugin not found)"}`);
+  if (!status.enabled || !status.available) return;
+
+  const doPoll = async () => {
+    try { await poll(); onUpdate(); }
+    catch (err) { console.error("Loops poll error:", err.message); }
+  };
+  await doPoll();
+  setInterval(doPoll, 5 * 60 * 1000);
 }
 
 async function loadConfig() {
@@ -75,3 +83,5 @@ function timeAgo(isoString) {
   const d = Math.floor(h / 24);
   return `${d}d ago`;
 }
+
+export default { status, get data() { return data; }, init };

@@ -1,13 +1,13 @@
-// src/tickets.js — Tab module for Jira ticket integration
+// src/tickets.js — Tab module: Jira ticket integration
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import config from "./config.js";
+import config from "../config.js";
 
 const execFileAsync = promisify(execFile);
 const DEFAULT_JQL = "assignee = currentUser() AND status != Done ORDER BY status ASC";
 const FIELDS = ["summary", "status", "issuetype", "parent"];
 
-export const status = {
+const status = {
   enabled: config.tickets.enabled,
   available: false,
   hint: null,
@@ -20,9 +20,37 @@ const detected = {
   mcpTool: null,
 };
 
-export const pollInterval = 3 * 60 * 1000;
+let data = [];
 
-export async function init() {
+async function poll() {
+  const { cloudId, jiraSite, jql, mcpTool } = detected;
+
+  try {
+    const { stdout } = await execFileAsync(
+      "mcpproxy",
+      [
+        "call", "tool-read",
+        "-t", mcpTool,
+        "-j", JSON.stringify({ cloudId, jql, fields: FIELDS }),
+        "-o", "json",
+      ],
+      { timeout: 30000, maxBuffer: 1024 * 1024 },
+    );
+    const jsonStart = stdout.indexOf("{");
+    if (jsonStart === -1) return;
+    const raw = JSON.parse(stdout.slice(jsonStart));
+    const textContent = raw?.content?.[0]?.text;
+    if (!textContent) return;
+
+    const issues = extractIssues(textContent);
+    const result = groupByParent(issues, jiraSite);
+    if (result.length > 0) data = result;
+  } catch (err) {
+    console.error("Tickets fetch error:", err.message);
+  }
+}
+
+async function init(onUpdate) {
   if (!status.enabled) return;
 
   try {
@@ -42,35 +70,15 @@ export async function init() {
   } catch (err) {
     status.hint = `Jira auto-detection failed: ${err.message}`;
     console.log(`Config: tickets enabled (auto-detect failed: ${err.message})`);
+    return;
   }
-}
 
-export async function poll() {
-  const { cloudId, jiraSite, jql, mcpTool } = detected;
-
-  try {
-    const { stdout } = await execFileAsync(
-      "mcpproxy",
-      [
-        "call", "tool-read",
-        "-t", mcpTool,
-        "-j", JSON.stringify({ cloudId, jql, fields: FIELDS }),
-        "-o", "json",
-      ],
-      { timeout: 30000, maxBuffer: 1024 * 1024 },
-    );
-    const jsonStart = stdout.indexOf("{");
-    if (jsonStart === -1) return [];
-    const raw = JSON.parse(stdout.slice(jsonStart));
-    const textContent = raw?.content?.[0]?.text;
-    if (!textContent) return [];
-
-    const issues = extractIssues(textContent);
-    return groupByParent(issues, jiraSite);
-  } catch (err) {
-    console.error("Tickets fetch error:", err.message);
-    return [];
-  }
+  const doPoll = async () => {
+    try { await poll(); onUpdate(); }
+    catch (err) { console.error("Tickets poll error:", err.message); }
+  };
+  await doPoll();
+  setInterval(doPoll, 3 * 60 * 1000);
 }
 
 // --- Jira server detection ---
@@ -90,16 +98,29 @@ async function detectCloudInfo(serverName) {
     ["call", "tool-read", "-t", tool, "-j", "{}", "-o", "json"],
     { timeout: 10000 },
   );
-  // mcpproxy wraps responses in { content: [{ text: "..." }] }
-  const jsonStart = stdout.indexOf("{");
-  if (jsonStart === -1) throw new Error("No JSON in getAccessibleResources response");
-  const raw = JSON.parse(stdout.slice(jsonStart));
-  const text = raw?.content?.[0]?.text;
-  if (!text) throw new Error("Empty getAccessibleResources response");
-  const resources = JSON.parse(text);
-  if (!Array.isArray(resources) || !resources.length) throw new Error("No accessible Atlassian resources found");
+  // mcpproxy double-wraps some MCP responses (Go map[] inside JSON).
+  const resources = extractJsonArray(stdout);
+  if (!resources.length) throw new Error("No accessible Atlassian resources found");
   const site = resources[0];
   return { cloudId: site.id, jiraSite: site.url };
+}
+
+function extractJsonArray(text) {
+  const match = text.match(/\[\\?"?\{\\?"id\\?"/);
+  if (!match) return [];
+  const slice = text.slice(match.index);
+  const unescaped = slice.includes('\\"') ? slice.replace(/\\"/g, '"').replace(/\\\\/g, "\\") : slice;
+  let depth = 0;
+  for (let i = 0; i < unescaped.length; i++) {
+    if (unescaped[i] === "[") depth++;
+    else if (unescaped[i] === "]") {
+      depth--;
+      if (depth === 0) {
+        try { return JSON.parse(unescaped.slice(0, i + 1)); } catch { return []; }
+      }
+    }
+  }
+  return [];
 }
 
 // --- Response parsing ---
@@ -223,3 +244,5 @@ function groupByParent(issues, jiraSite) {
   }
   return result;
 }
+
+export default { status, get data() { return data; }, init };

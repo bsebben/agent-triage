@@ -9,9 +9,9 @@ import { Monitor } from "./monitor.js";
 import * as cmux from "./cmux.js";
 import { execFile } from "node:child_process";
 import config, { HOME } from "./config.js";
-import * as loops from "./loops.js";
-import * as pulls from "./pulls.js";
-import * as tickets from "./tickets.js";
+import loops from "./tabs/loops.js";
+import pulls from "./tabs/pulls.js";
+import tickets from "./tabs/tickets.js";
 
 const __dirname = fileURLToPath(new URL(".", import.meta.url));
 const PUBLIC_DIR = join(__dirname, "..", "public");
@@ -26,11 +26,10 @@ const MIME_TYPES = {
 };
 
 // --- Tab registry ---
-// Each tab module exports: status, pollInterval, init(), poll()
-// To add a new tab: create a module, import it, add it here.
+// Each tab module exports: { status, data, init(onUpdate) }
+// Modules manage their own polling. To add a new tab: create a module, import it, add it here.
 
 const tabs = { loops, pulls, tickets };
-const tabData = { loops: [], pulls: { mine: [], reviews: [] }, tickets: [] };
 
 // --- Queue + WebSocket ---
 
@@ -45,22 +44,19 @@ function broadcast() {
   queue.save(join(DATA_DIR, "queue.json")).catch(() => {});
 }
 
-function broadcastUpdate() {
-  broadcast();
-}
+const monitor = new Monitor(queue, { onUpdate: broadcast });
 
-const monitor = new Monitor(queue, { onUpdate: broadcastUpdate });
-
-function getQueueData() {
+function getFullData() {
+  const tabData = {};
+  for (const [name, tab] of Object.entries(tabs)) {
+    tabData[name] = tab.data;
+  }
   return {
     groups: queue.grouped(),
     dismissed: queue.dismissedItems(),
     stats: queue.stats(),
+    ...tabData,
   };
-}
-
-function getFullData() {
-  return { ...getQueueData(), ...tabData };
 }
 
 function resolveCwd(repo) {
@@ -210,14 +206,14 @@ const server = createServer(async (req, res) => {
     if (req.url === "/api/dismiss" && req.method === "POST") {
       const { id } = await readBody(req);
       queue.dismiss(id);
-      broadcastUpdate();
+      broadcast();
       return jsonResponse(res, { ok: true });
     }
 
     if (req.url === "/api/restore" && req.method === "POST") {
       const { id } = await readBody(req);
       queue.restore(id);
-      broadcastUpdate();
+      broadcast();
       return jsonResponse(res, { ok: true });
     }
   } catch (err) {
@@ -238,30 +234,13 @@ wss.on("connection", (ws) => {
   ws.send(JSON.stringify({ type: "update", data: getFullData() }));
 });
 
-// --- Init + polling ---
+// --- Init ---
 
-for (const [name, tab] of Object.entries(tabs)) {
-  await tab.init();
+for (const tab of Object.values(tabs)) {
+  await tab.init(broadcast);
 }
 
 server.listen(PORT, () => {
   console.log(`Agent Triage running at http://localhost:${PORT}`);
   monitor.start();
-
-  for (const [name, tab] of Object.entries(tabs)) {
-    if (!tab.status.enabled || !tab.status.available) continue;
-
-    const doPoll = async () => {
-      try {
-        const result = await tab.poll();
-        if (result != null) tabData[name] = result;
-        broadcast();
-      } catch (err) {
-        console.error(`${name} poll error:`, err.message);
-      }
-    };
-
-    doPoll();
-    setInterval(doPoll, tab.pollInterval);
-  }
 });

@@ -86,18 +86,17 @@ npm run version-check # Verify version bump before pushing
 - `src/cmux.js` - Persistent socket RPC to cmux
 - `src/monitor.js` - Polls cmux for workspace/notification state
 - `src/queue.js` - In-memory queue with dismiss/restore
-- `src/loops.js` - Tab module: Claude Loops integration
-- `src/pulls.js` - Tab module: GitHub PR monitoring via `gh` CLI
-- `src/tickets.js` - Tab module: Jira tickets via MCP (auto-detected)
+- `src/tabs/loops.js` - Tab module: Claude Loops integration
+- `src/tabs/pulls.js` - Tab module: GitHub PR monitoring via `gh` CLI
+- `src/tabs/tickets.js` - Tab module: Jira tickets via MCP (auto-detected)
 - `config.schema.json` - JSON Schema for config.json (editor autocomplete)
 - `public/` - Vanilla JS frontend, no build step
 
 ### Tab Module Interface
 
-Each tab module (`loops.js`, `pulls.js`, `tickets.js`) exports:
+Each tab module in `src/tabs/` exports a single default object:
 - `status` — `{ enabled, available, hint, ...extra }` served via `/api/config`
-- `pollInterval` — milliseconds between polls
-- `init()` — async, detects dependencies, populates status
-- `poll()` — async, fetches and returns data
+- `data` — getter returning current poll data
+- `init(onUpdate)` — async, detects dependencies, starts polling, calls `onUpdate` on each poll
 
-To add a new tab: create a module with this interface, import it in `server.js`, and add it to the `tabs` registry.
+Modules manage their own polling internally. To add a new tab: create a module in `src/tabs/`, import it in `server.js`, and add it to the `tabs` object.
