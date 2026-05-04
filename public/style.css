@@ -532,7 +532,6 @@ main { padding: 8px; }
   border-collapse: collapse;
   font-size: 12px;
   margin: 0 8px;
-  table-layout: fixed;
 }
 
 .pulls-table th {
@@ -544,23 +543,16 @@ main { padding: 8px; }
   font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 0.5px;
+  white-space: nowrap;
 }
 
-.pull-status {
-  width: 80px;
-}
-
-.pull-ci {
-  width: 32px;
-  text-align: center;
+.pull-title { width: 100%; }
+.pull-status, .pull-ci, .pulls-table .row-action {
+  white-space: nowrap;
+  width: 1px;
   padding: 6px 4px;
 }
-
-.pulls-table .row-action {
-  width: 32px;
-  text-align: center;
-  padding: 6px 4px;
-}
+.pull-ci { text-align: center; }
 
 .pulls-table td {
   padding: 6px 8px;
