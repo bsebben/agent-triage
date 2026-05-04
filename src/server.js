@@ -16,6 +16,7 @@ import tickets from "./tabs/tickets.js";
 
 const __dirname = fileURLToPath(new URL(".", import.meta.url));
 const PUBLIC_DIR = join(__dirname, "..", "public");
+const TABS_DIR = join(__dirname, "tabs");
 const DATA_DIR = join(__dirname, "..", "data");
 const PORT = process.env.PORT || config.port;
 
@@ -197,6 +198,9 @@ const server = createServer(async (req, res) => {
   // Static files
   if (req.url === "/" || req.url === "/index.html") {
     return serveStatic(res, join(PUBLIC_DIR, "index.html"));
+  }
+  if (req.url.startsWith("/tabs/") && req.url.endsWith(".client.js")) {
+    return serveStatic(res, join(TABS_DIR, req.url.slice("/tabs/".length)));
   }
   return serveStatic(res, join(PUBLIC_DIR, req.url));
 });
