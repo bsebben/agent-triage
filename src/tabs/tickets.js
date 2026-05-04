@@ -40,8 +40,9 @@ async function init(tabConfig, onUpdate) {
     detected.mcpTool = `${server.name}:searchJiraIssuesUsingJql`;
     console.log(`Config: tickets enabled (${detected.jiraSite})`);
   } catch (err) {
-    tab.hint = `Jira auto-detection failed: ${err.message}`;
-    console.log(`Config: tickets enabled (auto-detect failed: ${err.message})`);
+    const friendly = friendlyError(err.message);
+    tab.hint = `Jira auto-detection failed. ${friendly}`;
+    console.log(`Config: tickets enabled (auto-detect failed: ${friendly})`);
     return;
   }
 
@@ -74,6 +75,14 @@ async function poll() {
   } catch (err) {
     console.error("Tickets fetch error:", err.message);
   }
+}
+
+function friendlyError(raw) {
+  if (raw.includes("rate limit")) return "Rate limited — will retry on next server restart.";
+  if (raw.includes("ENOENT")) return "mcpproxy not found. Make sure it's installed and in your PATH.";
+  if (raw.includes("timeout") || raw.includes("ETIMEDOUT")) return "Connection timed out. Check that your Jira MCP server is running.";
+  if (raw.includes("not found")) return "Jira tools not available on this MCP server.";
+  return "Check that your Jira MCP server is authenticated and running.";
 }
 
 // --- Jira server detection ---
