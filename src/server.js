@@ -237,8 +237,8 @@ wss.on("connection", (ws) => {
 
 // --- Init ---
 
-for (const tab of Object.values(tabs)) {
-  await tab.init(broadcast);
+for (const [name, tab] of Object.entries(tabs)) {
+  await tab.init(config[name], broadcast);
 }
 
 server.listen(PORT, () => {

@@ -1,22 +1,37 @@
-// src/loops.js — Tab module: Claude Loops integration
+// src/tabs/loops.js — Tab module: Claude Loops integration
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import yaml from "js-yaml";
-import config from "../config.js";
 import { startPolling } from "../utils.js";
 
-const DATA_DIR = config.loops.dataDir;
-const CONFIG_PATH = DATA_DIR ? join(DATA_DIR, "config.yml") : null;
-const STATE_DIR = DATA_DIR ? join(DATA_DIR, "state") : null;
-
+let cfg;
 let data = [];
 
+async function init(tabConfig, onUpdate) {
+  cfg = tabConfig;
+  const dataDir = cfg.dataDir;
+
+  tab.enabled = cfg.enabled;
+  tab.available = !!dataDir;
+  tab.hint = dataDir ? null : "Claude Loops plugin not found.";
+  tab.installUrl = cfg.installUrl;
+
+  console.log(`Config: loops ${cfg.enabled ? "enabled" : "disabled"}${dataDir ? ` (${dataDir})` : " (plugin not found)"}`);
+  if (!cfg.enabled || !dataDir) return;
+
+  await startPolling("Loops", poll, onUpdate, 5 * 60 * 1000);
+}
+
 async function poll() {
-  const loopConfig = await loadConfig();
+  const dataDir = cfg.dataDir;
+  const configPath = join(dataDir, "config.yml");
+  const stateDir = join(dataDir, "state");
+
+  const loopConfig = await loadYaml(configPath);
   const loops = [];
 
   for (const loop of loopConfig.loops || []) {
-    const state = await loadState(loop.name);
+    const state = await loadState(stateDir, loop.name);
     const schedule = loop.interval || loop.schedule || "—";
     const enabled = loop.enabled !== false;
 
@@ -35,25 +50,18 @@ async function poll() {
   data = loops;
 }
 
-async function init(onUpdate) {
-  console.log(`Config: loops ${config.loops.enabled ? "enabled" : "disabled"}${DATA_DIR ? ` (${DATA_DIR})` : " (plugin not found)"}`);
-  if (!config.loops.enabled || !DATA_DIR) return;
-
-  await startPolling("Loops", poll, onUpdate, 5 * 60 * 1000);
-}
-
-async function loadConfig() {
+async function loadYaml(path) {
   try {
-    const raw = await readFile(CONFIG_PATH, "utf-8");
+    const raw = await readFile(path, "utf-8");
     return yaml.load(raw) || {};
   } catch {
     return {};
   }
 }
 
-async function loadState(name) {
+async function loadState(stateDir, name) {
   try {
-    const raw = await readFile(join(STATE_DIR, `${name}.json`), "utf-8");
+    const raw = await readFile(join(stateDir, `${name}.json`), "utf-8");
     return JSON.parse(raw);
   } catch {
     return null;
@@ -73,11 +81,13 @@ function timeAgo(isoString) {
   return `${d}d ago`;
 }
 
-export default {
-  enabled: config.loops.enabled,
-  available: !!DATA_DIR,
-  hint: DATA_DIR ? null : "Claude Loops plugin not found.",
-  installUrl: config.loops.installUrl,
+const tab = {
+  enabled: false,
+  available: false,
+  hint: null,
+  installUrl: null,
   get data() { return data; },
   init,
 };
+
+export default tab;

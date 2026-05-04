@@ -1,7 +1,6 @@
-// src/pulls.js — Tab module: GitHub PR monitoring
+// src/tabs/pulls.js — Tab module: GitHub PR monitoring
 import { execFile, execFileSync } from "node:child_process";
 import { promisify } from "node:util";
-import config from "../config.js";
 import { startPolling } from "../utils.js";
 
 const execFileAsync = promisify(execFile);
@@ -12,7 +11,21 @@ const ghAvailable = (() => {
   catch { return false; }
 })();
 
+let cfg;
 let data = { mine: [], reviews: [] };
+
+async function init(tabConfig, onUpdate) {
+  cfg = tabConfig;
+
+  tab.enabled = cfg.enabled;
+  tab.available = ghAvailable;
+  tab.hint = ghAvailable ? null : "GitHub CLI (gh) not found. Install it with: brew install gh";
+
+  console.log(`Config: pulls ${cfg.enabled ? "enabled" : "disabled"}${ghAvailable ? "" : " (gh CLI not found)"}`);
+  if (!cfg.enabled || !ghAvailable) return;
+
+  await startPolling("Pulls", poll, onUpdate, 2 * 60 * 1000);
+}
 
 async function poll() {
   try {
@@ -21,13 +34,6 @@ async function poll() {
   } catch (err) {
     console.error("PR fetch error:", err.message);
   }
-}
-
-async function init(onUpdate) {
-  console.log(`Config: pulls ${config.pulls.enabled ? "enabled" : "disabled"}${ghAvailable ? "" : " (gh CLI not found)"}`);
-  if (!config.pulls.enabled || !ghAvailable) return;
-
-  await startPolling("Pulls", poll, onUpdate, 2 * 60 * 1000);
 }
 
 async function fetchAuthoredPrs() {
@@ -49,7 +55,7 @@ async function fetchReviewRequestedPrs() {
 }
 
 async function groupAndFetch(hits, filter, sortFn) {
-  const orgFilter = config.pulls.orgFilter;
+  const orgFilter = cfg.orgFilter;
   const byRepo = new Map();
   for (const hit of hits) {
     const repo = hit.repository.nameWithOwner;
@@ -120,10 +126,12 @@ function ciStatus(checks) {
   return "passing";
 }
 
-export default {
-  enabled: config.pulls.enabled,
-  available: ghAvailable,
-  hint: ghAvailable ? null : "GitHub CLI (gh) not found. Install it with: brew install gh",
+const tab = {
+  enabled: false,
+  available: false,
+  hint: null,
   get data() { return data; },
   init,
 };
+
+export default tab;

@@ -1,14 +1,11 @@
-// src/tickets.js — Tab module: Jira ticket integration
+// src/tabs/tickets.js — Tab module: Jira ticket integration
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import config from "../config.js";
 import { startPolling } from "../utils.js";
 
 const execFileAsync = promisify(execFile);
 const DEFAULT_JQL = "assignee = currentUser() AND status != Done ORDER BY status ASC";
 const FIELDS = ["summary", "status", "issuetype", "parent"];
-
-
 
 const detected = {
   cloudId: null,
@@ -18,6 +15,33 @@ const detected = {
 };
 
 let data = [];
+
+async function init(tabConfig, onUpdate) {
+  tab.enabled = tabConfig.enabled;
+  if (!tabConfig.enabled) return;
+
+  try {
+    const server = await detectJiraServer();
+    if (!server) {
+      tab.hint = "No Jira server found. Make sure your Jira MCP server is authenticated and running.";
+      console.log("Config: tickets enabled (no Jira server found)");
+      return;
+    }
+
+    const { cloudId, jiraSite } = await detectCloudInfo(server.name);
+    tab.available = true;
+    detected.cloudId = cloudId;
+    detected.jiraSite = jiraSite.replace(/\/$/, "");
+    detected.mcpTool = `${server.name}:searchJiraIssuesUsingJql`;
+    console.log(`Config: tickets enabled (${detected.jiraSite})`);
+  } catch (err) {
+    tab.hint = `Jira auto-detection failed: ${err.message}`;
+    console.log(`Config: tickets enabled (auto-detect failed: ${err.message})`);
+    return;
+  }
+
+  await startPolling("Tickets", poll, onUpdate, 3 * 60 * 1000);
+}
 
 async function poll() {
   const { cloudId, jiraSite, jql, mcpTool } = detected;
@@ -45,32 +69,6 @@ async function poll() {
   } catch (err) {
     console.error("Tickets fetch error:", err.message);
   }
-}
-
-async function init(onUpdate) {
-  if (!config.tickets.enabled) return;
-
-  try {
-    const server = await detectJiraServer();
-    if (!server) {
-      tab.hint = "No Jira server found. Make sure your Jira MCP server is authenticated and running.";
-      console.log("Config: tickets enabled (no Jira server found)");
-      return;
-    }
-
-    const { cloudId, jiraSite } = await detectCloudInfo(server.name);
-    tab.available = true;
-    detected.cloudId = cloudId;
-    detected.jiraSite = jiraSite.replace(/\/$/, "");
-    detected.mcpTool = `${server.name}:searchJiraIssuesUsingJql`;
-    console.log(`Config: tickets enabled (${detected.jiraSite})`);
-  } catch (err) {
-    tab.hint = `Jira auto-detection failed: ${err.message}`;
-    console.log(`Config: tickets enabled (auto-detect failed: ${err.message})`);
-    return;
-  }
-
-  await startPolling("Tickets", poll, onUpdate, 3 * 60 * 1000);
 }
 
 // --- Jira server detection ---
@@ -238,7 +236,7 @@ function groupByParent(issues, jiraSite) {
 }
 
 const tab = {
-  enabled: config.tickets.enabled,
+  enabled: false,
   available: false,
   hint: null,
   get data() { return data; },
