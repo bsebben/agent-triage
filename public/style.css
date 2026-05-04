@@ -546,15 +546,18 @@ main { padding: 8px; }
   letter-spacing: 0.5px;
 }
 
-.pulls-table th:nth-last-child(2),
-.pulls-table td:nth-last-child(2) {
-  width: 90px;
-  text-align: center;
+.pull-status {
+  width: 80px;
 }
 
-.pulls-table th:last-child,
-.pulls-table td:last-child {
-  width: 36px;
+.pull-ci {
+  width: 32px;
+  text-align: center;
+  padding: 6px 4px;
+}
+
+.pulls-table .row-action {
+  width: 32px;
   text-align: center;
   padding: 6px 4px;
 }
@@ -597,7 +600,6 @@ main { padding: 8px; }
 .pull-badge.status-comments { background: color-mix(in srgb, var(--clr-question) 20%, var(--card)); color: var(--clr-question); }
 .pull-badge.status-approved { background: color-mix(in srgb, var(--clr-completion) 20%, var(--card)); color: var(--clr-completion); }
 
-.pull-ci { text-align: center; }
 .ci-badge { font-weight: bold; }
 .ci-badge.ci-passing { color: var(--clr-completion); }
 .ci-badge.ci-failing { color: var(--clr-error); }

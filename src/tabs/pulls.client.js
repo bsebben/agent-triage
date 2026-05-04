@@ -151,7 +151,7 @@ function renderPullRow(pr, showAuthor, repo) {
   return `<tr class="pull-row" onclick="openExternal('${escapeHtml(pr.url)}')">
     <td class="pull-title"><span class="pull-number">#${pr.number}</span> ${escapeHtml(pr.title)}</td>
     ${showAuthor ? `<td class="pull-author">${escapeHtml(pr.author)}</td>` : ""}
-    <td><span class="pull-badge status-${pr.status}">${pr.status}</span></td>
+    <td class="pull-status"><span class="pull-badge status-${pr.status}">${pr.status}</span></td>
     <td class="pull-ci">${ciCell(pr.ci)}</td>
     <td class="row-action"><button class="agent-btn" title="Actions" data-pr-url="${escapeHtml(pr.url)}" onclick="event.stopPropagation(); openActionDrawerFromBtn(this)">${claudeIcon()}</button></td>
   </tr>`;
