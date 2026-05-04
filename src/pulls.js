@@ -5,7 +5,41 @@ import config from "./config.js";
 
 const execFileAsync = promisify(execFile);
 const PR_FIELDS = "number,title,isDraft,reviewDecision,latestReviews,statusCheckRollup,createdAt,url,headRefName,author";
+const TRANSIENT_PATTERNS = ["HTTP 504", "HTTP 503", "HTTP 502", "ECONNRESET", "ETIMEDOUT", "socket hang up"];
+const FETCH_CONCURRENCY = 4;
 
+async function withRetry(fn, maxAttempts = 3) {
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    try {
+      return await fn();
+    } catch (err) {
+      const isTransient = TRANSIENT_PATTERNS.some((p) => (err?.message ?? "").includes(p));
+      if (!isTransient || attempt === maxAttempts - 1) throw err;
+      await new Promise((res) => setTimeout(res, 600 * 2 ** attempt));
+    }
+  }
+}
+
+async function pMap(items, fn, concurrency) {
+  const results = new Array(items.length);
+  const queue = items.map((item, i) => ({ item, i }));
+  async function worker() {
+    let next;
+    while ((next = queue.shift())) {
+      results[next.i] = await fn(next.item);
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(concurrency, items.length) }, worker));
+  return results;
+}
+
+/**
+ * Fetches open PRs authored by and review-requested for the current user.
+ *
+ * Returns empty lists if pulls are disabled in config or any fetch fails.
+ *
+ * @returns {Promise<{mine: Array, reviews: Array}>}
+ */
 export async function getMyPulls() {
   if (!config.pulls.enabled) return { mine: [], reviews: [] };
   try {
@@ -81,15 +115,19 @@ async function groupAndFetch(hits, filter, sortFn) {
 
 async function fetchRepoPrs(repo, numbers, filter) {
   try {
-    const results = await Promise.all(
-      numbers.map(async (num) => {
-        const { stdout } = await execFileAsync(
-          "gh",
-          ["pr", "view", String(num), "--repo", repo, "--json", PR_FIELDS],
-          { timeout: 15000 },
+    const results = await pMap(
+      numbers,
+      async (num) => {
+        const { stdout } = await withRetry(() =>
+          execFileAsync(
+            "gh",
+            ["pr", "view", String(num), "--repo", repo, "--json", PR_FIELDS],
+            { timeout: 15000 },
+          )
         );
         return summarizePr(JSON.parse(stdout));
-      }),
+      },
+      FETCH_CONCURRENCY,
     );
     return results.filter(filter);
   } catch (err) {

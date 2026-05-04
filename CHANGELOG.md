@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.7.2] - 2026-05-04
+
+### Fixed
+
+- PR fetches no longer flood GitHub's API with unbounded concurrency; requests are capped at 4 in-flight per repo, and 504/503/502 errors are retried up to 3 times with exponential backoff before logging a failure.
+
 ## [1.7.1] - 2026-04-29
 
 ### Changed
