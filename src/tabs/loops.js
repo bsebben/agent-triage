@@ -3,6 +3,7 @@ import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import yaml from "js-yaml";
 import config from "../config.js";
+import { startPolling } from "../utils.js";
 
 const DATA_DIR = config.loops.dataDir;
 const CONFIG_PATH = DATA_DIR ? join(DATA_DIR, "config.yml") : null;
@@ -38,12 +39,7 @@ async function init(onUpdate) {
   console.log(`Config: loops ${config.loops.enabled ? "enabled" : "disabled"}${DATA_DIR ? ` (${DATA_DIR})` : " (plugin not found)"}`);
   if (!config.loops.enabled || !DATA_DIR) return;
 
-  const doPoll = async () => {
-    try { await poll(); onUpdate(); }
-    catch (err) { console.error("Loops poll error:", err.message); }
-  };
-  await doPoll();
-  setInterval(doPoll, 5 * 60 * 1000);
+  await startPolling("Loops", poll, onUpdate, 5 * 60 * 1000);
 }
 
 async function loadConfig() {

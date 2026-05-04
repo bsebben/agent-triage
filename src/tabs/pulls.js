@@ -2,6 +2,7 @@
 import { execFile, execFileSync } from "node:child_process";
 import { promisify } from "node:util";
 import config from "../config.js";
+import { startPolling } from "../utils.js";
 
 const execFileAsync = promisify(execFile);
 const PR_FIELDS = "number,title,isDraft,reviewDecision,latestReviews,statusCheckRollup,createdAt,url,headRefName,author";
@@ -26,12 +27,7 @@ async function init(onUpdate) {
   console.log(`Config: pulls ${config.pulls.enabled ? "enabled" : "disabled"}${ghAvailable ? "" : " (gh CLI not found)"}`);
   if (!config.pulls.enabled || !ghAvailable) return;
 
-  const doPoll = async () => {
-    try { await poll(); onUpdate(); }
-    catch (err) { console.error("Pulls poll error:", err.message); }
-  };
-  await doPoll();
-  setInterval(doPoll, 2 * 60 * 1000);
+  await startPolling("Pulls", poll, onUpdate, 2 * 60 * 1000);
 }
 
 async function fetchAuthoredPrs() {

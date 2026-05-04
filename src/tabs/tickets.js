@@ -2,6 +2,7 @@
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import config from "../config.js";
+import { startPolling } from "../utils.js";
 
 const execFileAsync = promisify(execFile);
 const DEFAULT_JQL = "assignee = currentUser() AND status != Done ORDER BY status ASC";
@@ -69,12 +70,7 @@ async function init(onUpdate) {
     return;
   }
 
-  const doPoll = async () => {
-    try { await poll(); onUpdate(); }
-    catch (err) { console.error("Tickets poll error:", err.message); }
-  };
-  await doPoll();
-  setInterval(doPoll, 3 * 60 * 1000);
+  await startPolling("Tickets", poll, onUpdate, 3 * 60 * 1000);
 }
 
 // --- Jira server detection ---
