@@ -597,8 +597,12 @@ main { padding: 8px; }
 .pull-badge.status-comments { background: color-mix(in srgb, var(--clr-question) 20%, var(--card)); color: var(--clr-question); }
 .pull-badge.status-approved { background: color-mix(in srgb, var(--clr-completion) 20%, var(--card)); color: var(--clr-completion); }
 
-.ci-check { color: var(--clr-completion); }
-.ci-x { color: var(--clr-error); }
+.pull-ci { text-align: center; }
+.ci-badge { font-weight: bold; }
+.ci-badge.ci-passing { color: var(--clr-completion); }
+.ci-badge.ci-failing { color: var(--clr-error); }
+.ci-badge.ci-running { color: var(--clr-waiting); }
+.ci-badge.ci-none { color: var(--muted); }
 
 .pulls-section-title {
   font-size: 13px;
