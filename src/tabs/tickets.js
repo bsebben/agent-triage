@@ -93,27 +93,38 @@ async function detectCloudInfo(serverName) {
     ["call", "tool-read", "-t", tool, "-j", "{}", "-o", "json"],
     { timeout: 10000 },
   );
-  // mcpproxy double-wraps some MCP responses (Go map[] inside JSON).
-  const resources = extractJsonArray(stdout);
+  // mcpproxy double-wraps MCP responses: outer JSON → text field with Go map[] → inner JSON → text with resources.
+  // Peel each layer by JSON-parsing, then extracting the text field, repeating until we find the resources array.
+  const resources = unwrapMcpResponse(stdout);
   if (!resources.length) throw new Error("No accessible Atlassian resources found");
   const site = resources[0];
   return { cloudId: site.id, jiraSite: site.url };
 }
 
-function extractJsonArray(text) {
-  const match = text.match(/\[\\?"?\{\\?"id\\?"/);
-  if (!match) return [];
-  const slice = text.slice(match.index);
-  const unescaped = slice.includes('\\"') ? slice.replace(/\\"/g, '"').replace(/\\\\/g, "\\") : slice;
-  let depth = 0;
-  for (let i = 0; i < unescaped.length; i++) {
-    if (unescaped[i] === "[") depth++;
-    else if (unescaped[i] === "]") {
-      depth--;
-      if (depth === 0) {
-        try { return JSON.parse(unescaped.slice(0, i + 1)); } catch { return []; }
-      }
+function unwrapMcpResponse(raw) {
+  let text = raw;
+  for (let i = 0; i < 5; i++) {
+    // Try parsing as a JSON array of resources
+    const arrayStart = text.indexOf("[{");
+    if (arrayStart >= 0) {
+      try {
+        const arr = JSON.parse(text.slice(arrayStart));
+        if (Array.isArray(arr) && arr[0]?.id) return arr;
+      } catch { /* not a complete array at this level */ }
     }
+    // Try parsing as a JSON object with content[0].text
+    const jsonStart = text.indexOf("{");
+    if (jsonStart >= 0) {
+      try {
+        const obj = JSON.parse(text.slice(jsonStart));
+        const inner = obj?.content?.[0]?.text;
+        if (inner) { text = inner; continue; }
+      } catch { /* not valid JSON, try extracting from Go map[] */ }
+    }
+    // Handle Go map[] serialization: map[text:{...} type:text]
+    const mapMatch = text.match(/map\[text:(\{.+\})\s+type:text\]/s);
+    if (mapMatch) { text = mapMatch[1]; continue; }
+    break;
   }
   return [];
 }

@@ -5,8 +5,8 @@
     "socket": null
   },
   "tabs": {
-    "loops": { "enabled": true },
-    "tickets": { "enabled": true },
-    "pulls": { "enabled": true }
+    "loops": {},
+    "tickets": {},
+    "pulls": {}
   }
 }
