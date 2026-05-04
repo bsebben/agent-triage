@@ -81,12 +81,23 @@ npm run version-check # Verify version bump before pushing
 
 ## Architecture
 
-- `src/server.js` - HTTP + WebSocket server, polls data sources on intervals
-- `src/config.js` - Config loader with auto-detection
+- `src/server.js` - HTTP + WebSocket server, tab registry, polling
+- `src/config.js` - Config loader (DEFAULTS + cmux detection, passes `config.tabs` to modules)
+- `src/utils.js` - Shared utilities (startPolling)
 - `src/cmux.js` - Persistent socket RPC to cmux
 - `src/monitor.js` - Polls cmux for workspace/notification state
 - `src/queue.js` - In-memory queue with dismiss/restore
-- `src/loops.js` - Reads Claude Loops plugin data directory
-- `src/pulls.js` - Fetches PRs via `gh` CLI
-- `src/tickets.js` - Fetches Jira tickets via mcpproxy CLI
+- `src/tabs/loops.js` - Tab module: Claude Loops integration
+- `src/tabs/pulls.js` - Tab module: GitHub PR monitoring via `gh` CLI
+- `src/tabs/tickets.js` - Tab module: Jira tickets via MCP (auto-detected)
 - `public/` - Vanilla JS frontend, no build step
+
+### Tab Module Interface
+
+Each tab module in `src/tabs/` exports:
+- `defaults` — named export, the tab's default config values
+- `default` — the tab object with: `enabled`, `available`, `hint`, `data` (getter), `init(tabConfig, onUpdate)`
+
+Modules define their own defaults, merge them with the config passed to `init()`, detect dependencies, and manage their own polling. Config.js has no tab-specific knowledge.
+
+To add a new tab: create a module in `src/tabs/`, import it in `server.js`, add it to the `tabs` object, and add its config under `tabs` in `config.schema.json`.

@@ -17,10 +17,9 @@ async function loadAppConfig() {
     if (appConfig.version) {
       document.querySelector(".app-version").textContent = `v${appConfig.version}`;
     }
-    // Hide tabs for disabled features
     for (const tab of ["loops", "tickets", "pulls"]) {
       const btn = document.querySelector(`.tab[data-tab="${tab}"]`);
-      if (btn && appConfig[tab]?.enabled === false) btn.style.display = "none";
+      if (btn) btn.style.display = appConfig[tab]?.enabled === false ? "none" : "";
     }
   } catch {}
 }

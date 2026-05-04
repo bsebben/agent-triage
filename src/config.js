@@ -1,5 +1,5 @@
 // src/config.js
-import { readFileSync, existsSync, readdirSync } from "node:fs";
+import { readFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import { homedir } from "node:os";
 import { execFileSync } from "node:child_process";
@@ -8,6 +8,11 @@ import { fileURLToPath } from "node:url";
 const __dirname = fileURLToPath(new URL(".", import.meta.url));
 const PROJECT_ROOT = join(__dirname, "..");
 const HOME = homedir();
+
+const DEFAULTS = {
+  port: 7777,
+  cmux: { binary: null, socket: null },
+};
 
 function loadConfigFile() {
   const configPath = join(PROJECT_ROOT, "config.json");
@@ -34,41 +39,15 @@ function detectCmuxSocket() {
   return existsSync(sock) ? sock : null;
 }
 
-function detectLoopsDataDir() {
-  const pluginsData = join(HOME, ".claude", "plugins", "data");
-  if (!existsSync(pluginsData)) return null;
-  const entries = readdirSync(pluginsData);
-  const matches = entries.filter((e) => e.startsWith("claude-loops"));
-  // Prefer the directory that has a state/ subdirectory with loop data
-  const withState = matches.find((e) => existsSync(join(pluginsData, e, "state")));
-  const match = withState || matches[0];
-  return match ? join(pluginsData, match) : null;
-}
-
 function resolve(raw) {
   const config = {
-    port: raw.port || 7777,
-    cmux: {
-      binary: raw.cmux?.binary || detectCmuxBinary(),
-      socket: raw.cmux?.socket || detectCmuxSocket(),
-    },
-    loops: {
-      enabled: raw.loops?.enabled !== false,
-      dataDir: raw.loops?.dataDir || detectLoopsDataDir(),
-      installUrl: raw.loops?.installUrl || "https://silver-adventure-o3qwg53.pages.github.io/plugin.html?name=claude-loops",
-    },
-    tickets: {
-      enabled: raw.tickets?.enabled === true,
-      cloudId: raw.tickets?.cloudId || "",
-      jiraSite: raw.tickets?.jiraSite || "",
-      jql: raw.tickets?.jql || "",
-      mcpTool: raw.tickets?.mcpTool || "",
-    },
-    pulls: {
-      enabled: raw.pulls?.enabled !== false,
-      orgFilter: raw.pulls?.orgFilter || null,
-    },
+    port: raw.port ?? DEFAULTS.port,
+    cmux: { ...DEFAULTS.cmux, ...raw.cmux },
+    tabs: raw.tabs || {},
   };
+
+  config.cmux.binary ??= detectCmuxBinary();
+  config.cmux.socket ??= detectCmuxSocket();
 
   if (!config.cmux.binary) {
     console.error("Could not find cmux. Set cmux.binary in config.json.");
@@ -79,30 +58,8 @@ function resolve(raw) {
     process.exit(1);
   }
 
-  if (config.loops.enabled && !config.loops.dataDir) {
-    console.warn("Claude Loops data directory not found — disabling Loops tab.");
-    console.warn("Install claude-loops or set loops.dataDir in config.json.");
-    config.loops.enabled = false;
-  }
-
-  if (config.tickets.enabled) {
-    const missing = [];
-    if (!config.tickets.cloudId) missing.push("tickets.cloudId");
-    if (!config.tickets.jiraSite) missing.push("tickets.jiraSite");
-    if (!config.tickets.jql) missing.push("tickets.jql");
-    if (!config.tickets.mcpTool) missing.push("tickets.mcpTool");
-    if (missing.length > 0) {
-      console.error(`Tickets enabled but missing required fields: ${missing.join(", ")}`);
-      process.exit(1);
-    }
-  }
-
-  // Log what was detected
   console.log(`Config: cmux binary = ${config.cmux.binary}`);
   console.log(`Config: cmux socket = ${config.cmux.socket}`);
-  console.log(`Config: loops ${config.loops.enabled ? "enabled" : "disabled"}${config.loops.dataDir ? ` (${config.loops.dataDir})` : ""}`);
-  console.log(`Config: tickets ${config.tickets.enabled ? "enabled" : "disabled"}`);
-  console.log(`Config: pulls ${config.pulls.enabled ? "enabled" : "disabled"}${config.pulls.orgFilter ? ` (orgs: ${config.pulls.orgFilter.join(", ")})` : ""}`);
 
   return Object.freeze(config);
 }

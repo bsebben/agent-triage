@@ -1,29 +1,32 @@
 import { createServer } from "node:http";
 import { readFileSync, existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
-import { join, extname } from "node:path";
+import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { WebSocketServer } from "ws";
 import { Queue } from "./queue.js";
 import { Monitor } from "./monitor.js";
 import * as cmux from "./cmux.js";
 import { execFile } from "node:child_process";
-import { getLoopStatuses } from "./loops.js";
-import { getMyPulls } from "./pulls.js";
-import { getMyTickets } from "./tickets.js";
+import { readBody, serveStatic, jsonResponse } from "./utils.js";
 import config, { HOME } from "./config.js";
+import loops from "./tabs/loops.js";
+import pulls from "./tabs/pulls.js";
+import tickets from "./tabs/tickets.js";
 
 const __dirname = fileURLToPath(new URL(".", import.meta.url));
 const PUBLIC_DIR = join(__dirname, "..", "public");
+const TABS_DIR = join(__dirname, "tabs");
 const DATA_DIR = join(__dirname, "..", "data");
 const PORT = process.env.PORT || config.port;
 
-const MIME_TYPES = {
-  ".html": "text/html",
-  ".css": "text/css",
-  ".js": "application/javascript",
-  ".json": "application/json",
-};
+// --- Tab registry ---
+// Each tab module exports: { status, data, init(onUpdate) }
+// Modules manage their own polling. To add a new tab: create a module, import it, add it here.
+
+const tabs = { loops, pulls, tickets };
+
+// --- Queue + WebSocket ---
 
 const queue = new Queue();
 await queue.load(join(DATA_DIR, "queue.json"));
@@ -36,26 +39,19 @@ function broadcast() {
   queue.save(join(DATA_DIR, "queue.json")).catch(() => {});
 }
 
-function broadcastUpdate() {
-  broadcast();
-}
+const monitor = new Monitor(queue, { onUpdate: broadcast });
 
-let loopsData = [];
-let pullsData = { mine: [], reviews: [] };
-let ticketsData = [];
-
-const monitor = new Monitor(queue, { onUpdate: broadcastUpdate });
-
-function getQueueData() {
+function getFullData() {
+  const tabData = {};
+  for (const [name, tab] of Object.entries(tabs)) {
+    tabData[name] = tab.data;
+  }
   return {
     groups: queue.grouped(),
     dismissed: queue.dismissedItems(),
     stats: queue.stats(),
+    ...tabData,
   };
-}
-
-function getFullData() {
-  return { ...getQueueData(), loops: loopsData, pulls: pullsData, tickets: ticketsData };
 }
 
 function resolveCwd(repo) {
@@ -69,28 +65,6 @@ function resolveCwd(repo) {
   return HOME;
 }
 
-async function readBody(req) {
-  const chunks = [];
-  for await (const chunk of req) chunks.push(chunk);
-  return JSON.parse(Buffer.concat(chunks).toString());
-}
-
-async function serveStatic(res, filePath) {
-  try {
-    const content = await readFile(filePath);
-    const ext = extname(filePath);
-    res.writeHead(200, { "Content-Type": MIME_TYPES[ext] || "text/plain" });
-    res.end(content);
-  } catch {
-    res.writeHead(404);
-    res.end("Not found");
-  }
-}
-
-function jsonResponse(res, data, status = 200) {
-  res.writeHead(status, { "Content-Type": "application/json" });
-  res.end(JSON.stringify(data));
-}
 
 const server = createServer(async (req, res) => {
   res.setHeader("Access-Control-Allow-Origin", "*");
@@ -104,11 +78,14 @@ const server = createServer(async (req, res) => {
     }
 
     if (req.url === "/api/config" && req.method === "GET") {
+      const tabConfigs = {};
+      for (const [name, tab] of Object.entries(tabs)) {
+        const { data, init, ...tabConfig } = tab;
+        tabConfigs[name] = tabConfig;
+      }
       return jsonResponse(res, {
         version: JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf-8")).version,
-        loops: { enabled: config.loops.enabled, installUrl: config.loops.installUrl },
-        tickets: { enabled: config.tickets.enabled },
-        pulls: { enabled: config.pulls.enabled },
+        ...tabConfigs,
       });
     }
 
@@ -203,14 +180,14 @@ const server = createServer(async (req, res) => {
     if (req.url === "/api/dismiss" && req.method === "POST") {
       const { id } = await readBody(req);
       queue.dismiss(id);
-      broadcastUpdate();
+      broadcast();
       return jsonResponse(res, { ok: true });
     }
 
     if (req.url === "/api/restore" && req.method === "POST") {
       const { id } = await readBody(req);
       queue.restore(id);
-      broadcastUpdate();
+      broadcast();
       return jsonResponse(res, { ok: true });
     }
   } catch (err) {
@@ -222,6 +199,9 @@ const server = createServer(async (req, res) => {
   if (req.url === "/" || req.url === "/index.html") {
     return serveStatic(res, join(PUBLIC_DIR, "index.html"));
   }
+  if (req.url.startsWith("/tabs/") && req.url.endsWith(".client.js")) {
+    return serveStatic(res, join(TABS_DIR, req.url.slice("/tabs/".length)));
+  }
   return serveStatic(res, join(PUBLIC_DIR, req.url));
 });
 
@@ -231,47 +211,13 @@ wss.on("connection", (ws) => {
   ws.send(JSON.stringify({ type: "update", data: getFullData() }));
 });
 
-async function pollLoops() {
-  try {
-    loopsData = await getLoopStatuses();
-    broadcast();
-  } catch (err) {
-    console.error("Loops poll error:", err.message);
-  }
-}
+// --- Init ---
 
-async function pollPulls() {
-  try {
-    pullsData = await getMyPulls();
-    broadcast();
-  } catch (err) {
-    console.error("Pulls poll error:", err.message);
-  }
-}
-
-async function pollTickets() {
-  try {
-    const result = await getMyTickets();
-    if (result.length > 0) ticketsData = result;
-    broadcast();
-  } catch (err) {
-    console.error("Tickets poll error:", err.message);
-  }
+for (const [name, tab] of Object.entries(tabs)) {
+  await tab.init(config.tabs[name] || {}, broadcast);
 }
 
 server.listen(PORT, () => {
-  console.log(`Agent Triage v1.0.0 running at http://localhost:${PORT}`);
+  console.log(`Agent Triage running at http://localhost:${PORT}`);
   monitor.start();
-  if (config.loops.enabled) {
-    pollLoops();
-    setInterval(pollLoops, 5 * 60 * 1000);
-  }
-  if (config.pulls.enabled) {
-    pollPulls();
-    setInterval(pollPulls, 2 * 60 * 1000);
-  }
-  if (config.tickets.enabled) {
-    pollTickets();
-    setInterval(pollTickets, 3 * 60 * 1000);
-  }
 });

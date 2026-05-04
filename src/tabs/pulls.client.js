@@ -40,6 +40,12 @@ function filterGroupsByStatus(groups, status) {
 }
 
 function renderPulls() {
+  const pullsCfg = appConfig.pulls || {};
+  if (!pullsCfg.available) {
+    const hint = escapeHtml(pullsCfg.hint || "GitHub CLI (gh) not found.");
+    queue.innerHTML = `<div class="empty-state">${hint}</div>`;
+    return;
+  }
   const pulls = state.pulls || { mine: [], reviews: [] };
   const mineCount = pulls.mine.reduce((n, g) => n + g.prs.length, 0);
   const reviewCount = pulls.reviews.reduce((n, g) => n + g.prs.length, 0);

@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.8.0] - 2026-05-04
+
+### Changed
+
+- All optional tabs (Loops, Pulls, Tickets) are now enabled by default with auto-detection; missing dependencies show a setup hint instead of hiding the tab
+- Jira tickets are zero-config: auto-detected at startup when a Jira MCP server is available
+
 ## [1.7.1] - 2026-04-29
 
 ### Changed
@@ -124,7 +131,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - cmux workspace and notification monitoring
 - Claude Loops plugin data integration
 - GitHub PR fetching via `gh` CLI
-- Jira ticket fetching via mcpproxy CLI
+- Jira ticket fetching via MCP
 - In-memory notification queue with dismiss/restore
 - Vanilla JS frontend dashboard (no build step)
 - PWA support for full-screen installation
