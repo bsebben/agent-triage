@@ -8,15 +8,6 @@ const DATA_DIR = config.loops.dataDir;
 const CONFIG_PATH = DATA_DIR ? join(DATA_DIR, "config.yml") : null;
 const STATE_DIR = DATA_DIR ? join(DATA_DIR, "state") : null;
 
-const tab = {
-  enabled: config.loops.enabled,
-  available: !!DATA_DIR,
-  hint: DATA_DIR ? null : "Claude Loops plugin not found.",
-  installUrl: config.loops.installUrl,
-  get data() { return data; },
-  init,
-};
-
 let data = [];
 
 async function poll() {
@@ -44,8 +35,8 @@ async function poll() {
 }
 
 async function init(onUpdate) {
-  console.log(`Config: loops ${tab.enabled ? "enabled" : "disabled"}${DATA_DIR ? ` (${DATA_DIR})` : " (plugin not found)"}`);
-  if (!tab.enabled || !tab.available) return;
+  console.log(`Config: loops ${config.loops.enabled ? "enabled" : "disabled"}${DATA_DIR ? ` (${DATA_DIR})` : " (plugin not found)"}`);
+  if (!config.loops.enabled || !DATA_DIR) return;
 
   const doPoll = async () => {
     try { await poll(); onUpdate(); }
@@ -86,4 +77,11 @@ function timeAgo(isoString) {
   return `${d}d ago`;
 }
 
-export default tab;
+export default {
+  enabled: config.loops.enabled,
+  available: !!DATA_DIR,
+  hint: DATA_DIR ? null : "Claude Loops plugin not found.",
+  installUrl: config.loops.installUrl,
+  get data() { return data; },
+  init,
+};

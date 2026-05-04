@@ -7,13 +7,7 @@ const execFileAsync = promisify(execFile);
 const DEFAULT_JQL = "assignee = currentUser() AND status != Done ORDER BY status ASC";
 const FIELDS = ["summary", "status", "issuetype", "parent"];
 
-const tab = {
-  enabled: config.tickets.enabled,
-  available: false,
-  hint: null,
-  get data() { return data; },
-  init,
-};
+
 
 const detected = {
   cloudId: null,
@@ -53,7 +47,7 @@ async function poll() {
 }
 
 async function init(onUpdate) {
-  if (!tab.enabled) return;
+  if (!config.tickets.enabled) return;
 
   try {
     const server = await detectJiraServer();
@@ -246,5 +240,13 @@ function groupByParent(issues, jiraSite) {
   }
   return result;
 }
+
+const tab = {
+  enabled: config.tickets.enabled,
+  available: false,
+  hint: null,
+  get data() { return data; },
+  init,
+};
 
 export default tab;
