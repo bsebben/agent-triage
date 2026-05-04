@@ -56,7 +56,7 @@ function resolve(raw) {
       socket: raw.cmux?.socket || detectCmuxSocket(),
     },
     loops: {
-      enabled: raw.loops?.enabled !== false,
+      enabled: raw.loops?.enabled,
       dataDir: raw.loops?.dataDir || detectLoopsDataDir(),
       installUrl: raw.loops?.installUrl || "https://silver-adventure-o3qwg53.pages.github.io/plugin.html?name=claude-loops",
     },
@@ -64,7 +64,7 @@ function resolve(raw) {
       enabled: raw.tickets?.enabled,
     },
     pulls: {
-      enabled: raw.pulls?.enabled !== false,
+      enabled: raw.pulls?.enabled,
       orgFilter: raw.pulls?.orgFilter || null,
     },
   };
@@ -78,17 +78,31 @@ function resolve(raw) {
     process.exit(1);
   }
 
-  if (config.loops.enabled && !config.loops.dataDir) {
-    console.warn("Claude Loops data directory not found — disabling Loops tab.");
-    console.warn("Install claude-loops or set loops.dataDir in config.json.");
+  if (config.loops.enabled === false) {
+    console.log("Config: loops disabled (explicit)");
+  } else if (config.loops.dataDir) {
+    config.loops.enabled = true;
+    console.log(`Config: loops enabled (${config.loops.dataDir})`);
+  } else {
     config.loops.enabled = false;
+    console.log("Config: loops disabled (claude-loops plugin not found)");
   }
 
-  // Log what was detected
+  if (config.pulls.enabled === false) {
+    console.log("Config: pulls disabled (explicit)");
+  } else {
+    try {
+      execFileSync("which", ["gh"], { encoding: "utf-8" });
+      config.pulls.enabled = true;
+      console.log(`Config: pulls enabled${config.pulls.orgFilter ? ` (orgs: ${config.pulls.orgFilter.join(", ")})` : ""}`);
+    } catch {
+      config.pulls.enabled = false;
+      console.log("Config: pulls disabled (gh CLI not found)");
+    }
+  }
+
   console.log(`Config: cmux binary = ${config.cmux.binary}`);
   console.log(`Config: cmux socket = ${config.cmux.socket}`);
-  console.log(`Config: loops ${config.loops.enabled ? "enabled" : "disabled"}${config.loops.dataDir ? ` (${config.loops.dataDir})` : ""}`);
-  console.log(`Config: pulls ${config.pulls.enabled ? "enabled" : "disabled"}${config.pulls.orgFilter ? ` (orgs: ${config.pulls.orgFilter.join(", ")})` : ""}`);
 
   return Object.freeze(config);
 }

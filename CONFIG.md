@@ -25,17 +25,17 @@ Connection settings for the cmux terminal multiplexer.
 
 ### loops
 
-Claude Loops integration — monitors autonomous loop agents running in the background.
+Claude Loops integration — monitors autonomous loop agents running in the background. Auto-detected at startup: enabled if the claude-loops plugin data directory is found.
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `loops.enabled` | boolean | `true` | Show the Loops tab. When true, auto-detects the plugin data directory. When false, shows an install prompt linking to `installUrl`. |
-| `loops.dataDir` | string or null | Auto-detect | Path to the claude-loops plugin data directory. When null, searches `~/.claude/plugins/data/` for a directory matching `claude-loops-*`. Set this if you have multiple loop plugins or a non-standard location. |
+| `loops.enabled` | boolean or null | `null` (auto) | Set `false` to explicitly disable. When null or omitted, enabled if claude-loops plugin is installed. |
+| `loops.dataDir` | string or null | Auto-detect | Path to the claude-loops plugin data directory. When null, searches `~/.claude/plugins/data/` for a directory matching `claude-loops-*`. |
 | `loops.installUrl` | string | *(marketplace link)* | URL shown when loops is not installed, linking to the claude-loops plugin installer. |
 
 ### tickets
 
-Jira integration — shows your assigned tickets grouped by parent story. Auto-detected at startup via mcpproxy: if a healthy Jira MCP server is found, tickets are enabled with no configuration needed.
+Jira integration — shows your assigned tickets grouped by parent story. Auto-detected at startup via mcpproxy: enabled if a healthy Jira MCP server is found.
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
@@ -43,25 +43,29 @@ Jira integration — shows your assigned tickets grouped by parent story. Auto-d
 
 ### pulls
 
-GitHub PR monitoring — shows your open PRs and incoming review requests.
+GitHub PR monitoring — shows your open PRs and incoming review requests. Auto-detected at startup: enabled if the `gh` CLI is installed.
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `pulls.enabled` | boolean | `true` | Show the Pull Requests tab. Requires the `gh` CLI, authenticated. |
+| `pulls.enabled` | boolean or null | `null` (auto) | Set `false` to explicitly disable. When null or omitted, enabled if `gh` CLI is found. |
 | `pulls.orgFilter` | string[] or null | `null` (all orgs) | Limit PR search to specific GitHub organizations. Example: `["MyCompany"]`. When null, searches all orgs you have access to. |
 
 ## Auto-Detection
 
-When a field is set to `null`, the server resolves it at startup and logs the result:
+All tabs (except Workspaces) are auto-detected at startup. Each tab checks for its dependency — if found, the tab is enabled; if not, it's silently disabled. Set `enabled: false` in any section to explicitly disable a tab.
 
 ```
-Config: cmux binary = /Applications/cmux.app/Contents/Resources/bin/cmux
-Config: cmux socket = /Users/you/Library/Application Support/cmux/cmux.sock
 Config: loops enabled (/Users/you/.claude/plugins/data/claude-loops-my-plugin)
 Config: pulls enabled
 Config: tickets enabled (auto-detected — https://yourcompany.atlassian.net)
+Config: cmux binary = /Applications/cmux.app/Contents/Resources/bin/cmux
+Config: cmux socket = /Users/you/Library/Application Support/cmux/cmux.sock
 ```
 
-Ticket auto-detection runs `mcpproxy upstream list --json` to find a healthy Jira MCP server, then calls `getAccessibleResources` to resolve the Atlassian Cloud ID and site URL. If mcpproxy isn't available or no Jira server is found, tickets are silently disabled.
+| Tab | Dependency | Detection |
+|-----|-----------|-----------|
+| Loops | claude-loops plugin | Searches `~/.claude/plugins/data/` for `claude-loops-*` directory |
+| Pulls | `gh` CLI | Checks `which gh` |
+| Tickets | mcpproxy + Jira MCP | Runs `mcpproxy upstream list --json`, finds a healthy Jira server, resolves Atlassian Cloud ID |
 
-If auto-detection fails for a required field (e.g., cmux not found), the server exits with a clear message telling you which config field to set.
+If auto-detection fails for cmux (required for the dashboard itself), the server exits with a clear message telling you which config field to set.

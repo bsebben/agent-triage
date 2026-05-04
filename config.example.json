@@ -4,14 +4,7 @@
     "binary": null,
     "socket": null
   },
-  "loops": {
-    "enabled": true,
-    "dataDir": null,
-    "installUrl": "https://silver-adventure-o3qwg53.pages.github.io/plugin.html?name=claude-loops"
-  },
+  "loops": {},
   "tickets": {},
-  "pulls": {
-    "enabled": true,
-    "orgFilter": null
-  }
+  "pulls": {}
 }
