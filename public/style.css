@@ -630,6 +630,19 @@ main { padding: 8px; }
 
 .pulls-filter-select:hover { border-color: var(--text-dim); }
 
+.pulls-filter-btn {
+  padding: 3px 8px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text-dim);
+  font-family: inherit;
+  font-size: 11px;
+  cursor: pointer;
+}
+.pulls-filter-btn:hover { border-color: var(--text-dim); color: var(--text); }
+.pulls-filter-btn.active { background: var(--card); color: var(--text); border-color: var(--text-dim); }
+
 .pulls-repo-group { margin-bottom: 8px; }
 
 .pulls-repo-name {

@@ -46,12 +46,21 @@ query($q: String!) {
         latestReviews(first: 10) {
           nodes { state }
         }
+        reviewRequests(first: 20) {
+          nodes {
+            requestedReviewer {
+              __typename
+              ... on User { login }
+            }
+          }
+        }
       }
     }
   }
 }`;
 
 let cfg;
+let currentUser = "";
 let data = { mine: [], reviews: [] };
 
 async function init(tabConfig, onUpdate) {
@@ -63,6 +72,11 @@ async function init(tabConfig, onUpdate) {
 
   console.log(`Config: pulls ${cfg.enabled ? "enabled" : "disabled"}${ghAvailable ? "" : " (gh CLI not found)"}`);
   if (!cfg.enabled || !ghAvailable) return;
+
+  try {
+    const { stdout } = await execFileAsync("gh", ["api", "user", "--jq", ".login"], { timeout: 10000 });
+    currentUser = stdout.trim();
+  } catch { /* non-fatal; directReview will always be false */ }
 
   await startPolling("Pulls", poll, onUpdate, 2 * 60 * 1000);
 }
@@ -122,6 +136,9 @@ function summarize(node) {
     author: node.author?.login || "",
     status: prStatus(node),
     ci: ciStatus(checks),
+    directReview: (node.reviewRequests?.nodes || []).some(
+      (r) => r.requestedReviewer?.__typename === "User" && r.requestedReviewer?.login === currentUser
+    ),
   };
 }
 

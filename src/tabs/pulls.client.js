@@ -3,6 +3,7 @@
 let pullsSubTab = "mine";
 let pullsAuthorFilter = "";
 let pullsStatusFilter = "";
+let pullsDirectFilter = false;
 
 function collectAuthors(groups) {
   const authors = new Set();
@@ -36,6 +37,12 @@ function filterGroupsByStatus(groups, status) {
   if (!status) return groups;
   return groups
     .map((g) => ({ ...g, prs: g.prs.filter((pr) => pr.status === status) }))
+    .filter((g) => g.prs.length > 0);
+}
+
+function filterGroupsByDirect(groups) {
+  return groups
+    .map((g) => ({ ...g, prs: g.prs.filter((pr) => pr.directReview) }))
     .filter((g) => g.prs.length > 0);
 }
 
@@ -73,15 +80,14 @@ function renderPulls() {
   } else {
     const authors = collectAuthors(pulls.reviews);
     const statuses = collectStatuses(pulls.reviews);
-    const hasFilters = authors.length > 1 || statuses.length > 1;
-    if (hasFilters) {
-      html += `<div class="pulls-filter-bar">`;
-      if (authors.length > 1) html += renderAuthorFilter(authors);
-      if (statuses.length > 1) html += renderStatusFilter(statuses);
-      html += `</div>`;
-    }
+    html += `<div class="pulls-filter-bar">`;
+    if (authors.length > 1) html += renderAuthorFilter(authors);
+    if (statuses.length > 1) html += renderStatusFilter(statuses);
+    html += `<button class="pulls-filter-btn${pullsDirectFilter ? " active" : ""}" onclick="togglePullsDirectFilter()">Assigned to me</button>`;
+    html += `</div>`;
     let filtered = filterGroupsByAuthor(pulls.reviews, pullsAuthorFilter);
     filtered = filterGroupsByStatus(filtered, pullsStatusFilter);
+    if (pullsDirectFilter) filtered = filterGroupsByDirect(filtered);
     const filteredCount = filtered.reduce((n, g) => n + g.prs.length, 0);
     if (filteredCount === 0) {
       html += `<div class="empty-state">No review requests</div>`;
@@ -123,10 +129,16 @@ function setPullsAuthorFilter(author) {
   renderPulls();
 }
 
+function togglePullsDirectFilter() {
+  pullsDirectFilter = !pullsDirectFilter;
+  renderPulls();
+}
+
 function switchPullsTab(tab) {
   pullsSubTab = tab;
   pullsAuthorFilter = "";
   pullsStatusFilter = "";
+  pullsDirectFilter = false;
   renderPulls();
 }
 

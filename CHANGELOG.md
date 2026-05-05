@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.9.0] - 2026-05-05
+
+### Added
+
+- "Assigned to me" toggle button on the Reviews tab — filters to PRs where you are a direct, named reviewer rather than a team member
+
 ## [1.8.2] - 2026-05-05
 
 ### Fixed
