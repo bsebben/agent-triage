@@ -77,8 +77,9 @@ function render() {
   else if (activeTab === "tickets") renderTickets();
 
   if (activeTab !== "workspaces") {
-    const cls = refreshState.cls ? ` ${refreshState.cls}` : "";
-    const text = refreshState.text || "\u21bb Refresh";
+    const rs = refreshStates[activeTab] || {};
+    const cls = rs.cls ? ` ${rs.cls}` : "";
+    const text = rs.text || "\u21bb Refresh";
     queue.insertAdjacentHTML("afterbegin",
       `<button class="refresh-btn${cls}" title="Refresh" onclick="refreshTab()">${text}</button>`);
   }
@@ -87,22 +88,23 @@ function render() {
   updateTabBadges();
 }
 
-let refreshState = {};
+const refreshStates = {};
 
 async function refreshTab() {
-  if (refreshState.cls === "refreshing") return;
-  refreshState = { cls: "refreshing", text: "\u21bb Refreshing\u2026" };
+  if (refreshStates[activeTab]?.cls === "refreshing") return;
+  const tab = activeTab;
+  refreshStates[tab] = { cls: "refreshing", text: "\u21bb Refreshing\u2026" };
   render();
   try {
-    const res = await fetch(`/api/refresh/${activeTab}`, { method: "POST" });
-    refreshState = res.ok
+    const res = await fetch(`/api/refresh/${tab}`, { method: "POST" });
+    refreshStates[tab] = res.ok
       ? { cls: "refresh-ok", text: "\u2713 Refreshed" }
       : { cls: "refresh-err", text: "\u2717 Failed" };
   } catch {
-    refreshState = { cls: "refresh-err", text: "\u2717 Failed" };
+    refreshStates[tab] = { cls: "refresh-err", text: "\u2717 Failed" };
   }
   render();
-  setTimeout(() => { refreshState = {}; render(); }, 1500);
+  setTimeout(() => { delete refreshStates[tab]; render(); }, 1500);
 }
 
 function updateTabBadges() {
