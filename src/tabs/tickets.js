@@ -25,32 +25,38 @@ async function init(tabConfig, onUpdate) {
   tab.enabled = cfg.enabled;
   if (!cfg.enabled) return;
 
-  try {
-    const server = await detectJiraServer();
-    if (!server) {
-      tab.hint = "No Jira server found. Make sure your Jira MCP server is authenticated and running.";
-      console.log("Config: tickets enabled (no Jira server found)");
-      return;
-    }
-
-    const { cloudId, jiraSite } = await detectCloudInfo(server.name);
-    tab.available = true;
-    detected.cloudId = cloudId;
-    detected.jiraSite = jiraSite.replace(/\/$/, "");
-    detected.mcpTool = `${server.name}:searchJiraIssuesUsingJql`;
-    console.log(`Config: tickets enabled (${detected.jiraSite})`);
-  } catch (err) {
-    const friendly = friendlyError(err.message);
-    tab.hint = `Jira auto-detection failed. ${friendly}`;
-    console.log(`Config: tickets enabled (auto-detect failed: ${friendly})`);
-    return;
-  }
-
   await startPolling("Tickets", poll, onUpdate, 3 * 60 * 1000);
 }
 
+async function detect() {
+  const server = await detectJiraServer();
+  if (!server) {
+    tab.hint = "No Jira server found. Make sure your Jira MCP server is authenticated and running.";
+    return false;
+  }
+
+  const { cloudId, jiraSite } = await detectCloudInfo(server.name);
+  tab.available = true;
+  tab.hint = null;
+  detected.cloudId = cloudId;
+  detected.jiraSite = jiraSite.replace(/\/$/, "");
+  detected.mcpTool = `${server.name}:searchJiraIssuesUsingJql`;
+  console.log(`Config: tickets enabled (${detected.jiraSite})`);
+  return true;
+}
+
 async function poll() {
+  if (!detected.mcpTool) {
+    try { await detect(); } catch (err) {
+      tab.hint = `Jira auto-detection failed. ${friendlyError(err.message)}`;
+      console.log(`[tickets] detection failed: ${friendlyError(err.message)}`);
+      return;
+    }
+    if (!detected.mcpTool) return;
+  }
+
   const { cloudId, jiraSite, jql, mcpTool } = detected;
+  console.log(`[tickets] polling: ${mcpTool}`);
 
   try {
     const { stdout } = await execFileAsync(
@@ -72,13 +78,16 @@ async function poll() {
     const issues = extractIssues(textContent);
     const result = groupByParent(issues, jiraSite);
     if (result.length > 0) data = result;
+    tab.hint = null;
   } catch (err) {
-    console.error("Tickets fetch error:", err.message);
+    const friendly = friendlyError(err.message);
+    tab.hint = friendly;
+    console.error(`[tickets] fetch error: ${friendly}`);
   }
 }
 
 function friendlyError(raw) {
-  if (raw.includes("rate limit")) return "Rate limited — will retry on next server restart.";
+  if (raw.includes("rate limit")) return "Rate limited — will retry on next poll.";
   if (raw.includes("ENOENT")) return "mcpproxy not found. Make sure it's installed and in your PATH.";
   if (raw.includes("timeout") || raw.includes("ETIMEDOUT")) return "Connection timed out. Check that your Jira MCP server is running.";
   if (raw.includes("not found")) return "Jira tools not available on this MCP server.";

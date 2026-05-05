@@ -1,16 +1,17 @@
 // public/tab-tickets.js
 
 function renderTickets() {
-  const ticketsCfg = appConfig.tickets || {};
-  if (!ticketsCfg.available) {
-    const hint = escapeHtml(ticketsCfg.hint || "Jira not detected. Make sure your Jira MCP server is authenticated and running.");
+  const ticketStatus = state.tabStatus?.tickets || appConfig.tickets || {};
+  if (!ticketStatus.available) {
+    const hint = escapeHtml(ticketStatus.hint || "Jira not detected. Make sure your Jira MCP server is authenticated and running.");
     queue.innerHTML = `<div class="empty-state">${hint}</div>`;
     return;
   }
   const groups = state.tickets || [];
   const totalTickets = groups.reduce((n, g) => n + g.tickets.length, 0);
   if (totalTickets === 0) {
-    queue.innerHTML = `<div class="empty-state">No assigned tickets</div>`;
+    const hint = ticketStatus.hint ? escapeHtml(ticketStatus.hint) : "No assigned tickets";
+    queue.innerHTML = `<div class="empty-state">${hint}</div>`;
     return;
   }
   queue.innerHTML = `<div class="tickets-section">

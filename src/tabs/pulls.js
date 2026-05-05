@@ -80,11 +80,13 @@ async function poll() {
 }
 
 async function searchPrs(query, filter, sortFn) {
+  console.log(`[pulls] polling: ${query}`);
   const { stdout } = await execFileAsync(
     "gh", ["api", "graphql", "-F", `query=${PR_QUERY}`, "-F", `q=${query}`],
     { timeout: 30000 },
   );
   const nodes = JSON.parse(stdout).data.search.nodes;
+  console.log(`[pulls] got ${nodes.length} results`);
 
   const orgFilter = cfg.orgFilter;
   const byRepo = new Map();

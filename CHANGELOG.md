@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.8.2] - 2026-05-05
+
+### Fixed
+
+- Jira detection now retries on each poll instead of failing permanently at startup
+- Ticket fetch errors (rate limits, timeouts) shown in the tab instead of "No assigned tickets"
+- Tab status (hints, availability) streams via WebSocket for real-time updates
+- Poll errors show friendly one-line messages instead of raw mcpproxy stderr
+
 ## [1.8.1] - 2026-05-04
 
 ### Fixed

@@ -43,14 +43,18 @@ const monitor = new Monitor(queue, { onUpdate: broadcast });
 
 function getFullData() {
   const tabData = {};
+  const tabStatus = {};
   for (const [name, tab] of Object.entries(tabs)) {
     tabData[name] = tab.data;
+    const { data, init, ...status } = tab;
+    tabStatus[name] = status;
   }
   return {
     groups: queue.grouped(),
     dismissed: queue.dismissedItems(),
     stats: queue.stats(),
     ...tabData,
+    tabStatus,
   };
 }
 

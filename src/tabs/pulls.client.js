@@ -40,7 +40,7 @@ function filterGroupsByStatus(groups, status) {
 }
 
 function renderPulls() {
-  const pullsCfg = appConfig.pulls || {};
+  const pullsCfg = state.tabStatus?.pulls || appConfig.pulls || {};
   if (!pullsCfg.available) {
     const hint = escapeHtml(pullsCfg.hint || "GitHub CLI (gh) not found.");
     queue.innerHTML = `<div class="empty-state">${hint}</div>`;
