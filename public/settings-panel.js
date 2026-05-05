@@ -7,17 +7,35 @@ const MAX_DISPLAY_LINES = 200;
 function toggleSettingsPanel() {
   settingsOpen = !settingsOpen;
   let panel = document.getElementById("settings-panel");
+  let backdrop = document.getElementById("settings-backdrop");
+
   if (settingsOpen) {
+    if (!backdrop) {
+      backdrop = document.createElement("div");
+      backdrop.id = "settings-backdrop";
+      backdrop.addEventListener("click", () => toggleSettingsPanel());
+      document.body.appendChild(backdrop);
+    }
     if (!panel) {
       panel = document.createElement("div");
       panel.id = "settings-panel";
       document.body.appendChild(panel);
     }
     renderSettings();
-    panel.classList.add("open");
-  } else if (panel) {
-    panel.classList.remove("open");
+    requestAnimationFrame(() => {
+      backdrop.classList.add("open");
+      panel.classList.add("open");
+    });
+    document.addEventListener("keydown", settingsKeyHandler);
+  } else {
+    if (panel) panel.classList.remove("open");
+    if (backdrop) backdrop.classList.remove("open");
+    document.removeEventListener("keydown", settingsKeyHandler);
   }
+}
+
+function settingsKeyHandler(e) {
+  if (e.key === "Escape") toggleSettingsPanel();
 }
 
 function renderSettings() {

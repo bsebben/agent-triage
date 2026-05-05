@@ -40,8 +40,15 @@ header {
 .header-row {
   display: flex;
   align-items: baseline;
-  justify-content: space-between;
+  gap: 8px;
   margin-bottom: 4px;
+}
+
+.header-right {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-left: auto;
 }
 
 header h1 {
@@ -1093,6 +1100,17 @@ main { padding: 8px; position: relative; }
   transition: color 0.15s;
 }
 .settings-btn:hover { color: var(--text); }
+
+#settings-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 199;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease;
+}
+#settings-backdrop.open { opacity: 1; pointer-events: auto; }
 
 #settings-panel {
   position: fixed;
