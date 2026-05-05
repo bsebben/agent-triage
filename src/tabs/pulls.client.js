@@ -4,6 +4,7 @@ let pullsSubTab = "mine";
 let pullsAuthorFilter = "";
 let pullsStatusFilter = "";
 let pullsDirectFilter = false;
+const collapsedPullRepos = new Set();
 
 function collectAuthors(groups) {
   const authors = new Set();
@@ -75,7 +76,7 @@ function renderPulls() {
     if (filteredCount === 0) {
       html += `<div class="empty-state">No open pull requests</div>`;
     } else {
-      html += filtered.map((g) => renderPullGroup(g, false)).join("");
+      html += filtered.map((g) => renderPullGroup(g, false, "mine")).join("");
     }
   } else {
     const authors = collectAuthors(pulls.reviews);
@@ -92,7 +93,7 @@ function renderPulls() {
     if (filteredCount === 0) {
       html += `<div class="empty-state">No review requests</div>`;
     } else {
-      html += filtered.map((g) => renderPullGroup(g, true)).join("");
+      html += filtered.map((g) => renderPullGroup(g, true, "reviews")).join("");
     }
   }
 
@@ -142,13 +143,30 @@ function switchPullsTab(tab) {
   renderPulls();
 }
 
-function renderPullGroup(group, showAuthor) {
+function togglePullRepo(key, header) {
+  if (collapsedPullRepos.has(key)) {
+    collapsedPullRepos.delete(key);
+  } else {
+    collapsedPullRepos.add(key);
+  }
+  toggleGroup(header);
+}
+
+function renderPullGroup(group, showAuthor, subTab) {
+  const key = `${subTab}:${group.repo}`;
+  const isCollapsed = collapsedPullRepos.has(key);
   return `<div class="pulls-repo-group">
-    <div class="pulls-repo-name">${escapeHtml(group.repo)}</div>
-    <table class="pulls-table">
-      <thead><tr><th>PR</th>${showAuthor ? "<th>Author</th>" : ""}<th>Status</th><th>CI</th><th></th></tr></thead>
-      <tbody>${group.prs.map((pr) => renderPullRow(pr, showAuthor, group.repo)).join("")}</tbody>
-    </table>
+    <div class="pulls-repo-group-header" data-repo-key="${escapeHtml(key)}" onclick="togglePullRepo('${escapeHtml(key)}', this)">
+      <span class="chevron${isCollapsed ? " collapsed" : ""}">▼</span>
+      ${escapeHtml(group.repo)}
+      <span class="pulls-repo-count">(${group.prs.length})</span>
+    </div>
+    <div class="group-items${isCollapsed ? " collapsed" : ""}">
+      <table class="pulls-table">
+        <thead><tr><th>PR</th>${showAuthor ? "<th>Author</th>" : ""}<th>Status</th><th>CI</th><th></th></tr></thead>
+        <tbody>${group.prs.map((pr) => renderPullRow(pr, showAuthor, group.repo)).join("")}</tbody>
+      </table>
+    </div>
   </div>`;
 }
 
