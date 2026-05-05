@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.11.0] - 2026-05-05
+
+### Added
+
+- Settings panel with live server logs, resolved config display, and restart button
+- Backdrop overlays on all drawers/panels — click outside or press Escape to close
+
 ## [1.10.0] - 2026-05-05
 
 ### Added

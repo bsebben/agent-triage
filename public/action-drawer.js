@@ -1,7 +1,7 @@
 // public/action-drawer.js — side drawer with vertical action tabs and item metadata
 
 let drawerEl = null;
-let drawerOutsideHandler = null;
+let drawerBackdrop = null;
 let drawerKeyHandler = null;
 
 function findPrByUrl(url) {
@@ -87,6 +87,12 @@ function renderDrawerContent(item, type, repo) {
 }
 
 function openActionDrawer(item, type, repo) {
+  if (!drawerBackdrop) {
+    drawerBackdrop = document.createElement("div");
+    drawerBackdrop.className = "drawer-backdrop";
+    drawerBackdrop.addEventListener("click", closeActionDrawer);
+    document.body.appendChild(drawerBackdrop);
+  }
   if (!drawerEl) {
     drawerEl = document.createElement("div");
     drawerEl.className = "action-drawer";
@@ -106,18 +112,11 @@ function openActionDrawer(item, type, repo) {
     });
   });
 
-  // Open with next-frame transition trigger so the slide-in animates
-  requestAnimationFrame(() => drawerEl.classList.add("open"));
+  requestAnimationFrame(() => {
+    drawerBackdrop.classList.add("open");
+    drawerEl.classList.add("open");
+  });
 
-  if (!drawerOutsideHandler) {
-    drawerOutsideHandler = (e) => {
-      if (!drawerEl) return;
-      if (drawerEl.contains(e.target)) return;
-      if (e.target.closest(".agent-btn")) return;
-      closeActionDrawer();
-    };
-    document.addEventListener("mousedown", drawerOutsideHandler);
-  }
   if (!drawerKeyHandler) {
     drawerKeyHandler = (e) => {
       if (e.key === "Escape") closeActionDrawer();
@@ -127,12 +126,8 @@ function openActionDrawer(item, type, repo) {
 }
 
 function closeActionDrawer() {
-  if (!drawerEl) return;
-  drawerEl.classList.remove("open");
-  if (drawerOutsideHandler) {
-    document.removeEventListener("mousedown", drawerOutsideHandler);
-    drawerOutsideHandler = null;
-  }
+  if (drawerEl) drawerEl.classList.remove("open");
+  if (drawerBackdrop) drawerBackdrop.classList.remove("open");
   if (drawerKeyHandler) {
     document.removeEventListener("keydown", drawerKeyHandler);
     drawerKeyHandler = null;
