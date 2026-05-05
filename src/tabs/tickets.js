@@ -84,7 +84,7 @@ async function poll() {
 }
 
 function friendlyError(raw) {
-  if (raw.includes("rate limit")) return "Rate limited — will retry automatically.";
+  if (raw.includes("rate limit")) return "Rate limited — will retry on next poll.";
   if (raw.includes("ENOENT")) return "mcpproxy not found. Make sure it's installed and in your PATH.";
   if (raw.includes("timeout") || raw.includes("ETIMEDOUT")) return "Connection timed out. Check that your Jira MCP server is running.";
   if (raw.includes("not found")) return "Jira tools not available on this MCP server.";
