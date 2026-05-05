@@ -25,7 +25,7 @@ async function init(tabConfig, onUpdate) {
   tab.enabled = cfg.enabled;
   if (!cfg.enabled) return;
 
-  await startPolling("Tickets", poll, onUpdate, 3 * 60 * 1000);
+  tab.refresh = await startPolling("Tickets", poll, onUpdate, 3 * 60 * 1000);
 }
 
 async function detect() {

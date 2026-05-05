@@ -75,8 +75,26 @@ function render() {
   else if (activeTab === "loops") renderLoops();
   else if (activeTab === "pulls") renderPulls();
   else if (activeTab === "tickets") renderTickets();
+
+  if (activeTab !== "workspaces") {
+    const existing = queue.querySelector(".refresh-btn");
+    if (!existing) {
+      queue.insertAdjacentHTML("afterbegin",
+        `<button class="refresh-btn" title="Refresh" onclick="refreshTab()">&#x21bb;</button>`);
+    }
+  }
+
   selectedIndex = -1;
   updateTabBadges();
+}
+
+async function refreshTab() {
+  const btn = queue.querySelector(".refresh-btn");
+  if (btn) btn.classList.add("spinning");
+  try {
+    await fetch(`/api/refresh/${activeTab}`, { method: "POST" });
+  } catch {}
+  if (btn) setTimeout(() => btn.classList.remove("spinning"), 500);
 }
 
 function updateTabBadges() {

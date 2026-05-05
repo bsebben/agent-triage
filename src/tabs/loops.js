@@ -38,7 +38,7 @@ async function init(tabConfig, onUpdate) {
   console.log(`Config: loops ${cfg.enabled ? "enabled" : "disabled"}${dataDir ? ` (${dataDir})` : " (plugin not found)"}`);
   if (!cfg.enabled || !dataDir) return;
 
-  await startPolling("Loops", poll, onUpdate, 5 * 60 * 1000);
+  tab.refresh = await startPolling("Loops", poll, onUpdate, 5 * 60 * 1000);
 }
 
 async function poll() {

@@ -93,6 +93,14 @@ const server = createServer(async (req, res) => {
       });
     }
 
+    if (req.url?.startsWith("/api/refresh/") && req.method === "POST") {
+      const name = req.url.slice("/api/refresh/".length);
+      const tab = tabs[name];
+      if (!tab?.refresh) return jsonResponse(res, { error: "unknown tab" }, 404);
+      tab.refresh();
+      return jsonResponse(res, { ok: true });
+    }
+
     if (req.url === "/api/changelog" && req.method === "GET") {
       try {
         const content = await readFile(join(__dirname, "..", "CHANGELOG.md"), "utf-8");
