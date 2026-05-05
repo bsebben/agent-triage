@@ -34,6 +34,8 @@ function connect() {
       applyRenames();
       applyCloses();
       if (!renaming) render();
+    } else if (msg.type === "log" || msg.type === "logs") {
+      if (typeof handleLogMessage === "function") handleLogMessage(msg);
     }
   };
   ws.onclose = () => setTimeout(connect, 2000);
