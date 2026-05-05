@@ -9,6 +9,7 @@ import { Monitor } from "./monitor.js";
 import * as cmux from "./cmux.js";
 import { execFile } from "node:child_process";
 import { readBody, serveStatic, jsonResponse } from "./utils.js";
+import { initLogs, getLines } from "./logs.js";
 import config, { HOME } from "./config.js";
 import loops from "./tabs/loops.js";
 import pulls from "./tabs/pulls.js";
@@ -25,6 +26,14 @@ const PORT = process.env.PORT || config.port;
 // Modules manage their own polling. To add a new tab: create a module, import it, add it here.
 
 const tabs = { loops, pulls, tickets };
+
+// --- Logs ---
+
+function sendToAll(payload) {
+  for (const client of wss.clients) {
+    if (client.readyState === 1) client.send(payload);
+  }
+}
 
 // --- Queue + WebSocket ---
 
@@ -89,6 +98,7 @@ const server = createServer(async (req, res) => {
       }
       return jsonResponse(res, {
         version: JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf-8")).version,
+        resolved: config,
         ...tabConfigs,
       });
     }
@@ -103,6 +113,16 @@ const server = createServer(async (req, res) => {
       } catch (err) {
         return jsonResponse(res, { error: err.message }, 500);
       }
+    }
+
+    if (req.url === "/api/logs" && req.method === "GET") {
+      return jsonResponse(res, getLines());
+    }
+
+    if (req.url === "/api/restart" && req.method === "POST") {
+      jsonResponse(res, { ok: true });
+      setTimeout(() => process.exit(0), 100);
+      return;
     }
 
     if (req.url === "/api/changelog" && req.method === "GET") {
@@ -223,8 +243,11 @@ const server = createServer(async (req, res) => {
 
 const wss = new WebSocketServer({ server });
 
+initLogs(sendToAll);
+
 wss.on("connection", (ws) => {
   ws.send(JSON.stringify({ type: "update", data: getFullData() }));
+  ws.send(JSON.stringify({ type: "logs", lines: getLines() }));
 });
 
 // --- Init ---

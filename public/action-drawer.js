@@ -1,8 +1,7 @@
 // public/action-drawer.js — side drawer with vertical action tabs and item metadata
 
 let drawerEl = null;
-let drawerOutsideHandler = null;
-let drawerKeyHandler = null;
+let closeDrawer = null;
 
 function findPrByUrl(url) {
   const pulls = state.pulls || { mine: [], reviews: [] };
@@ -87,11 +86,10 @@ function renderDrawerContent(item, type, repo) {
 }
 
 function openActionDrawer(item, type, repo) {
-  if (!drawerEl) {
-    drawerEl = document.createElement("div");
-    drawerEl.className = "action-drawer";
-    document.body.appendChild(drawerEl);
-  }
+  if (closeDrawer) closeDrawer();
+
+  drawerEl = document.createElement("div");
+  drawerEl.className = "action-drawer";
   drawerEl.dataset.type = type;
   drawerEl.innerHTML = renderDrawerContent(item, type, repo);
 
@@ -106,37 +104,13 @@ function openActionDrawer(item, type, repo) {
     });
   });
 
-  // Open with next-frame transition trigger so the slide-in animates
-  requestAnimationFrame(() => drawerEl.classList.add("open"));
-
-  if (!drawerOutsideHandler) {
-    drawerOutsideHandler = (e) => {
-      if (!drawerEl) return;
-      if (drawerEl.contains(e.target)) return;
-      if (e.target.closest(".agent-btn")) return;
-      closeActionDrawer();
-    };
-    document.addEventListener("mousedown", drawerOutsideHandler);
-  }
-  if (!drawerKeyHandler) {
-    drawerKeyHandler = (e) => {
-      if (e.key === "Escape") closeActionDrawer();
-    };
-    document.addEventListener("keydown", drawerKeyHandler);
-  }
+  closeDrawer = openOverlay(drawerEl, {
+    onClose: () => { drawerEl.remove(); drawerEl = null; closeDrawer = null; },
+  });
 }
 
 function closeActionDrawer() {
-  if (!drawerEl) return;
-  drawerEl.classList.remove("open");
-  if (drawerOutsideHandler) {
-    document.removeEventListener("mousedown", drawerOutsideHandler);
-    drawerOutsideHandler = null;
-  }
-  if (drawerKeyHandler) {
-    document.removeEventListener("keydown", drawerKeyHandler);
-    drawerKeyHandler = null;
-  }
+  if (closeDrawer) closeDrawer();
 }
 
 function openActionDrawerFromBtn(btn) {
