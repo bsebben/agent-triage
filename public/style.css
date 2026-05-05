@@ -149,7 +149,7 @@ main { padding: 8px; position: relative; }
   transition: color 0.15s, border-color 0.15s;
 }
 .refresh-btn:hover { color: var(--text); border-color: var(--text-dim); }
-.refresh-btn.spinning { animation: spin 0.5s linear; pointer-events: none; }
+.refresh-btn.refreshing { color: var(--text-dim); pointer-events: none; }
 .refresh-btn.refresh-ok { color: var(--clr-completion); border-color: var(--clr-completion); }
 .refresh-btn.refresh-err { color: var(--clr-error); border-color: var(--clr-error); }
 @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }

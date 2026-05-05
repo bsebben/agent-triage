@@ -90,15 +90,16 @@ function render() {
 
 async function refreshTab() {
   const btn = queue.querySelector(".refresh-btn");
-  if (!btn || btn.classList.contains("spinning")) return;
-  btn.classList.add("spinning");
+  if (!btn || btn.classList.contains("refreshing")) return;
+  btn.classList.add("refreshing");
+  btn.textContent = "\u21bb Refreshing\u2026";
   try {
     const res = await fetch(`/api/refresh/${activeTab}`, { method: "POST" });
-    btn.classList.remove("spinning");
+    btn.classList.remove("refreshing");
     btn.classList.add(res.ok ? "refresh-ok" : "refresh-err");
     btn.textContent = res.ok ? "\u2713 Refreshed" : "\u2717 Failed";
   } catch {
-    btn.classList.remove("spinning");
+    btn.classList.remove("refreshing");
     btn.classList.add("refresh-err");
     btn.textContent = "\u2717 Failed";
   }

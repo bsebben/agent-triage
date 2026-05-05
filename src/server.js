@@ -97,8 +97,12 @@ const server = createServer(async (req, res) => {
       const name = req.url.slice("/api/refresh/".length);
       const tab = tabs[name];
       if (!tab?.refresh) return jsonResponse(res, { error: "unknown tab" }, 404);
-      tab.refresh();
-      return jsonResponse(res, { ok: true });
+      try {
+        await tab.refresh();
+        return jsonResponse(res, { ok: true });
+      } catch (err) {
+        return jsonResponse(res, { error: err.message }, 500);
+      }
     }
 
     if (req.url === "/api/changelog" && req.method === "GET") {

@@ -16,7 +16,7 @@ export function startPolling(name, pollFn, onUpdate, intervalMs) {
   };
   doPoll();
   setInterval(doPoll, intervalMs);
-  return doPoll;
+  return async () => { await pollFn(); onUpdate(); };
 }
 
 export function timeAgo(isoString) {
