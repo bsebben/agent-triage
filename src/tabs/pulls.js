@@ -90,6 +90,7 @@ async function poll() {
     data = { mine, reviews };
   } catch (err) {
     console.error("PR fetch error:", err.message);
+    throw err;
   }
 }
 
