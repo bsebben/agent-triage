@@ -92,9 +92,26 @@ async function refreshTab() {
   const btn = queue.querySelector(".refresh-btn");
   if (btn) btn.classList.add("spinning");
   try {
-    await fetch(`/api/refresh/${activeTab}`, { method: "POST" });
-  } catch {}
+    const res = await fetch(`/api/refresh/${activeTab}`, { method: "POST" });
+    if (res.ok) {
+      showToast("Refreshed");
+    } else {
+      showToast("Refresh failed", true);
+    }
+  } catch {
+    showToast("Refresh failed", true);
+  }
   if (btn) setTimeout(() => btn.classList.remove("spinning"), 500);
+}
+
+function showToast(message, isError = false) {
+  const existing = document.querySelector(".toast");
+  if (existing) existing.remove();
+  const toast = document.createElement("div");
+  toast.className = `toast${isError ? " toast-error" : ""}`;
+  toast.textContent = message;
+  document.body.appendChild(toast);
+  setTimeout(() => toast.remove(), 2000);
 }
 
 function updateTabBadges() {
