@@ -80,7 +80,7 @@ function render() {
     const existing = queue.querySelector(".refresh-btn");
     if (!existing) {
       queue.insertAdjacentHTML("afterbegin",
-        `<button class="refresh-btn" title="Refresh" onclick="refreshTab()">&#x21bb;</button>`);
+        `<button class="refresh-btn" title="Refresh" onclick="refreshTab()">&#x21bb; Refresh</button>`);
     }
   }
 
