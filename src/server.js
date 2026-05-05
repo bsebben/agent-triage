@@ -98,6 +98,7 @@ const server = createServer(async (req, res) => {
       }
       return jsonResponse(res, {
         version: JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf-8")).version,
+        resolved: config,
         ...tabConfigs,
       });
     }

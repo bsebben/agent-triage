@@ -25,11 +25,14 @@ function renderSettings() {
   if (!panel) return;
 
   const tabStatuses = state.tabStatus || {};
-  const configSections = Object.entries(tabStatuses).map(([name, s]) => {
+  const tabRows = Object.entries(tabStatuses).map(([name, s]) => {
     const status = s.available ? '<span class="log-info">available</span>' : `<span class="log-error">unavailable</span>`;
     const hint = s.hint ? ` — ${escapeHtml(s.hint)}` : "";
     return `<div class="settings-config-row">${escapeHtml(name)}: ${status}${hint}</div>`;
   }).join("");
+
+  const resolved = appConfig.resolved || {};
+  const configJson = JSON.stringify(resolved, null, 2);
 
   const version = appConfig.version ? `v${appConfig.version}` : "";
 
@@ -43,7 +46,11 @@ function renderSettings() {
         <h3>Server ${version}</h3>
         <button class="settings-restart-btn" onclick="restartServer()">Restart</button>
       </div>
-      <div class="settings-config">${configSections}</div>
+      <div class="settings-config">${tabRows}</div>
+    </div>
+    <div class="settings-section">
+      <h3>Resolved Config</h3>
+      <pre class="settings-config-json">${escapeHtml(configJson)}</pre>
     </div>
     <div class="settings-section settings-logs-section">
       <h3>Server Logs</h3>

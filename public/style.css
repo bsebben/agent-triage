@@ -1184,3 +1184,15 @@ main { padding: 8px; position: relative; }
 .log-warn { color: var(--clr-waiting); }
 .log-error { color: var(--clr-error); }
 .log-empty { color: var(--text-dim); font-style: italic; }
+
+.settings-config-json {
+  background: var(--surface);
+  border-radius: 4px;
+  padding: 8px;
+  font-family: "SF Mono", Menlo, monospace;
+  font-size: 10px;
+  line-height: 1.5;
+  color: var(--text-dim);
+  overflow-x: auto;
+  white-space: pre;
+}
