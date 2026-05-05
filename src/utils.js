@@ -12,7 +12,7 @@ const MIME_TYPES = {
 export function startPolling(name, pollFn, onUpdate, intervalMs) {
   const doPoll = async () => {
     try { await pollFn(); onUpdate(); }
-    catch (err) { console.error(`${name} poll error:`, err.message); }
+    catch (err) { console.error(`[${name.toLowerCase()}] poll error: ${err.message.split("\n")[0]}`); }
   };
   doPoll();
   setInterval(doPoll, intervalMs);
