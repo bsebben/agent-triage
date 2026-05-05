@@ -1,8 +1,7 @@
 // public/action-drawer.js — side drawer with vertical action tabs and item metadata
 
 let drawerEl = null;
-let drawerBackdrop = null;
-let drawerKeyHandler = null;
+let closeDrawer = null;
 
 function findPrByUrl(url) {
   const pulls = state.pulls || { mine: [], reviews: [] };
@@ -87,17 +86,10 @@ function renderDrawerContent(item, type, repo) {
 }
 
 function openActionDrawer(item, type, repo) {
-  if (!drawerBackdrop) {
-    drawerBackdrop = document.createElement("div");
-    drawerBackdrop.className = "drawer-backdrop";
-    drawerBackdrop.addEventListener("click", closeActionDrawer);
-    document.body.appendChild(drawerBackdrop);
-  }
-  if (!drawerEl) {
-    drawerEl = document.createElement("div");
-    drawerEl.className = "action-drawer";
-    document.body.appendChild(drawerEl);
-  }
+  if (closeDrawer) closeDrawer();
+
+  drawerEl = document.createElement("div");
+  drawerEl.className = "action-drawer";
   drawerEl.dataset.type = type;
   drawerEl.innerHTML = renderDrawerContent(item, type, repo);
 
@@ -112,26 +104,13 @@ function openActionDrawer(item, type, repo) {
     });
   });
 
-  requestAnimationFrame(() => {
-    drawerBackdrop.classList.add("open");
-    drawerEl.classList.add("open");
+  closeDrawer = openOverlay(drawerEl, {
+    onClose: () => { drawerEl.remove(); drawerEl = null; closeDrawer = null; },
   });
-
-  if (!drawerKeyHandler) {
-    drawerKeyHandler = (e) => {
-      if (e.key === "Escape") closeActionDrawer();
-    };
-    document.addEventListener("keydown", drawerKeyHandler);
-  }
 }
 
 function closeActionDrawer() {
-  if (drawerEl) drawerEl.classList.remove("open");
-  if (drawerBackdrop) drawerBackdrop.classList.remove("open");
-  if (drawerKeyHandler) {
-    document.removeEventListener("keydown", drawerKeyHandler);
-    drawerKeyHandler = null;
-  }
+  if (closeDrawer) closeDrawer();
 }
 
 function openActionDrawerFromBtn(btn) {

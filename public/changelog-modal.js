@@ -1,4 +1,6 @@
-// public/changelog-modal.js — modal that displays CHANGELOG.md, opened by clicking the header version
+// public/changelog-modal.js — modal that displays CHANGELOG.md
+
+let closeChangelog = null;
 
 function escapeChangelogHtml(str) {
   return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
@@ -49,26 +51,8 @@ function parseChangelog(md) {
   return html.join("\n");
 }
 
-function closeChangelogModal() {
-  const backdrop = document.querySelector(".modal-backdrop");
-  if (!backdrop) return;
-  backdrop.classList.remove("visible");
-  document.removeEventListener("keydown", changelogKeyHandler);
-  setTimeout(() => backdrop.remove(), 200);
-}
-
-function changelogKeyHandler(e) {
-  if (e.key === "Escape") closeChangelogModal();
-}
-
 async function openChangelogModal() {
-  if (document.querySelector(".modal-backdrop")) return;
-
-  const backdrop = document.createElement("div");
-  backdrop.className = "modal-backdrop";
-  backdrop.addEventListener("click", (e) => {
-    if (e.target === backdrop) closeChangelogModal();
-  });
+  if (closeChangelog) return;
 
   const panel = document.createElement("div");
   panel.className = "modal-panel";
@@ -79,12 +63,11 @@ async function openChangelogModal() {
     </div>
     <div class="modal-body">Loading…</div>
   `;
-  panel.querySelector(".modal-close").addEventListener("click", closeChangelogModal);
+  panel.querySelector(".modal-close").addEventListener("click", () => closeChangelog?.());
 
-  backdrop.appendChild(panel);
-  document.body.appendChild(backdrop);
-  requestAnimationFrame(() => backdrop.classList.add("visible"));
-  document.addEventListener("keydown", changelogKeyHandler);
+  closeChangelog = openOverlay(panel, {
+    onClose: () => { panel.remove(); closeChangelog = null; },
+  });
 
   const body = panel.querySelector(".modal-body");
   try {

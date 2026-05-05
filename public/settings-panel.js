@@ -1,46 +1,27 @@
 // public/settings-panel.js — Settings panel with server logs and restart
 
-let settingsOpen = false;
+let closeSettings = null;
+let settingsPanel = null;
 let logLines = [];
 const MAX_DISPLAY_LINES = 200;
 
 function toggleSettingsPanel() {
-  settingsOpen = !settingsOpen;
-  let panel = document.getElementById("settings-panel");
-  let backdrop = document.getElementById("settings-backdrop");
-
-  if (settingsOpen) {
-    if (!backdrop) {
-      backdrop = document.createElement("div");
-      backdrop.id = "settings-backdrop";
-      backdrop.addEventListener("click", () => toggleSettingsPanel());
-      document.body.appendChild(backdrop);
-    }
-    if (!panel) {
-      panel = document.createElement("div");
-      panel.id = "settings-panel";
-      document.body.appendChild(panel);
-    }
-    renderSettings();
-    requestAnimationFrame(() => {
-      backdrop.classList.add("open");
-      panel.classList.add("open");
-    });
-    document.addEventListener("keydown", settingsKeyHandler);
-  } else {
-    if (panel) panel.classList.remove("open");
-    if (backdrop) backdrop.classList.remove("open");
-    document.removeEventListener("keydown", settingsKeyHandler);
+  if (closeSettings) {
+    closeSettings();
+    return;
   }
-}
 
-function settingsKeyHandler(e) {
-  if (e.key === "Escape") toggleSettingsPanel();
+  settingsPanel = document.createElement("div");
+  settingsPanel.id = "settings-panel";
+  renderSettings();
+
+  closeSettings = openOverlay(settingsPanel, {
+    onClose: () => { settingsPanel.remove(); settingsPanel = null; closeSettings = null; },
+  });
 }
 
 function renderSettings() {
-  const panel = document.getElementById("settings-panel");
-  if (!panel) return;
+  if (!settingsPanel) return;
 
   const tabStatuses = state.tabStatus || {};
   const tabRows = Object.entries(tabStatuses).map(([name, s]) => {
@@ -51,13 +32,12 @@ function renderSettings() {
 
   const resolved = appConfig.resolved || {};
   const configJson = JSON.stringify(resolved, null, 2);
-
   const version = appConfig.version ? `v${appConfig.version}` : "";
 
-  panel.innerHTML = `
+  settingsPanel.innerHTML = `
     <div class="settings-header">
       <h2>Settings</h2>
-      <button class="settings-close" onclick="toggleSettingsPanel()">&times;</button>
+      <button class="settings-close" onclick="closeSettings?.()">&times;</button>
     </div>
     <div class="settings-section">
       <div class="settings-section-header">
@@ -97,13 +77,13 @@ function scrollLogsToBottom() {
 function handleLogMessage(msg) {
   if (msg.type === "logs") {
     logLines = msg.lines || [];
-    if (settingsOpen) renderSettings();
+    if (closeSettings) renderSettings();
   } else if (msg.type === "log") {
     logLines.push(msg.entry);
     if (logLines.length > MAX_DISPLAY_LINES * 2) {
       logLines = logLines.slice(-MAX_DISPLAY_LINES);
     }
-    if (settingsOpen) {
+    if (closeSettings) {
       const el = document.getElementById("settings-log-output");
       if (el) {
         const time = new Date(msg.entry.ts).toLocaleTimeString();

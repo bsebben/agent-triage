@@ -809,7 +809,7 @@ main { padding: 8px; position: relative; }
   display: block;
 }
 
-.drawer-backdrop {
+.overlay-backdrop {
   position: fixed;
   inset: 0;
   background: rgba(0, 0, 0, 0.5);
@@ -818,7 +818,7 @@ main { padding: 8px; position: relative; }
   pointer-events: none;
   transition: opacity 0.2s ease;
 }
-.drawer-backdrop.open { opacity: 1; pointer-events: auto; }
+.overlay-backdrop.open { opacity: 1; pointer-events: auto; }
 
 .action-drawer {
   position: fixed;
@@ -981,36 +981,26 @@ main { padding: 8px; position: relative; }
 }
 
 /* Changelog modal */
-.modal-backdrop {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.55);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 100;
-  opacity: 0;
-  transition: opacity 0.2s ease;
-  padding: 24px;
-}
-
-.modal-backdrop.visible { opacity: 1; }
-
 .modal-panel {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%) translateY(8px);
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 8px;
-  width: 100%;
+  width: calc(100% - 48px);
   max-width: 600px;
   max-height: 80vh;
   display: flex;
   flex-direction: column;
   box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5);
-  transform: translateY(8px);
-  transition: transform 0.2s ease;
+  z-index: 200;
+  opacity: 0;
+  transition: transform 0.2s ease, opacity 0.2s ease;
 }
 
-.modal-backdrop.visible .modal-panel { transform: translateY(0); }
+.modal-panel.open { transform: translate(-50%, -50%) translateY(0); opacity: 1; }
 
 .modal-header {
   display: flex;
@@ -1111,17 +1101,6 @@ main { padding: 8px; position: relative; }
   transition: color 0.15s;
 }
 .settings-btn:hover { color: var(--text); }
-
-#settings-backdrop {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.5);
-  z-index: 199;
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 0.2s ease;
-}
-#settings-backdrop.open { opacity: 1; pointer-events: auto; }
 
 #settings-panel {
   position: fixed;
