@@ -84,8 +84,8 @@ async function init(tabConfig, onUpdate) {
 async function poll() {
   try {
     const [mine, reviews] = await Promise.all([
-      searchPrs("is:pr is:open author:@me", () => true, prPriority),
-      searchPrs("is:pr is:open review-requested:@me draft:false", (pr) => !pr.isDraft, reviewPriority),
+      searchPrs("is:pr is:open archived:false author:@me", () => true, prPriority),
+      searchPrs("is:pr is:open archived:false review-requested:@me draft:false", (pr) => !pr.isDraft, reviewPriority),
     ]);
     data = { mine, reviews };
   } catch (err) {
