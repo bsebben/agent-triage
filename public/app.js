@@ -75,8 +75,36 @@ function render() {
   else if (activeTab === "loops") renderLoops();
   else if (activeTab === "pulls") renderPulls();
   else if (activeTab === "tickets") renderTickets();
+
+  if (activeTab !== "workspaces") {
+    const rs = refreshStates[activeTab] || {};
+    const cls = rs.cls ? ` ${rs.cls}` : "";
+    const text = rs.text || "\u21bb Refresh";
+    queue.insertAdjacentHTML("afterbegin",
+      `<button class="refresh-btn${cls}" title="Refresh" onclick="refreshTab()">${text}</button>`);
+  }
+
   selectedIndex = -1;
   updateTabBadges();
+}
+
+const refreshStates = {};
+
+async function refreshTab() {
+  if (refreshStates[activeTab]?.cls === "refreshing") return;
+  const tab = activeTab;
+  refreshStates[tab] = { cls: "refreshing", text: "\u21bb Refreshing\u2026" };
+  render();
+  try {
+    const res = await fetch(`/api/refresh/${tab}`, { method: "POST" });
+    refreshStates[tab] = res.ok
+      ? { cls: "refresh-ok", text: "\u2713 Refreshed" }
+      : { cls: "refresh-err", text: "\u2717 Failed" };
+  } catch {
+    refreshStates[tab] = { cls: "refresh-err", text: "\u2717 Failed" };
+  }
+  render();
+  setTimeout(() => { delete refreshStates[tab]; render(); }, 1500);
 }
 
 function updateTabBadges() {

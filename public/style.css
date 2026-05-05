@@ -128,7 +128,31 @@ header h1 {
 .tab-badge-running { background: var(--clr-completion); }
 .tab-badge-attention { background: var(--clr-question); color: #1a1a2e; }
 
-main { padding: 8px; }
+main { padding: 8px; position: relative; }
+
+.refresh-btn {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text-dim);
+  font-size: 11px;
+  gap: 4px;
+  padding: 4px 8px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10;
+  transition: color 0.15s, border-color 0.15s;
+}
+.refresh-btn:hover { color: var(--text); border-color: var(--text-dim); }
+.refresh-btn.refreshing { color: var(--text-dim); pointer-events: none; }
+.refresh-btn.refresh-ok { color: var(--clr-completion); border-color: var(--clr-completion); }
+.refresh-btn.refresh-err { color: var(--clr-error); border-color: var(--clr-error); }
+@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
 
 .sub-tabs {
   display: flex;

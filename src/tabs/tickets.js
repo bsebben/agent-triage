@@ -25,7 +25,7 @@ async function init(tabConfig, onUpdate) {
   tab.enabled = cfg.enabled;
   if (!cfg.enabled) return;
 
-  await startPolling("Tickets", poll, onUpdate, 3 * 60 * 1000);
+  tab.refresh = await startPolling("Tickets", poll, onUpdate, 3 * 60 * 1000);
 }
 
 async function detect() {
@@ -50,9 +50,9 @@ async function poll() {
     try { await detect(); } catch (err) {
       tab.hint = `Jira auto-detection failed. ${friendlyError(err.message)}`;
       console.log(`[tickets] detection failed: ${friendlyError(err.message)}`);
-      return;
+      throw err;
     }
-    if (!detected.mcpTool) return;
+    if (!detected.mcpTool) throw new Error("Jira server not available");
   }
 
   const { cloudId, jiraSite, jql, mcpTool } = detected;
@@ -83,6 +83,7 @@ async function poll() {
     const friendly = friendlyError(err.message);
     tab.hint = friendly;
     console.error(`[tickets] fetch error: ${friendly}`);
+    throw err;
   }
 }
 

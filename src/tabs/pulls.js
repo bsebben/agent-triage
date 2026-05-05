@@ -78,7 +78,7 @@ async function init(tabConfig, onUpdate) {
     currentUser = stdout.trim();
   } catch { /* non-fatal; directReview will always be false */ }
 
-  await startPolling("Pulls", poll, onUpdate, 2 * 60 * 1000);
+  tab.refresh = await startPolling("Pulls", poll, onUpdate, 2 * 60 * 1000);
 }
 
 async function poll() {
@@ -90,6 +90,7 @@ async function poll() {
     data = { mine, reviews };
   } catch (err) {
     console.error("PR fetch error:", err.message);
+    throw err;
   }
 }
 
