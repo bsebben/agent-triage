@@ -90,28 +90,22 @@ function render() {
 
 async function refreshTab() {
   const btn = queue.querySelector(".refresh-btn");
-  if (btn) btn.classList.add("spinning");
+  if (!btn || btn.classList.contains("spinning")) return;
+  btn.classList.add("spinning");
   try {
     const res = await fetch(`/api/refresh/${activeTab}`, { method: "POST" });
-    if (res.ok) {
-      showToast("Refreshed");
-    } else {
-      showToast("Refresh failed", { error: true });
-    }
+    btn.classList.remove("spinning");
+    btn.classList.add(res.ok ? "refresh-ok" : "refresh-err");
+    btn.textContent = res.ok ? "\u2713 Refreshed" : "\u2717 Failed";
   } catch {
-    showToast("Refresh failed", { error: true });
+    btn.classList.remove("spinning");
+    btn.classList.add("refresh-err");
+    btn.textContent = "\u2717 Failed";
   }
-  if (btn) setTimeout(() => btn.classList.remove("spinning"), 500);
-}
-
-function showToast(message, { error = false, position = "top" } = {}) {
-  const existing = document.querySelector(".toast");
-  if (existing) existing.remove();
-  const toast = document.createElement("div");
-  toast.className = `toast toast-${position}${error ? " toast-error" : ""}`;
-  toast.textContent = message;
-  document.body.appendChild(toast);
-  setTimeout(() => toast.remove(), 2000);
+  setTimeout(() => {
+    btn.classList.remove("refresh-ok", "refresh-err");
+    btn.textContent = "\u21bb Refresh";
+  }, 1500);
 }
 
 function updateTabBadges() {
