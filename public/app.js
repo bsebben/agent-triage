@@ -77,36 +77,32 @@ function render() {
   else if (activeTab === "tickets") renderTickets();
 
   if (activeTab !== "workspaces") {
-    const existing = queue.querySelector(".refresh-btn");
-    if (!existing) {
-      queue.insertAdjacentHTML("afterbegin",
-        `<button class="refresh-btn" title="Refresh" onclick="refreshTab()">&#x21bb; Refresh</button>`);
-    }
+    const cls = refreshState.cls ? ` ${refreshState.cls}` : "";
+    const text = refreshState.text || "\u21bb Refresh";
+    queue.insertAdjacentHTML("afterbegin",
+      `<button class="refresh-btn${cls}" title="Refresh" onclick="refreshTab()">${text}</button>`);
   }
 
   selectedIndex = -1;
   updateTabBadges();
 }
 
+let refreshState = {};
+
 async function refreshTab() {
-  const btn = queue.querySelector(".refresh-btn");
-  if (!btn || btn.classList.contains("refreshing")) return;
-  btn.classList.add("refreshing");
-  btn.textContent = "\u21bb Refreshing\u2026";
+  if (refreshState.cls === "refreshing") return;
+  refreshState = { cls: "refreshing", text: "\u21bb Refreshing\u2026" };
+  render();
   try {
     const res = await fetch(`/api/refresh/${activeTab}`, { method: "POST" });
-    btn.classList.remove("refreshing");
-    btn.classList.add(res.ok ? "refresh-ok" : "refresh-err");
-    btn.textContent = res.ok ? "\u2713 Refreshed" : "\u2717 Failed";
+    refreshState = res.ok
+      ? { cls: "refresh-ok", text: "\u2713 Refreshed" }
+      : { cls: "refresh-err", text: "\u2717 Failed" };
   } catch {
-    btn.classList.remove("refreshing");
-    btn.classList.add("refresh-err");
-    btn.textContent = "\u2717 Failed";
+    refreshState = { cls: "refresh-err", text: "\u2717 Failed" };
   }
-  setTimeout(() => {
-    btn.classList.remove("refresh-ok", "refresh-err");
-    btn.textContent = "\u21bb Refresh";
-  }, 1500);
+  render();
+  setTimeout(() => { refreshState = {}; render(); }, 1500);
 }
 
 function updateTabBadges() {
