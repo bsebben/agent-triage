@@ -134,23 +134,25 @@ function renderPullGroup(group, showAuthor) {
   return `<div class="pulls-repo-group">
     <div class="pulls-repo-name">${escapeHtml(group.repo)}</div>
     <table class="pulls-table">
-      <thead><tr><th>PR</th>${showAuthor ? "<th>Author</th>" : ""}<th>Status</th><th></th></tr></thead>
+      <thead><tr><th>PR</th>${showAuthor ? "<th>Author</th>" : ""}<th>Status</th><th>CI</th><th></th></tr></thead>
       <tbody>${group.prs.map((pr) => renderPullRow(pr, showAuthor, group.repo)).join("")}</tbody>
     </table>
   </div>`;
 }
 
-function ciIndicator(ci) {
-  if (ci === "failing") return ' <span class="ci-x">\u2717</span>';
-  if (ci === "passing") return ' <span class="ci-check">\u2713</span>';
-  return "";
+function ciCell(ci) {
+  if (ci === "failing") return '<span class="ci-badge ci-failing">\u2717</span>';
+  if (ci === "passing") return '<span class="ci-badge ci-passing">\u2713</span>';
+  if (ci === "running") return '<span class="ci-badge ci-running">\u25CB</span>';
+  return '<span class="ci-badge ci-none">\u2014</span>';
 }
 
 function renderPullRow(pr, showAuthor, repo) {
   return `<tr class="pull-row" onclick="openExternal('${escapeHtml(pr.url)}')">
     <td class="pull-title"><span class="pull-number">#${pr.number}</span> ${escapeHtml(pr.title)}</td>
     ${showAuthor ? `<td class="pull-author">${escapeHtml(pr.author)}</td>` : ""}
-    <td><span class="pull-badge status-${pr.status}">${pr.status}${ciIndicator(pr.ci)}</span></td>
+    <td class="pull-status"><span class="pull-badge status-${pr.status}">${pr.status}</span></td>
+    <td class="pull-ci">${ciCell(pr.ci)}</td>
     <td class="row-action"><button class="agent-btn" title="Actions" data-pr-url="${escapeHtml(pr.url)}" onclick="event.stopPropagation(); openActionDrawerFromBtn(this)">${claudeIcon()}</button></td>
   </tr>`;
 }

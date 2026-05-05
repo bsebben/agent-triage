@@ -4,7 +4,6 @@ import { promisify } from "node:util";
 import { startPolling } from "../utils.js";
 
 const execFileAsync = promisify(execFile);
-const PR_FIELDS = "number,title,isDraft,reviewDecision,latestReviews,statusCheckRollup,createdAt,url,headRefName,author";
 
 const ghAvailable = (() => {
   try { execFileSync("which", ["gh"], { encoding: "utf-8" }); return true; }
@@ -15,6 +14,42 @@ export const defaults = {
   enabled: true,
   orgFilter: null,
 };
+
+const PR_QUERY = `
+query($q: String!) {
+  search(query: $q, type: ISSUE, first: 100) {
+    nodes {
+      ... on PullRequest {
+        number
+        title
+        url
+        isDraft
+        createdAt
+        headRefName
+        reviewDecision
+        author { login }
+        repository { nameWithOwner }
+        commits(last: 1) {
+          nodes {
+            commit {
+              statusCheckRollup {
+                contexts(first: 50) {
+                  nodes {
+                    ... on CheckRun { conclusion status }
+                    ... on StatusContext { state }
+                  }
+                }
+              }
+            }
+          }
+        }
+        latestReviews(first: 10) {
+          nodes { state }
+        }
+      }
+    }
+  }
+}`;
 
 let cfg;
 let data = { mine: [], reviews: [] };
@@ -34,75 +69,57 @@ async function init(tabConfig, onUpdate) {
 
 async function poll() {
   try {
-    const [mine, reviews] = await Promise.all([fetchAuthoredPrs(), fetchReviewRequestedPrs()]);
+    const [mine, reviews] = await Promise.all([
+      searchPrs("is:pr is:open author:@me", () => true, prPriority),
+      searchPrs("is:pr is:open review-requested:@me draft:false", (pr) => !pr.isDraft, reviewPriority),
+    ]);
     data = { mine, reviews };
   } catch (err) {
     console.error("PR fetch error:", err.message);
   }
 }
 
-async function fetchAuthoredPrs() {
+async function searchPrs(query, filter, sortFn) {
   const { stdout } = await execFileAsync(
-    "gh",
-    ["search", "prs", "--author=@me", "--state=open", "--json", "repository,number", "--limit", "100"],
-    { timeout: 15000 },
+    "gh", ["api", "graphql", "-F", `query=${PR_QUERY}`, "-F", `q=${query}`],
+    { timeout: 30000 },
   );
-  return groupAndFetch(JSON.parse(stdout), () => true, prPriority);
-}
+  const nodes = JSON.parse(stdout).data.search.nodes;
 
-async function fetchReviewRequestedPrs() {
-  const { stdout } = await execFileAsync(
-    "gh",
-    ["search", "prs", "--review-requested=@me", "--state=open", "--draft=false", "--json", "repository,number", "--limit", "100"],
-    { timeout: 15000 },
-  );
-  return groupAndFetch(JSON.parse(stdout), (pr) => !pr.isDraft, reviewPriority);
-}
-
-async function groupAndFetch(hits, filter, sortFn) {
   const orgFilter = cfg.orgFilter;
   const byRepo = new Map();
-  for (const hit of hits) {
-    const repo = hit.repository.nameWithOwner;
+
+  for (const node of nodes) {
+    const repo = node.repository.nameWithOwner;
     if (orgFilter && !orgFilter.includes(repo.split("/")[0])) continue;
-    if (!byRepo.has(repo)) byRepo.set(repo, []);
-    byRepo.get(repo).push(hit.number);
+    const pr = summarize(node);
+    if (!filter(pr)) continue;
+    const repoName = repo.split("/")[1];
+    if (!byRepo.has(repoName)) byRepo.set(repoName, []);
+    byRepo.get(repoName).push(pr);
   }
 
   const groups = [];
-  await Promise.all([...byRepo.entries()].map(async ([repo, numbers]) => {
-    const prs = await fetchRepoPrs(repo, numbers, filter);
-    if (prs.length > 0) groups.push({ repo: repo.split("/")[1], prs });
-  }));
-
-  for (const g of groups) g.prs.sort((a, b) => sortFn(a) - sortFn(b));
+  for (const [repo, prs] of byRepo) {
+    prs.sort((a, b) => sortFn(a) - sortFn(b));
+    groups.push({ repo, prs });
+  }
   groups.sort((a, b) => b.prs.length - a.prs.length);
   return groups;
 }
 
-async function fetchRepoPrs(repo, numbers, filter) {
-  try {
-    const results = await Promise.all(
-      numbers.map(async (num) => {
-        const { stdout } = await execFileAsync(
-          "gh", ["pr", "view", String(num), "--repo", repo, "--json", PR_FIELDS],
-          { timeout: 15000 },
-        );
-        return summarizePr(JSON.parse(stdout));
-      }),
-    );
-    return results.filter(filter);
-  } catch (err) {
-    console.error(`PR fetch error for ${repo}:`, err.message);
-    return [];
-  }
-}
-
-function summarizePr(pr) {
+function summarize(node) {
+  const checks = node.commits?.nodes?.[0]?.commit?.statusCheckRollup?.contexts?.nodes || [];
   return {
-    number: pr.number, title: pr.title, branch: pr.headRefName, url: pr.url,
-    createdAt: pr.createdAt, isDraft: pr.isDraft, author: pr.author?.login || "",
-    status: prStatus(pr), ci: ciStatus(pr.statusCheckRollup || []),
+    number: node.number,
+    title: node.title,
+    branch: node.headRefName,
+    url: node.url,
+    createdAt: node.createdAt,
+    isDraft: node.isDraft,
+    author: node.author?.login || "",
+    status: prStatus(node),
+    ci: ciStatus(checks),
   };
 }
 
@@ -115,19 +132,25 @@ function prPriority(pr) {
 const CI_ORDER = { passing: 0, running: 1, none: 2, failing: 3 };
 function reviewPriority(pr) { return CI_ORDER[pr.ci] ?? 2; }
 
-function prStatus(pr) {
-  if (pr.isDraft) return "draft";
-  if (pr.reviewDecision === "APPROVED") return "approved";
-  if ((pr.latestReviews || []).length > 0) return "comments";
+function prStatus(node) {
+  if (node.isDraft) return "draft";
+  if (node.reviewDecision === "APPROVED") return "approved";
+  if ((node.latestReviews?.nodes || []).length > 0) return "comments";
   return "open";
 }
 
 function ciStatus(checks) {
   if (checks.length === 0) return "none";
-  const meaningful = checks.filter((c) => c.conclusion !== "SKIPPED" && c.conclusion !== "NEUTRAL");
+  const meaningful = checks.filter((c) =>
+    c.conclusion !== "SKIPPED" && c.conclusion !== "NEUTRAL" && c.state !== "EXPECTED"
+  );
   if (meaningful.length === 0) return "none";
-  if (meaningful.some((c) => c.status !== "COMPLETED")) return "running";
-  if (meaningful.some((c) => c.conclusion === "FAILURE" || c.conclusion === "TIMED_OUT")) return "failing";
+  const hasIncomplete = meaningful.some((c) => c.status === "IN_PROGRESS" || c.status === "QUEUED" || c.state === "PENDING");
+  if (hasIncomplete) return "running";
+  const hasFailing = meaningful.some((c) =>
+    c.conclusion === "FAILURE" || c.conclusion === "TIMED_OUT" || c.state === "FAILURE" || c.state === "ERROR"
+  );
+  if (hasFailing) return "failing";
   return "passing";
 }
 
