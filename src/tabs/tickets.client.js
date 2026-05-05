@@ -10,7 +10,8 @@ function renderTickets() {
   const groups = state.tickets || [];
   const totalTickets = groups.reduce((n, g) => n + g.tickets.length, 0);
   if (totalTickets === 0) {
-    queue.innerHTML = `<div class="empty-state">No assigned tickets</div>`;
+    const hint = ticketStatus.hint ? escapeHtml(ticketStatus.hint) : "No assigned tickets";
+    queue.innerHTML = `<div class="empty-state">${hint}</div>`;
     return;
   }
   queue.innerHTML = `<div class="tickets-section">

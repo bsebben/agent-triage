@@ -78,8 +78,11 @@ async function poll() {
     const issues = extractIssues(textContent);
     const result = groupByParent(issues, jiraSite);
     if (result.length > 0) data = result;
+    tab.hint = null;
   } catch (err) {
-    console.error(`[tickets] fetch error: ${friendlyError(err.message)}`);
+    const friendly = friendlyError(err.message);
+    tab.hint = friendly;
+    console.error(`[tickets] fetch error: ${friendly}`);
   }
 }
 
