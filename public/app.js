@@ -96,19 +96,19 @@ async function refreshTab() {
     if (res.ok) {
       showToast("Refreshed");
     } else {
-      showToast("Refresh failed", true);
+      showToast("Refresh failed", { error: true });
     }
   } catch {
-    showToast("Refresh failed", true);
+    showToast("Refresh failed", { error: true });
   }
   if (btn) setTimeout(() => btn.classList.remove("spinning"), 500);
 }
 
-function showToast(message, isError = false) {
+function showToast(message, { error = false, position = "top" } = {}) {
   const existing = document.querySelector(".toast");
   if (existing) existing.remove();
   const toast = document.createElement("div");
-  toast.className = `toast${isError ? " toast-error" : ""}`;
+  toast.className = `toast toast-${position}${error ? " toast-error" : ""}`;
   toast.textContent = message;
   document.body.appendChild(toast);
   setTimeout(() => toast.remove(), 2000);
