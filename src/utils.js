@@ -10,13 +10,14 @@ const MIME_TYPES = {
 };
 
 export function startPolling(name, pollFn, onUpdate, intervalMs) {
+  const refresh = async () => { await pollFn(); onUpdate(); };
   const doPoll = async () => {
-    try { await pollFn(); onUpdate(); }
+    try { await refresh(); }
     catch (err) { console.error(`[${name.toLowerCase()}] poll error: ${err.message.split("\n")[0]}`); }
   };
   doPoll();
   setInterval(doPoll, intervalMs);
-  return async () => { await pollFn(); onUpdate(); };
+  return refresh;
 }
 
 export function timeAgo(isoString) {
