@@ -91,6 +91,7 @@ async function groupAndFetch(hits, filter, sortFn) {
   const orgFilter = config.pulls.orgFilter;
   const byRepo = new Map();
   for (const hit of hits) {
+    if (hit.repository.isArchived) continue;
     const repo = hit.repository.nameWithOwner;
     if (orgFilter && !orgFilter.includes(repo.split("/")[0])) continue;
     if (!byRepo.has(repo)) byRepo.set(repo, []);

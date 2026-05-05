@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.8.2] - 2026-05-05
+
+### Fixed
+
+- PRs from archived repositories are now silently excluded from both the Mine and Reviews tabs — archived repos are read-only and can never be acted on
+
 ## [1.7.2] - 2026-05-04
 
 ### Fixed
