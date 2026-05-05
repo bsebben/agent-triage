@@ -1,9 +1,9 @@
 // public/tab-tickets.js
 
 function renderTickets() {
-  const ticketsCfg = appConfig.tickets || {};
-  if (!ticketsCfg.available) {
-    const hint = escapeHtml(ticketsCfg.hint || "Jira not detected. Make sure your Jira MCP server is authenticated and running.");
+  const ticketStatus = state.tabStatus?.tickets || appConfig.tickets || {};
+  if (!ticketStatus.available) {
+    const hint = escapeHtml(ticketStatus.hint || "Jira not detected. Make sure your Jira MCP server is authenticated and running.");
     queue.innerHTML = `<div class="empty-state">${hint}</div>`;
     return;
   }

@@ -1,7 +1,7 @@
 // public/tab-loops.js
 
 function renderLoops() {
-  const loopsCfg = appConfig.loops || {};
+  const loopsCfg = state.tabStatus?.loops || appConfig.loops || {};
   if (!loopsCfg.available) {
     const hint = escapeHtml(loopsCfg.hint || "Claude Loops plugin not found.");
     const url = loopsCfg.installUrl || "#";
