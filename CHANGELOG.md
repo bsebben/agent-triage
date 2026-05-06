@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.12.2] - 2026-05-06
+
+### Fixed
+
+- Workspace group collapse/expand state is now preserved across polling cycles
+
 ## [1.12.1] - 2026-05-05
 
 ### Fixed

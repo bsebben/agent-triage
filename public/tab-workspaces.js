@@ -1,7 +1,24 @@
 // public/tab-workspaces.js
 
+const collapsedGroups = new Set(["Dismissed"]);
+
+function saveCollapseState() {
+  const headers = queue.querySelectorAll(".group-header");
+  headers.forEach((header) => {
+    const title = header.querySelector("span:nth-child(2)")?.textContent || "";
+    const items = header.nextElementSibling;
+    if (items && items.classList.contains("collapsed")) {
+      collapsedGroups.add(title);
+    } else {
+      collapsedGroups.delete(title);
+    }
+  });
+}
+
 function renderWorkspaces() {
   const { groups, dismissed } = state;
+
+  saveCollapseState();
 
   let html = `<div class="tab-toolbar"><button class="btn-new-workspace" onclick="newWorkspace()">New Workspace</button></div>`;
 
@@ -12,23 +29,28 @@ function renderWorkspaces() {
 
   html += groups
     .map(
-      (g) => `<div class="group">
+      (g) => {
+        const title = g.title || "Unknown";
+        const isCollapsed = collapsedGroups.has(title);
+        return `<div class="group">
       <div class="group-header" onclick="toggleGroup(this)">
-        <span class="chevron">\u25bc</span> <span>${escapeHtml(g.title || "Unknown")}</span>
+        <span class="chevron${isCollapsed ? " collapsed" : ""}">\u25bc</span> <span>${escapeHtml(title)}</span>
         <span class="count">(${g.items.length})</span>
       </div>
-      <div class="group-items">${g.items.map((i) => renderCard(i)).join("")}</div>
-    </div>`
+      <div class="group-items${isCollapsed ? " collapsed" : ""}">${g.items.map((i) => renderCard(i)).join("")}</div>
+    </div>`;
+      }
     )
     .join("");
 
   if (dismissed && dismissed.length > 0) {
+    const dismissedCollapsed = collapsedGroups.has("Dismissed");
     html += `<div class="group dismissed-group">
       <div class="group-header" onclick="toggleGroup(this)">
-        <span class="chevron collapsed">\u25bc</span> <span>Dismissed</span>
+        <span class="chevron${dismissedCollapsed ? " collapsed" : ""}">\u25bc</span> <span>Dismissed</span>
         <span class="count">(${dismissed.length})</span>
       </div>
-      <div class="group-items collapsed">${dismissed.map((i) => renderCard(i, { isDismissed: true })).join("")}</div>
+      <div class="group-items${dismissedCollapsed ? " collapsed" : ""}">${dismissed.map((i) => renderCard(i, { isDismissed: true })).join("")}</div>
     </div>`;
   }
 
