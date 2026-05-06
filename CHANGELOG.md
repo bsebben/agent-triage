@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.13.3] - 2026-05-06
+
+### Fixed
+
+- Claude sessions are now detected via cmux process tags instead of notification history, fixing workspaces showing as "terminal" after dashboard restart
+- Workspaces correctly revert to "terminal" when Claude exits
+
 ## [1.13.2] - 2026-05-06
 
 ### Fixed
