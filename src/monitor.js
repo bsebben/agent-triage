@@ -96,11 +96,17 @@ export class Monitor {
 
   async poll() {
     try {
-      const [notifications, workspaces, terminals] = await Promise.all([
+      const [notifications, workspaces, terminals, agentWsIds] = await Promise.all([
         this.#cmux.listNotifications(),
         this.#cmux.listWorkspaces(),
         this.#cmux.listTerminals(),
+        this.#cmux.listAgentWorkspaceIds(),
       ]);
+
+      for (const id of agentWsIds) this.#knownAgentWorkspaces.add(id);
+      for (const id of this.#knownAgentWorkspaces) {
+        if (!agentWsIds.has(id)) this.#knownAgentWorkspaces.delete(id);
+      }
 
       const currentIds = new Set();
 
@@ -109,7 +115,6 @@ export class Monitor {
 
       for (const n of notifications) {
         if (n.workspaceId === dashboardWsId) continue;
-        this.#knownAgentWorkspaces.add(n.workspaceId);
         currentIds.add(n.id);
         const enriched = await enrichNotification(n, workspaces, terminals);
         this.#queue.upsert(enriched);

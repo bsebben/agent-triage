@@ -146,6 +146,23 @@ export function categorizeNotification(n) {
   return "unknown";
 }
 
+export async function listAgentWorkspaceIds() {
+  try {
+    const raw = await rpc("system.top");
+    const ids = new Set();
+    for (const win of raw.windows || []) {
+      for (const ws of win.workspaces || []) {
+        for (const tag of ws.tags || []) {
+          if (tag.key === "claude_code") ids.add(ws.id);
+        }
+      }
+    }
+    return ids;
+  } catch {
+    return new Set();
+  }
+}
+
 export async function listWorkspaces() {
   const raw = await rpc("workspace.list");
   return (raw.workspaces || []).map((w) => ({
