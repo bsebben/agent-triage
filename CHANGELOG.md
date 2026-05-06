@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.14.5] - 2026-05-06
+
+### Fixed
+
+- Fixed server crash after in-place update — missing `return` in `/api/update` success path caused headers to be written twice
+
 ## [1.14.4] - 2026-05-06
 
 ### Fixed
