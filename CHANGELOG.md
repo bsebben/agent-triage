@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.13.0] - 2026-05-06
+
+### Added
+
+- New Session and New Terminal buttons in the toolbar, per-group headers, and per-card actions
+- Session buttons launch Claude Code in the target directory; terminal buttons open a plain shell
+- CSS tooltips (`data-tip`) for instant hover labels on all new buttons
+
 ## [1.12.2] - 2026-05-06
 
 ### Fixed

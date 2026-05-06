@@ -183,8 +183,14 @@ async function apiPost(endpoint, body) {
   return res.json();
 }
 
-async function newWorkspace() {
-  await apiPost("new-workspace", {});
+async function newSession(cwd) {
+  const body = { command: "claude" };
+  if (cwd) body.cwd = cwd;
+  await apiPost("new-workspace", body);
+}
+
+async function newWorkspace(cwd) {
+  await apiPost("new-workspace", cwd ? { cwd } : {});
 }
 
 function toggleGroup(header) {

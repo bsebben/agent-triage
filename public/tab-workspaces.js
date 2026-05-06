@@ -20,7 +20,10 @@ function renderWorkspaces() {
 
   saveCollapseState();
 
-  let html = `<div class="tab-toolbar"><button class="btn-new-workspace" onclick="newWorkspace()">New Workspace</button></div>`;
+  let html = `<div class="tab-toolbar">
+    <button class="btn-new-workspace" onclick="newSession()" data-tip="New Session">${claudeIcon()}</button>
+    <button class="btn-new-workspace" onclick="newWorkspace()" data-tip="New Terminal">&gt;_</button>
+  </div>`;
 
   if (groups.length === 0 && (!dismissed || dismissed.length === 0)) {
     queue.innerHTML = html + `<div class="empty-state">No agent activity detected</div>`;
@@ -32,10 +35,15 @@ function renderWorkspaces() {
       (g) => {
         const title = g.title || "Unknown";
         const isCollapsed = collapsedGroups.has(title);
+        const dir = g.directory || "";
         return `<div class="group">
       <div class="group-header" onclick="toggleGroup(this)">
         <span class="chevron${isCollapsed ? " collapsed" : ""}">\u25bc</span> <span>${escapeHtml(title)}</span>
         <span class="count">(${g.items.length})</span>
+        <span class="group-actions" onclick="event.stopPropagation()">
+          <button class="btn-group-add" data-cwd="${escapeHtml(dir)}" onclick="newSession(this.dataset.cwd)" data-tip="New Session">${claudeIcon()}</button>
+          <button class="btn-group-add" data-cwd="${escapeHtml(dir)}" onclick="newWorkspace(this.dataset.cwd)" data-tip="New Terminal">&gt;_</button>
+        </span>
       </div>
       <div class="group-items${isCollapsed ? " collapsed" : ""}">${g.items.map((i) => renderCard(i)).join("")}</div>
     </div>`;
@@ -91,6 +99,12 @@ function renderCard(item, { isDismissed = false } = {}) {
   const cardTitle = item.workspaceTitle || "Unknown";
   const subtitle = item.gitBranch || null;
 
+  const dir = item.workspaceDir || "";
+  const newBtns = !isDismissed
+    ? `<button class="btn-card-new" data-cwd="${escapeHtml(dir)}" onclick="event.stopPropagation();newSession(this.dataset.cwd)" data-tip="New Session">${claudeIcon()}</button>
+       <button class="btn-card-new" data-cwd="${escapeHtml(dir)}" onclick="event.stopPropagation();newWorkspace(this.dataset.cwd)" data-tip="New Terminal">&gt;_</button>`
+    : "";
+
   const dismissBtn = isDismissed
     ? `<a class="card-dismiss" onclick="event.stopPropagation();restore('${item.id}')">restore</a>`
     : `<a class="card-dismiss" onclick="event.stopPropagation();dismiss('${item.id}')">dismiss</a>`;
@@ -102,7 +116,7 @@ function renderCard(item, { isDismissed = false } = {}) {
   return `<div class="card${selectedClass} cat-${escapeHtml(item.category)}" data-workspace-id="${item.workspaceId}" onclick="cardClick(event,'${item.workspaceId}')">
     <div class="card-body-left">
       <div class="card-title-row"><span class="card-title-group"><span class="card-title">${escapeHtml(cardTitle)}</span><a class="card-edit" onclick="event.stopPropagation();startRename(this,'${item.workspaceId}','${escapeHtml(cardTitle)}')">&#9998;</a></span></div>
-    <span class="card-actions-right">${dismissBtn}${closeBtn}</span>
+    <span class="card-actions-right">${newBtns}${dismissBtn}${closeBtn}</span>
       <div class="card-header">
         <span class="card-category ${escapeHtml(item.category)}"><span class="card-icon">${categoryIcon(item.category)}</span> ${escapeHtml(item.category)}</span>
       </div>
