@@ -1,5 +1,5 @@
 import { createServer } from "node:http";
-import { readFileSync, existsSync } from "node:fs";
+import { readFileSync, existsSync, utimesSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -124,7 +124,10 @@ const server = createServer(async (req, res) => {
 
     if (req.url === "/api/restart" && req.method === "POST") {
       jsonResponse(res, { ok: true });
-      setTimeout(() => process.exit(0), 100);
+      setTimeout(() => {
+        const now = new Date();
+        utimesSync(join(__dirname, "server.js"), now, now);
+      }, 100);
       return;
     }
 
@@ -238,7 +241,11 @@ const server = createServer(async (req, res) => {
         await git(["pull", "origin", "master"]);
         await new Promise((resolve, reject) =>
           execFile("npm", ["install"], { cwd: repoCwd }, (err) => err ? reject(err) : resolve()));
-        return jsonResponse(res, { ok: true });
+        jsonResponse(res, { ok: true });
+        setTimeout(() => {
+          const now = new Date();
+          utimesSync(join(__dirname, "server.js"), now, now);
+        }, 200);
       } catch (err) {
         return jsonResponse(res, { ok: false, error: err.message }, 500);
       }

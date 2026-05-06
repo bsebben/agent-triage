@@ -12,6 +12,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - Fixed duplicate "Agent Triage Dashboard Host" workspaces — `close-workspace` was called with `--name` (unsupported), so stale workspaces were never cleaned up
 - Autostart now uses `find-window` for exact title matching and closes all stale duplicates before creating a new workspace
 
+## [1.14.2] - 2026-05-06
+
+### Fixed
+
+- Server now restarts after in-place update so the new version and code take effect immediately
+- Fixed settings restart button — `process.exit(0)` killed the server permanently since `--watch` only restarts on file changes, not process exit. Both restart and update now touch `src/server.js` to trigger `--watch`
+
+## [1.14.1] - 2026-05-06
+
+### Fixed
+
+- Fixed duplicate "Agent Triage Dashboard Host" workspaces — `close-workspace` was called with `--name` (unsupported), so stale workspaces were never cleaned up
+- Autostart now uses `find-window` for exact title matching and closes all stale duplicates before creating a new workspace
+
 ## [1.14.0] - 2026-05-06
 
 ### Added
