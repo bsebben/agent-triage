@@ -69,7 +69,7 @@ header h1 {
 .app-version:hover { color: var(--text); }
 
 .btn-new-workspace {
-  padding: 4px 10px;
+  padding: 4px 8px;
   border: 1px solid var(--text-dim);
   border-radius: 4px;
   background: transparent;
@@ -84,6 +84,33 @@ header h1 {
 
 .btn-new-workspace:hover { color: var(--text); border-color: var(--text); }
 .btn-new-workspace:active { opacity: 0.7; }
+.btn-new-workspace .claude-icon { width: 12px; height: 12px; vertical-align: -1px; }
+
+[data-tip] {
+  position: relative;
+}
+
+[data-tip]::after {
+  content: attr(data-tip);
+  position: absolute;
+  bottom: calc(100% + 4px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text);
+  font-size: 11px;
+  font-weight: 400;
+  padding: 3px 6px;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.1s ease;
+  z-index: 10;
+}
+
+[data-tip]:hover::after { opacity: 1; }
 
 .tabs {
   display: flex;
@@ -187,6 +214,7 @@ main { padding: 8px; position: relative; }
 .tab-toolbar {
   display: flex;
   justify-content: flex-start;
+  gap: 6px;
   padding: 4px 0 8px;
 }
 
@@ -221,6 +249,31 @@ main { padding: 8px; position: relative; }
   font-weight: 400;
   font-size: 12px;
 }
+
+.group-actions {
+  margin-left: auto;
+  display: flex;
+  gap: 4px;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.group-header:hover .group-actions { opacity: 1; }
+
+.btn-group-add {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text-dim);
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1;
+  padding: 0 5px;
+}
+
+.btn-group-add:hover { color: var(--text); border-color: var(--text-dim); }
+.btn-group-add .claude-icon { width: 12px; height: 12px; vertical-align: -1px; }
 
 .card {
   background: var(--card);
@@ -298,6 +351,24 @@ main { padding: 8px; position: relative; }
   top: 8px;
   right: 12px;
 }
+
+.btn-card-new {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  color: var(--text-dim);
+  cursor: pointer;
+  font-size: 11px;
+  font-family: inherit;
+  line-height: 1;
+  padding: 2px 4px;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.card:hover .btn-card-new { opacity: 1; }
+.btn-card-new:hover { color: var(--text); border-color: var(--text-dim); }
+.btn-card-new .claude-icon { width: 10px; height: 10px; vertical-align: -1px; }
 
 .card-dismiss {
   font-size: 11px;
