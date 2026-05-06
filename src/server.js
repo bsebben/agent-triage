@@ -222,20 +222,22 @@ const server = createServer(async (req, res) => {
     }
 
     if (req.url === "/api/update" && req.method === "POST") {
+      const repoCwd = join(__dirname, "..");
+      const git = (args) => new Promise((resolve, reject) =>
+        execFile("git", args, { cwd: repoCwd }, (err, stdout) => err ? reject(err) : resolve(stdout)));
       try {
-        const { stdout: status } = await new Promise((resolve, reject) =>
-          execFile("git", ["status", "--porcelain"], { cwd: join(__dirname, "..") }, (err, stdout) =>
-            err ? reject(err) : resolve({ stdout })));
+        const branch = (await git(["rev-parse", "--abbrev-ref", "HEAD"])).trim();
+        if (branch !== "master") {
+          return jsonResponse(res, { ok: false, error: `On branch '${branch}', not master` });
+        }
+        const status = await git(["status", "--porcelain"]);
         const tracked = status.split("\n").filter((l) => l && !l.startsWith("??")).join("\n");
         if (tracked.trim()) {
           return jsonResponse(res, { ok: false, error: "Working tree has uncommitted changes" });
         }
+        await git(["pull", "origin", "master"]);
         await new Promise((resolve, reject) =>
-          execFile("git", ["pull", "origin", "master"], { cwd: join(__dirname, "..") }, (err) =>
-            err ? reject(err) : resolve()));
-        await new Promise((resolve, reject) =>
-          execFile("npm", ["install"], { cwd: join(__dirname, "..") }, (err) =>
-            err ? reject(err) : resolve()));
+          execFile("npm", ["install"], { cwd: repoCwd }, (err) => err ? reject(err) : resolve()));
         return jsonResponse(res, { ok: true });
       } catch (err) {
         return jsonResponse(res, { ok: false, error: err.message }, 500);
