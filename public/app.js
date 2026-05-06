@@ -34,11 +34,12 @@ function connect() {
       applyRenames();
       applyCloses();
       if (!renaming) render();
+      if (typeof renderUpdateIndicator === "function") renderUpdateIndicator();
     } else if (msg.type === "log" || msg.type === "logs") {
       if (typeof handleLogMessage === "function") handleLogMessage(msg);
     }
   };
-  ws.onclose = () => setTimeout(connect, 2000);
+  ws.onclose = () => setTimeout(() => { connect(); loadAppConfig(); }, 2000);
 }
 
 function applyCloses() {
