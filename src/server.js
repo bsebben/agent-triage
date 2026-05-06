@@ -246,6 +246,7 @@ const server = createServer(async (req, res) => {
           const now = new Date();
           utimesSync(join(__dirname, "server.js"), now, now);
         }, 200);
+        return;
       } catch (err) {
         return jsonResponse(res, { ok: false, error: err.message }, 500);
       }
