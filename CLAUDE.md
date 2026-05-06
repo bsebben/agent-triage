@@ -52,7 +52,7 @@ After installing, the user can reopen it from Spotlight (search "Agent Triage"),
 
 ## Versioning
 
-This project uses semantic versioning. **Before pushing, run `npm run version-check`** to verify the version was bumped.
+This project uses semantic versioning. **Every PR must bump the version** — the auto-update feature relies on version changes to notify users. Before pushing, run `npm run version-check` to verify the version was bumped.
 
 - **Patch** (x.y.Z): bug fixes, config tweaks, docs-only changes to code files
 - **Minor** (x.Y.0): new features, new tabs, new config fields
@@ -60,7 +60,7 @@ This project uses semantic versioning. **Before pushing, run `npm run version-ch
 
 The check compares `package.json` version against `origin/master`. If code in `src/`, `public/`, or `test/` changed without a version bump, it fails.
 
-When bumping, update the version in `package.json`. The server reads it at startup and exposes it via `/api/config`.
+When bumping, update the version in `package.json` and add a corresponding entry in `CHANGELOG.md`. The server reads the version at startup and exposes it via `/api/config`.
 
 ## Changelog
 
