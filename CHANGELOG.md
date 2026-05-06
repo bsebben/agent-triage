@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.13.1] - 2026-05-06
+
+### Fixed
+
+- Dismissed cards now show a "close" button alongside "restore" so workspaces can be closed directly
+
 ## [1.13.0] - 2026-05-06
 
 ### Added
