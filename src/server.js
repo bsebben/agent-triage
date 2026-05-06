@@ -226,7 +226,8 @@ const server = createServer(async (req, res) => {
         const { stdout: status } = await new Promise((resolve, reject) =>
           execFile("git", ["status", "--porcelain"], { cwd: join(__dirname, "..") }, (err, stdout) =>
             err ? reject(err) : resolve({ stdout })));
-        if (status.trim()) {
+        const tracked = status.split("\n").filter((l) => l && !l.startsWith("??")).join("\n");
+        if (tracked.trim()) {
           return jsonResponse(res, { ok: false, error: "Working tree has uncommitted changes" });
         }
         await new Promise((resolve, reject) =>
