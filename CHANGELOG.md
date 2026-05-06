@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.13.2] - 2026-05-06
+
+### Fixed
+
+- New Session and New Terminal buttons now only appear on group headers (on hover), not on individual cards
+
 ## [1.13.1] - 2026-05-06
 
 ### Fixed

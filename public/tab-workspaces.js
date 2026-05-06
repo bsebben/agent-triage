@@ -99,12 +99,6 @@ function renderCard(item, { isDismissed = false } = {}) {
   const cardTitle = item.workspaceTitle || "Unknown";
   const subtitle = item.gitBranch || null;
 
-  const dir = item.workspaceDir || "";
-  const newBtns = !isDismissed
-    ? `<button class="btn-card-new" data-cwd="${escapeHtml(dir)}" onclick="event.stopPropagation();newSession(this.dataset.cwd)" data-tip="New Session">${claudeIcon()}</button>
-       <button class="btn-card-new" data-cwd="${escapeHtml(dir)}" onclick="event.stopPropagation();newWorkspace(this.dataset.cwd)" data-tip="New Terminal">&gt;_</button>`
-    : "";
-
   const dismissBtn = isDismissed
     ? `<a class="card-dismiss" onclick="event.stopPropagation();restore('${item.id}')">restore</a>`
     : `<a class="card-dismiss" onclick="event.stopPropagation();dismiss('${item.id}')">dismiss</a>`;
@@ -114,7 +108,7 @@ function renderCard(item, { isDismissed = false } = {}) {
   return `<div class="card${selectedClass} cat-${escapeHtml(item.category)}" data-workspace-id="${item.workspaceId}" onclick="cardClick(event,'${item.workspaceId}')">
     <div class="card-body-left">
       <div class="card-title-row"><span class="card-title-group"><span class="card-title">${escapeHtml(cardTitle)}</span><a class="card-edit" onclick="event.stopPropagation();startRename(this,'${item.workspaceId}','${escapeHtml(cardTitle)}')">&#9998;</a></span></div>
-    <span class="card-actions-right">${newBtns}${dismissBtn}${closeBtn}</span>
+    <span class="card-actions-right">${dismissBtn}${closeBtn}</span>
       <div class="card-header">
         <span class="card-category ${escapeHtml(item.category)}"><span class="card-icon">${categoryIcon(item.category)}</span> ${escapeHtml(item.category)}</span>
       </div>
