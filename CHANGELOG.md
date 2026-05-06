@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.14.0] - 2026-05-06
+
+### Added
+
+- Auto-update notification: checks `origin/master` every 30 minutes for newer versions
+- Update indicator in header with "What's New" modal showing changelog diff
+- In-place update button that runs `git pull` + `npm install` (server auto-restarts via `--watch`)
+- `POST /api/check-update` endpoint for manual refresh
+- `POST /api/update` endpoint with dirty-tree safety check
+
 ## [1.13.3] - 2026-05-06
 
 ### Fixed

@@ -11,6 +11,7 @@ import { execFile } from "node:child_process";
 import { readBody, serveStatic, jsonResponse } from "./utils.js";
 import { initLogs, getLines } from "./logs.js";
 import config, { HOME } from "./config.js";
+import { UpdateChecker } from "./update-checker.js";
 import loops from "./tabs/loops.js";
 import pulls from "./tabs/pulls.js";
 import tickets from "./tabs/tickets.js";
@@ -48,6 +49,7 @@ function broadcast() {
   queue.save(join(DATA_DIR, "queue.json")).catch(() => {});
 }
 
+const updateChecker = new UpdateChecker();
 const monitor = new Monitor(queue, { onUpdate: broadcast });
 
 function getFullData() {
@@ -62,6 +64,7 @@ function getFullData() {
     groups: queue.grouped(),
     dismissed: queue.dismissedItems(),
     stats: queue.stats(),
+    updateStatus: updateChecker.data,
     ...tabData,
     tabStatus,
   };
@@ -213,6 +216,34 @@ const server = createServer(async (req, res) => {
       return jsonResponse(res, { ok: true });
     }
 
+    if (req.url === "/api/check-update" && req.method === "POST") {
+      await updateChecker.check();
+      return jsonResponse(res, { ok: true });
+    }
+
+    if (req.url === "/api/update" && req.method === "POST") {
+      const repoCwd = join(__dirname, "..");
+      const git = (args) => new Promise((resolve, reject) =>
+        execFile("git", args, { cwd: repoCwd }, (err, stdout) => err ? reject(err) : resolve(stdout)));
+      try {
+        const branch = (await git(["rev-parse", "--abbrev-ref", "HEAD"])).trim();
+        if (branch !== "master") {
+          return jsonResponse(res, { ok: false, error: `On branch '${branch}', not master` });
+        }
+        const status = await git(["status", "--porcelain"]);
+        const tracked = status.split("\n").filter((l) => l && !l.startsWith("??")).join("\n");
+        if (tracked.trim()) {
+          return jsonResponse(res, { ok: false, error: "Working tree has uncommitted changes" });
+        }
+        await git(["pull", "origin", "master"]);
+        await new Promise((resolve, reject) =>
+          execFile("npm", ["install"], { cwd: repoCwd }, (err) => err ? reject(err) : resolve()));
+        return jsonResponse(res, { ok: true });
+      } catch (err) {
+        return jsonResponse(res, { ok: false, error: err.message }, 500);
+      }
+    }
+
     if (req.url === "/api/dismiss" && req.method === "POST") {
       const { id } = await readBody(req);
       queue.dismiss(id);
@@ -255,6 +286,8 @@ wss.on("connection", (ws) => {
 for (const [name, tab] of Object.entries(tabs)) {
   await tab.init(config.tabs[name] || {}, broadcast);
 }
+
+updateChecker.init(broadcast);
 
 server.listen(PORT, () => {
   console.log(`Agent Triage running at http://localhost:${PORT}`);
