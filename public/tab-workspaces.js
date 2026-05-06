@@ -109,9 +109,7 @@ function renderCard(item, { isDismissed = false } = {}) {
     ? `<a class="card-dismiss" onclick="event.stopPropagation();restore('${item.id}')">restore</a>`
     : `<a class="card-dismiss" onclick="event.stopPropagation();dismiss('${item.id}')">dismiss</a>`;
 
-  const closeBtn = !isDismissed
-    ? `<a class="card-close" onclick="event.stopPropagation();closeWorkspace('${item.workspaceId}')">close</a>`
-    : "";
+  const closeBtn = `<a class="card-close" onclick="event.stopPropagation();closeWorkspace('${item.workspaceId}')">close</a>`;
 
   return `<div class="card${selectedClass} cat-${escapeHtml(item.category)}" data-workspace-id="${item.workspaceId}" onclick="cardClick(event,'${item.workspaceId}')">
     <div class="card-body-left">
