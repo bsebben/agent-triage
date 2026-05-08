@@ -3,7 +3,7 @@
 let pullsSubTab = "mine";
 let pullsAuthorFilter = "";
 let pullsStatusFilter = "";
-let pullsDirectFilter = false;
+let pullsDirectFilter = true;
 const collapsedPullRepos = new Set();
 
 function collectAuthors(groups) {
@@ -139,7 +139,7 @@ function switchPullsTab(tab) {
   pullsSubTab = tab;
   pullsAuthorFilter = "";
   pullsStatusFilter = "";
-  pullsDirectFilter = false;
+  pullsDirectFilter = true;
   renderPulls();
 }
 
