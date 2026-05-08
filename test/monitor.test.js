@@ -125,4 +125,34 @@ describe("Monitor terminal detection", () => {
     assert.equal(w1.category, "running");
     assert.equal(w2.category, "terminal");
   });
+
+  it("evicts a dismissed synthetic entry when the workspace starts producing notifications", async () => {
+    const state = {
+      notifications: [],
+      workspaces: [{ id: "W1", title: "claude-session", directory: "/home/user/project" }],
+      agentWorkspaceIds: new Set(["W1"]),
+    };
+    const cmuxApi = {
+      listNotifications: async () => state.notifications,
+      listWorkspaces: async () => state.workspaces,
+      listTerminals: async () => [],
+      listAgentWorkspaceIds: async () => state.agentWorkspaceIds,
+      readScreen: async () => null,
+    };
+    const monitor = new Monitor(queue, { cmuxApi });
+
+    await monitor.poll();
+    assert.equal(queue.items().length, 1);
+    queue.dismiss("synthetic-W1");
+    assert.equal(queue.dismissedItems().length, 1);
+
+    state.notifications = [
+      { id: "notif-abc", category: "permission", workspaceId: "W1", surfaceId: "S1", body: "approve?" },
+    ];
+    await monitor.poll();
+
+    assert.equal(queue.items().length, 1, "notification should be the only active entry");
+    assert.equal(queue.items()[0].id, "notif-abc");
+    assert.equal(queue.dismissedItems().length, 0, "stale dismissed synthetic should be evicted");
+  });
 });
