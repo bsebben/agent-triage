@@ -5,15 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.14.7] - 2026-05-11
+
+### Fixed
+
+- Workspaces no longer appear in both the active and Dismissed sections after chatting with a dismissed session — dismissed entries are now restored to active when their workspace produces fresh activity, instead of ghosting under a stale id
+
 ## [1.14.6] - 2026-05-08
 
 ### Changed
 
 - "Assigned to me" filter on Reviews sub-tab now defaults to on
-
-### Fixed
-
-- Workspaces no longer appear in both the active and Dismissed sections after chatting with a dismissed session — dismissed entries are now restored to active when their workspace produces fresh activity, instead of ghosting under a stale id
 
 ## [1.14.5] - 2026-05-06
 
