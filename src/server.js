@@ -233,12 +233,16 @@ const server = createServer(async (req, res) => {
 
     if (req.url === "/api/update" && req.method === "POST") {
       const repoCwd = join(__dirname, "..");
+      const body = await readBody(req).catch(() => ({}));
       const git = (args) => new Promise((resolve, reject) =>
         execFile("git", args, { cwd: repoCwd }, (err, stdout) => err ? reject(err) : resolve(stdout)));
       try {
         const branch = (await git(["rev-parse", "--abbrev-ref", "HEAD"])).trim();
-        if (branch !== "master") {
-          return jsonResponse(res, { ok: false, error: `On branch '${branch}', not master` });
+        if (branch !== "master" && !body.switchBranch) {
+          return jsonResponse(res, { ok: false, needsBranchSwitch: true, branch });
+        }
+        if (branch !== "master" && body.switchBranch) {
+          await git(["checkout", "master"]);
         }
         const status = await git(["status", "--porcelain"]);
         const tracked = status.split("\n").filter((l) => l && !l.startsWith("??")).join("\n");
