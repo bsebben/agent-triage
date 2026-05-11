@@ -1,6 +1,6 @@
 {
   "name": "agent-triage",
-  "version": "1.14.7",
+  "version": "1.15.0",
   "type": "module",
   "scripts": {
     "start": "node --watch src/server.js",

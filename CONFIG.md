@@ -13,6 +13,7 @@ Most fields have sensible defaults. A minimal config only needs cmux paths (auto
 ```json
 {
   "port": 7777,
+  "defaultDirectory": null,
   "cmux": { "binary": null, "socket": null },
   "tabs": {
     "loops": { "enabled": true },
@@ -23,6 +24,18 @@ Most fields have sensible defaults. A minimal config only needs cmux paths (auto
 ```
 
 Fields set to `null` are auto-detected at startup. The server logs what it found so you can verify.
+
+## Default Directory
+
+The `defaultDirectory` field controls where the "New Session" and "New Terminal" toolbar buttons open. When set to `null` (default), new workspaces open in your home directory. Set it to an absolute path to always start in a specific location:
+
+```json
+{
+  "defaultDirectory": "/Users/you/workspace"
+}
+```
+
+Per-group buttons (inside workspace groups) still open in that group's directory regardless of this setting.
 
 ## Tabs
 

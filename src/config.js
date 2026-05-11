@@ -11,8 +11,16 @@ const HOME = homedir();
 
 const DEFAULTS = {
   port: 7777,
+  defaultDirectory: null,
   cmux: { binary: null, socket: null },
 };
+
+function expandHome(p) {
+  if (!p) return p;
+  if (p === "~") return HOME;
+  if (p.startsWith("~/")) return join(HOME, p.slice(2));
+  return p;
+}
 
 function loadConfigFile() {
   const configPath = join(PROJECT_ROOT, "config.json");
@@ -42,6 +50,7 @@ function detectCmuxSocket() {
 function resolve(raw) {
   const config = {
     port: raw.port ?? DEFAULTS.port,
+    defaultDirectory: expandHome(raw.defaultDirectory) || HOME,
     cmux: { ...DEFAULTS.cmux, ...raw.cmux },
     tabs: raw.tabs || {},
   };

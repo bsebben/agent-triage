@@ -1,5 +1,6 @@
 {
   "port": 7777,
+  "defaultDirectory": null,
   "cmux": {
     "binary": null,
     "socket": null

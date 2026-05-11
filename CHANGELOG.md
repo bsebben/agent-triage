@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.15.0] - 2026-05-11
+
+### Added
+
+- Configurable `defaultDirectory` for "New Session" and "New Terminal" toolbar buttons — defaults to home directory, set in config.json to always open in a specific location
+- "Edit" button in the settings panel opens a Claude session pre-loaded with the current config and a prompt to walk through changes
+
 ## [1.14.7] - 2026-05-11
 
 ### Fixed
