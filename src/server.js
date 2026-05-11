@@ -102,6 +102,7 @@ const server = createServer(async (req, res) => {
       return jsonResponse(res, {
         version: JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf-8")).version,
         resolved: config,
+        projectDir: join(__dirname, ".."),
         ...tabConfigs,
       });
     }
@@ -200,7 +201,13 @@ const server = createServer(async (req, res) => {
 
     if (req.url === "/api/new-workspace" && req.method === "POST") {
       const body = await readBody(req).catch(() => ({}));
-      await cmux.createWorkspace({ cwd: body.cwd, command: body.command });
+      const cwd = body.cwd || config.defaultDirectory;
+      let { command } = body;
+      if (command === "claude" && body.prompt) {
+        const escaped = "'" + body.prompt.replace(/'/g, "'\\''") + "'";
+        command = `claude ${escaped}`;
+      }
+      await cmux.createWorkspace({ cwd, command });
       await monitor.poll();
       return jsonResponse(res, { ok: true });
     }

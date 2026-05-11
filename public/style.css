@@ -1275,6 +1275,18 @@ main { padding: 8px; position: relative; }
 }
 .settings-restart-btn:hover { background: color-mix(in srgb, var(--clr-error) 15%, var(--bg)); }
 
+.settings-edit-btn {
+  background: none;
+  border: 1px solid var(--text-dim);
+  color: var(--text-dim);
+  border-radius: 4px;
+  padding: 3px 10px;
+  font-size: 11px;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+.settings-edit-btn:hover { background: color-mix(in srgb, var(--text-dim) 15%, var(--bg)); color: var(--text); }
+
 .settings-config-row {
   font-size: 12px;
   padding: 2px 0;
