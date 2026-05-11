@@ -142,7 +142,23 @@ export class Monitor {
         }
       }
 
-      // Remove active (non-dismissed) items that cmux no longer reports.
+      // Restore any dismissed items whose workspace is producing fresh activity.
+      // A workspace's representation rotates ids (synthetic-<wsId> ↔ notification id),
+      // so a dismissal made against one id would otherwise ghost in the dismissed
+      // section while a new id appears in the active section for the same workspace.
+      const activeWorkspaceIds = new Set();
+      for (const item of this.#queue.items()) {
+        if (item.workspaceId) activeWorkspaceIds.add(item.workspaceId);
+      }
+      for (const item of this.#queue.dismissedItems()) {
+        if (item.workspaceId && activeWorkspaceIds.has(item.workspaceId)) {
+          this.#queue.restore(item.id);
+        }
+      }
+
+      // Remove active items that cmux no longer reports. Combined with the
+      // restore step above, this drops the now-stale id and leaves only the
+      // live one for that workspace.
       for (const item of this.#queue.items()) {
         if (!currentIds.has(item.id)) {
           this.#queue.remove(item.id);
