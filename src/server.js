@@ -241,17 +241,23 @@ const server = createServer(async (req, res) => {
         if (branch !== "master" && !body.switchBranch) {
           return jsonResponse(res, { ok: false, needsBranchSwitch: true, branch });
         }
-        if (branch !== "master" && body.switchBranch) {
-          await git(["checkout", "master"]);
-        }
         const status = await git(["status", "--porcelain"]);
         const tracked = status.split("\n").filter((l) => l && !l.startsWith("??")).join("\n");
         if (tracked.trim()) {
           return jsonResponse(res, { ok: false, error: "Working tree has uncommitted changes" });
         }
-        await git(["pull", "origin", "master"]);
-        await new Promise((resolve, reject) =>
-          execFile("npm", ["install"], { cwd: repoCwd }, (err) => err ? reject(err) : resolve()));
+        const switched = branch !== "master" && body.switchBranch;
+        if (switched) {
+          await git(["checkout", "master"]);
+        }
+        try {
+          await git(["pull", "origin", "master"]);
+          await new Promise((resolve, reject) =>
+            execFile("npm", ["install"], { cwd: repoCwd }, (err) => err ? reject(err) : resolve()));
+        } catch (err) {
+          if (switched) await git(["checkout", branch]).catch(() => {});
+          throw err;
+        }
         jsonResponse(res, { ok: true });
         setTimeout(() => {
           const now = new Date();

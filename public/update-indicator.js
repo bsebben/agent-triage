@@ -93,7 +93,8 @@ function openBranchSwitchModal(branch, btn) {
   panel.querySelector('[data-action="cancel"]').addEventListener("click", () => close?.());
   panel.querySelector('[data-action="confirm"]').addEventListener("click", () => {
     close?.();
-    performUpdate(btn, { switchBranch: true });
+    const liveBtn = document.querySelector(".update-action-btn") || btn;
+    performUpdate(liveBtn, { switchBranch: true });
   });
 
   close = openOverlay(panel, {
