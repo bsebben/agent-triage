@@ -1,6 +1,7 @@
 {
   "port": 7777,
   "defaultDirectory": null,
+  "maxSessions": null,
   "cmux": {
     "binary": null,
     "socket": null

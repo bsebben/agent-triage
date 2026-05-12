@@ -188,11 +188,23 @@ async function apiPost(endpoint, body) {
 async function newSession(cwd) {
   const body = { command: "claude" };
   if (cwd) body.cwd = cwd;
-  await apiPost("new-workspace", body);
+  const res = await apiPost("new-workspace", body);
+  if (res.error && res.limit) showSessionLimitAlert(res);
 }
 
 async function newWorkspace(cwd) {
-  await apiPost("new-workspace", cwd ? { cwd } : {});
+  const res = await apiPost("new-workspace", cwd ? { cwd } : {});
+  if (res.error && res.limit) showSessionLimitAlert(res);
+}
+
+function showSessionLimitAlert(res) {
+  const existing = document.querySelector(".session-limit-toast");
+  if (existing) return;
+  const toast = document.createElement("div");
+  toast.className = "session-limit-toast";
+  toast.textContent = `Session limit reached (${res.current}/${res.limit})`;
+  queue.prepend(toast);
+  setTimeout(() => toast.remove(), 3000);
 }
 
 function toggleGroup(header) {

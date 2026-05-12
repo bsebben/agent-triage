@@ -66,6 +66,23 @@ describe("Queue", () => {
     assert.equal(zp.items.length, 2);
   });
 
+  it("counts unique workspace IDs from active items", () => {
+    queue.upsert({ id: "A", category: "running", workspaceId: "W1", body: "" });
+    queue.upsert({ id: "B", category: "waiting", workspaceId: "W1", body: "q" });
+    queue.upsert({ id: "C", category: "terminal", workspaceId: "W2", body: "" });
+    queue.upsert({ id: "D", category: "running", workspaceId: "W3", body: "" });
+    const ids = new Set(queue.items().map((i) => i.workspaceId));
+    assert.equal(ids.size, 3);
+  });
+
+  it("excludes dismissed items from session count", () => {
+    queue.upsert({ id: "A", category: "running", workspaceId: "W1", body: "" });
+    queue.upsert({ id: "B", category: "running", workspaceId: "W2", body: "" });
+    queue.dismiss("B");
+    const ids = new Set(queue.items().map((i) => i.workspaceId));
+    assert.equal(ids.size, 1);
+  });
+
   it("sorts groups alphabetically regardless of item priority", () => {
     queue.upsert({ id: "Z1", category: "running", workspaceId: "W1", workspaceDir: `${HOME}/workspace/zenpayroll`, body: "" });
     queue.upsert({ id: "A1", category: "terminal", workspaceId: "W2", workspaceDir: `${HOME}/workspace/agent-triage`, body: "" });
