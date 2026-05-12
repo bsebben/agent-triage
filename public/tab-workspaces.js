@@ -17,12 +17,19 @@ function saveCollapseState() {
 
 function renderWorkspaces() {
   const { groups, dismissed } = state;
+  const atLimit = state.maxSessions !== null && state.sessionCount >= state.maxSessions;
 
   saveCollapseState();
 
-  let html = `<div class="tab-toolbar">
-    <button class="btn-new-workspace" onclick="newSession()" data-tip="New Session">${claudeIcon()}</button>
-    <button class="btn-new-workspace" onclick="newWorkspace()" data-tip="New Terminal">&gt;_</button>
+  let html = "";
+  if (atLimit) {
+    html += `<div class="session-limit-toast">Session limit reached (${state.sessionCount}/${state.maxSessions})</div>`;
+  }
+
+  const disabledAttr = atLimit ? " disabled" : "";
+  html += `<div class="tab-toolbar">
+    <button class="btn-new-workspace" onclick="newSession()" data-tip="New Session"${disabledAttr}>${claudeIcon()}</button>
+    <button class="btn-new-workspace" onclick="newWorkspace()" data-tip="New Terminal"${disabledAttr}>&gt;_</button>
   </div>`;
 
   if (groups.length === 0 && (!dismissed || dismissed.length === 0)) {
@@ -41,8 +48,8 @@ function renderWorkspaces() {
         <span class="chevron${isCollapsed ? " collapsed" : ""}">\u25bc</span> <span>${escapeHtml(title)}</span>
         <span class="count">(${g.items.length})</span>
         <span class="group-actions" onclick="event.stopPropagation()">
-          <button class="btn-group-add" data-cwd="${escapeHtml(dir)}" onclick="newSession(this.dataset.cwd)" data-tip="New Session">${claudeIcon()}</button>
-          <button class="btn-group-add" data-cwd="${escapeHtml(dir)}" onclick="newWorkspace(this.dataset.cwd)" data-tip="New Terminal">&gt;_</button>
+          <button class="btn-group-add" data-cwd="${escapeHtml(dir)}" onclick="newSession(this.dataset.cwd)" data-tip="New Session"${disabledAttr}>${claudeIcon()}</button>
+          <button class="btn-group-add" data-cwd="${escapeHtml(dir)}" onclick="newWorkspace(this.dataset.cwd)" data-tip="New Terminal"${disabledAttr}>&gt;_</button>
         </span>
       </div>
       <div class="group-items${isCollapsed ? " collapsed" : ""}">${g.items.map((i) => renderCard(i)).join("")}</div>

@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.17.0] - 2026-05-12
+
+### Added
+
+- Configurable `maxSessions` limit (null = unlimited, number = hard cap) — disables new session/terminal buttons and shows a toast when active workspace count reaches the limit
+- Server-side enforcement via 429 on `/api/new-workspace` and `/api/agent-workspace`
+- Max Sessions toggle in the settings panel for runtime changes without editing config.json
+
 ## [1.16.0] - 2026-05-11
 
 ### Added

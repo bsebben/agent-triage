@@ -10,7 +10,7 @@ import * as cmux from "./cmux.js";
 import { execFile } from "node:child_process";
 import { readBody, serveStatic, jsonResponse } from "./utils.js";
 import { initLogs, getLines } from "./logs.js";
-import config, { HOME } from "./config.js";
+import config, { HOME, updateConfigFile } from "./config.js";
 import { UpdateChecker } from "./update-checker.js";
 import loops from "./tabs/loops.js";
 import pulls from "./tabs/pulls.js";
@@ -52,6 +52,12 @@ function broadcast() {
 const updateChecker = new UpdateChecker();
 const monitor = new Monitor(queue, { onUpdate: broadcast });
 
+function getSessionCount() {
+  const ids = new Set();
+  for (const item of queue.items()) ids.add(item.workspaceId);
+  return ids.size;
+}
+
 function getFullData() {
   const tabData = {};
   const tabStatus = {};
@@ -64,6 +70,8 @@ function getFullData() {
     groups: queue.grouped(),
     dismissed: queue.dismissedItems(),
     stats: queue.stats(),
+    maxSessions: config.maxSessions,
+    sessionCount: getSessionCount(),
     updateStatus: updateChecker.data,
     ...tabData,
     tabStatus,
@@ -200,6 +208,9 @@ const server = createServer(async (req, res) => {
     }
 
     if (req.url === "/api/new-workspace" && req.method === "POST") {
+      if (config.maxSessions !== null && getSessionCount() >= config.maxSessions) {
+        return jsonResponse(res, { error: "Session limit reached", limit: config.maxSessions, current: getSessionCount() }, 429);
+      }
       const body = await readBody(req).catch(() => ({}));
       const cwd = body.cwd || config.defaultDirectory;
       let { command } = body;
@@ -213,6 +224,9 @@ const server = createServer(async (req, res) => {
     }
 
     if (req.url === "/api/agent-workspace" && req.method === "POST") {
+      if (config.maxSessions !== null && getSessionCount() >= config.maxSessions) {
+        return jsonResponse(res, { error: "Session limit reached", limit: config.maxSessions, current: getSessionCount() }, 429);
+      }
       const { prompt, repo } = await readBody(req);
       if (!prompt || typeof prompt !== "string") {
         return jsonResponse(res, { error: "prompt required" }, 400);
@@ -267,6 +281,17 @@ const server = createServer(async (req, res) => {
       } catch (err) {
         return jsonResponse(res, { ok: false, error: err.message }, 500);
       }
+    }
+
+    if (req.url === "/api/config/max-sessions" && req.method === "POST") {
+      const { maxSessions } = await readBody(req);
+      if (maxSessions !== null && (!Number.isInteger(maxSessions) || maxSessions < 1)) {
+        return jsonResponse(res, { error: "maxSessions must be a positive integer or null" }, 400);
+      }
+      config.maxSessions = maxSessions;
+      updateConfigFile("maxSessions", maxSessions);
+      broadcast();
+      return jsonResponse(res, { ok: true, maxSessions });
     }
 
     if (req.url === "/api/dismiss" && req.method === "POST") {

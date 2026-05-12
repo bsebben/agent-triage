@@ -1,5 +1,5 @@
 // src/config.js
-import { readFileSync, existsSync } from "node:fs";
+import { readFileSync, existsSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { homedir } from "node:os";
 import { execFileSync } from "node:child_process";
@@ -12,6 +12,7 @@ const HOME = homedir();
 const DEFAULTS = {
   port: 7777,
   defaultDirectory: null,
+  maxSessions: null,
   cmux: { binary: null, socket: null },
 };
 
@@ -48,9 +49,16 @@ function detectCmuxSocket() {
 }
 
 function resolve(raw) {
+  const maxSessions = raw.maxSessions ?? DEFAULTS.maxSessions;
+  if (maxSessions !== null && (!Number.isInteger(maxSessions) || maxSessions < 1)) {
+    console.error("maxSessions must be a positive integer or null.");
+    process.exit(1);
+  }
+
   const config = {
     port: raw.port ?? DEFAULTS.port,
     defaultDirectory: expandHome(raw.defaultDirectory) || HOME,
+    maxSessions,
     cmux: { ...DEFAULTS.cmux, ...raw.cmux },
     tabs: raw.tabs || {},
   };
@@ -70,9 +78,16 @@ function resolve(raw) {
   console.log(`Config: cmux binary = ${config.cmux.binary}`);
   console.log(`Config: cmux socket = ${config.cmux.socket}`);
 
-  return Object.freeze(config);
+  return config;
+}
+
+function updateConfigFile(key, value) {
+  const configPath = join(PROJECT_ROOT, "config.json");
+  const raw = JSON.parse(readFileSync(configPath, "utf-8"));
+  raw[key] = value;
+  writeFileSync(configPath, JSON.stringify(raw, null, 2) + "\n");
 }
 
 const config = resolve(loadConfigFile());
 export default config;
-export { HOME };
+export { HOME, PROJECT_ROOT, updateConfigFile };
