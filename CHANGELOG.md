@@ -17,6 +17,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- Confirmation modal when upgrading from a non-master branch — asks to switch to master instead of showing an error
+
+## [1.15.0] - 2026-05-11
+
+### Added
+
 - Configurable `defaultDirectory` for "New Session" and "New Terminal" toolbar buttons — defaults to home directory, set in config.json to always open in a specific location
 - "Edit" button in the settings panel opens a Claude session pre-loaded with the current config and a prompt to walk through changes
 
