@@ -142,23 +142,26 @@ export class Monitor {
         }
       }
 
-      // Restore any dismissed items whose workspace is producing fresh activity.
-      // A workspace's representation rotates ids (synthetic-<wsId> ↔ notification id),
-      // so a dismissal made against one id would otherwise ghost in the dismissed
-      // section while a new id appears in the active section for the same workspace.
-      const activeWorkspaceIds = new Set();
-      for (const item of this.#queue.items()) {
-        if (item.workspaceId) activeWorkspaceIds.add(item.workspaceId);
-      }
+      // When a workspace's representation rotates IDs (synthetic ↔ notification,
+      // or notification ID changes), carry the dismissed state forward to the new
+      // ID — unless the new item escalated to an attention-required category
+      // (e.g. running → permission), which should surface for the user.
+      const ATTENTION = new Set(["error", "permission", "waiting", "question"]);
+      const dismissedByWs = new Map();
       for (const item of this.#queue.dismissedItems()) {
-        if (item.workspaceId && activeWorkspaceIds.has(item.workspaceId)) {
-          this.#queue.restore(item.id);
+        if (item.workspaceId) dismissedByWs.set(item.workspaceId, item);
+      }
+      for (const item of this.#queue.items()) {
+        const prev = dismissedByWs.get(item.workspaceId);
+        if (!prev || prev.id === item.id) continue;
+        const escalated = ATTENTION.has(item.category) && !ATTENTION.has(prev.category);
+        if (!escalated) {
+          this.#queue.dismiss(item.id);
         }
+        this.#queue.remove(prev.id);
       }
 
-      // Remove active items that cmux no longer reports. Combined with the
-      // restore step above, this drops the now-stale id and leaves only the
-      // live one for that workspace.
+      // Remove active (non-dismissed) items that cmux no longer reports.
       for (const item of this.#queue.items()) {
         if (!currentIds.has(item.id)) {
           this.#queue.remove(item.id);
