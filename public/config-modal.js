@@ -121,14 +121,39 @@ async function openConfigModal() {
       groups.get(entry.group).push({ key, entry });
     }
 
-    let html = "";
+    const topGroups = [];
+    const tabGroups = [];
     for (const [group, fields] of groups) {
+      if (group.startsWith("tabs.")) tabGroups.push({ group, fields });
+      else topGroups.push({ group, fields });
+    }
+
+    let html = "";
+    for (const { group, fields } of topGroups) {
       html += `<div class="config-group">`;
       html += `<h3 class="config-group-title">${escapeHtml(groupLabel(group))}</h3>`;
       for (const { key, entry } of fields) {
         const rawValue = getNestedValue(raw, key);
         const resolvedValue = getNestedValue(resolved, key);
         html += renderField(key, entry, rawValue, resolvedValue);
+      }
+      html += `</div>`;
+    }
+
+    if (tabGroups.length > 0) {
+      html += `<div class="config-group">`;
+      html += `<h3 class="config-group-title">Tabs</h3>`;
+      for (const { group, fields } of tabGroups) {
+        const tabName = group.split(".").pop();
+        const tabLabel = tabName.charAt(0).toUpperCase() + tabName.slice(1);
+        html += `<div class="config-tab-section">`;
+        html += `<h4 class="config-tab-title">${escapeHtml(tabLabel)}</h4>`;
+        for (const { key, entry } of fields) {
+          const rawValue = getNestedValue(raw, key);
+          const resolvedValue = getNestedValue(resolved, key);
+          html += renderField(key, entry, rawValue, resolvedValue);
+        }
+        html += `</div>`;
       }
       html += `</div>`;
     }

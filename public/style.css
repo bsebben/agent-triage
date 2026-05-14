@@ -1466,3 +1466,17 @@ main { padding: 8px; position: relative; }
   color: var(--text-dim);
   opacity: 0.7;
 }
+
+.config-tab-section {
+  margin-left: 12px;
+  margin-bottom: 12px;
+  padding-left: 12px;
+  border-left: 2px solid var(--border);
+}
+
+.config-tab-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  margin: 0 0 6px 0;
+}
