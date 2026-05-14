@@ -1480,3 +1480,7 @@ main { padding: 8px; position: relative; }
   color: var(--text);
   margin: 0 0 6px 0;
 }
+
+.config-tab-section .config-field {
+  margin-left: 8px;
+}
