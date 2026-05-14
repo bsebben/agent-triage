@@ -16,11 +16,84 @@ const DEFAULTS = {
   cmux: { binary: null, socket: null },
 };
 
+export const FIELD_META = {
+  port:             { description: "<b>Requires restart.</b> HTTP port the dashboard listens on" },
+  maxSessions:      { type: "number", nullable: true, description: "Caps how many concurrent Claude Code workspaces can be open" },
+  defaultDirectory: { type: "string", nullable: true, description: "Working directory for new sessions" },
+  "cmux.binary":    { type: "string", nullable: true, description: "<b>Requires restart.</b> Path to the cmux CLI binary" },
+  "cmux.socket":    { type: "string", nullable: true, description: "<b>Requires restart.</b> Unix socket for cmux RPC" },
+  "tabs.loops.dataDir":    { type: "string", nullable: true, description: "Path to claude-loops plugin data" },
+  "tabs.loops.installUrl": { type: "string", nullable: true, description: "URL shown when the plugin isn't installed" },
+  "tabs.pulls.orgFilter":  { type: "string", nullable: true, description: "GitHub org to filter PRs by" },
+};
+
+function inferType(value) {
+  if (value === null || value === undefined) return "string";
+  if (typeof value === "boolean") return "boolean";
+  if (typeof value === "number") return "number";
+  return "string";
+}
+
+export function buildSchema(tabDefaults) {
+  const schema = {};
+
+  for (const [key, value] of Object.entries(DEFAULTS)) {
+    if (key === "cmux" || key === "tabs") continue;
+    const meta = FIELD_META[key] || {};
+    schema[key] = {
+      type: meta.type || inferType(value),
+      default: value,
+      group: "server",
+      description: meta.description || "",
+      ...(meta.nullable && { nullable: true }),
+    };
+  }
+
+  for (const [key, value] of Object.entries(DEFAULTS.cmux)) {
+    const path = `cmux.${key}`;
+    const meta = FIELD_META[path] || {};
+    schema[path] = {
+      type: meta.type || inferType(value),
+      default: value,
+      group: "cmux",
+      description: meta.description || "",
+      ...(meta.nullable && { nullable: true }),
+    };
+  }
+
+  for (const [tabName, defaults] of Object.entries(tabDefaults)) {
+    for (const [key, value] of Object.entries(defaults)) {
+      const path = `tabs.${tabName}.${key}`;
+      const meta = FIELD_META[path] || {};
+      const isNullDefault = value === null;
+      schema[path] = {
+        type: meta.type || (isNullDefault ? "string" : inferType(value)),
+        default: value,
+        group: `tabs.${tabName}`,
+        description: meta.description || "",
+        ...((meta.nullable || isNullDefault) && { nullable: true }),
+      };
+    }
+  }
+
+  return schema;
+}
+
 function expandHome(p) {
   if (!p) return p;
   if (p === "~") return HOME;
   if (p.startsWith("~/")) return join(HOME, p.slice(2));
   return p;
+}
+
+export function loadRawConfig() {
+  const configPath = join(PROJECT_ROOT, "config.json");
+  return JSON.parse(readFileSync(configPath, "utf-8"));
+}
+
+export function writeConfigFile(configObj) {
+  const configPath = join(PROJECT_ROOT, "config.json");
+  writeFileSync(configPath, JSON.stringify(configObj, null, 2) + "\n");
 }
 
 function loadConfigFile() {
@@ -30,7 +103,7 @@ function loadConfigFile() {
     console.error("  cp config.example.json config.json");
     process.exit(1);
   }
-  return JSON.parse(readFileSync(configPath, "utf-8"));
+  return loadRawConfig();
 }
 
 function detectCmuxBinary() {
@@ -81,13 +154,6 @@ function resolve(raw) {
   return config;
 }
 
-function updateConfigFile(key, value) {
-  const configPath = join(PROJECT_ROOT, "config.json");
-  const raw = JSON.parse(readFileSync(configPath, "utf-8"));
-  raw[key] = value;
-  writeFileSync(configPath, JSON.stringify(raw, null, 2) + "\n");
-}
-
 const config = resolve(loadConfigFile());
 export default config;
-export { HOME, PROJECT_ROOT, updateConfigFile };
+export { HOME, PROJECT_ROOT };

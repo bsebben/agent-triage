@@ -30,8 +30,6 @@ function renderSettings() {
     return `<div class="settings-config-row">${escapeHtml(name)}: ${status}${hint}</div>`;
   }).join("");
 
-  const resolved = appConfig.resolved || {};
-  const configJson = JSON.stringify(resolved, null, 2);
   const version = appConfig.version ? `v${appConfig.version}` : "";
 
   settingsPanel.innerHTML = `
@@ -42,32 +40,12 @@ function renderSettings() {
     <div class="settings-section">
       <div class="settings-section-header">
         <h3>Server ${version}</h3>
-        <button class="settings-restart-btn" onclick="restartServer()">Restart</button>
-      </div>
-      <div class="settings-config">${tabRows}</div>
-    </div>
-    <div class="settings-section">
-      <h3>Max Sessions</h3>
-      <div class="settings-max-sessions">
-        <label class="settings-toggle-row">
-          <input type="checkbox" id="max-sessions-toggle"
-            ${resolved.maxSessions !== null ? "checked" : ""}
-            onchange="toggleMaxSessions(this.checked)">
-          <span>Limit concurrent workspaces</span>
-        </label>
-        <div class="settings-max-sessions-input" style="${resolved.maxSessions === null ? "display:none" : ""}">
-          <input type="number" id="max-sessions-value" min="1" step="1"
-            value="${resolved.maxSessions || 6}"
-            onchange="saveMaxSessions()">
+        <div class="settings-header-actions">
+          <button class="settings-edit-btn" onclick="editSettings()">Edit Configuration</button>
+          <button class="settings-restart-btn" onclick="restartServer()">Restart</button>
         </div>
       </div>
-    </div>
-    <div class="settings-section">
-      <div class="settings-section-header">
-        <h3>Resolved Config</h3>
-        <button class="settings-edit-btn" onclick="editSettings()">Edit</button>
-      </div>
-      <pre class="settings-config-json">${escapeHtml(configJson)}</pre>
+      <div class="settings-config">${tabRows}</div>
     </div>
     <div class="settings-section settings-logs-section">
       <h3>Server Logs</h3>
@@ -116,26 +94,8 @@ function handleLogMessage(msg) {
 }
 
 async function editSettings() {
-  if (!appConfig.projectDir) return;
-  const resolved = appConfig.resolved || {};
-  const configJson = JSON.stringify(resolved, null, 2);
-  const prompt = [
-    "I want to edit the Agent Triage dashboard config.",
-    "Here is the current resolved configuration:",
-    "",
-    "```json",
-    configJson,
-    "```",
-    "",
-    "Read config.json and CONFIG.md, show the current settings with a brief note on what each does,",
-    "then ask: \"What would you like to change?\"",
-  ].join("\n");
-  await apiPost("new-workspace", {
-    cwd: appConfig.projectDir,
-    command: "claude",
-    prompt,
-  });
   if (closeSettings) closeSettings();
+  openConfigModal();
 }
 
 async function restartServer() {
@@ -146,17 +106,3 @@ async function restartServer() {
   } catch {}
 }
 
-function toggleMaxSessions(enabled) {
-  const inputDiv = document.querySelector(".settings-max-sessions-input");
-  if (inputDiv) inputDiv.style.display = enabled ? "" : "none";
-  const value = enabled ? parseInt(document.getElementById("max-sessions-value")?.value, 10) || 6 : null;
-  apiPost("config/max-sessions", { maxSessions: value });
-}
-
-function saveMaxSessions() {
-  const toggle = document.getElementById("max-sessions-toggle");
-  if (!toggle?.checked) return;
-  const value = parseInt(document.getElementById("max-sessions-value")?.value, 10);
-  if (!value || value < 1) return;
-  apiPost("config/max-sessions", { maxSessions: value });
-}
