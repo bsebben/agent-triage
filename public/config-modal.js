@@ -20,11 +20,13 @@ function renderField(key, entry, rawValue, resolvedValue) {
   if (entry.type === "boolean") {
     const checked = rawValue !== null && rawValue !== undefined ? rawValue : entry.default;
     return `
-      <div class="config-field">
-        <label class="config-field-label" for="${id}">${escapeHtml(label)}</label>
-        <input type="checkbox" id="${id}" data-key="${key}" data-type="boolean"
-          ${checked ? "checked" : ""}>
-        <span class="config-field-desc">${escapeHtml(entry.description)}</span>
+      <div class="config-field config-field-toggle">
+        <label class="config-toggle" for="${id}">
+          <input type="checkbox" id="${id}" data-key="${key}" data-type="boolean"
+            ${checked ? "checked" : ""}>
+          <span class="config-toggle-track"></span>
+          <span class="config-toggle-label">${escapeHtml(label)}</span>
+        </label>
       </div>`;
   }
 

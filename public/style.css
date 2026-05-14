@@ -1446,10 +1446,59 @@ main { padding: 8px; position: relative; }
   opacity: 0.5;
 }
 
-.config-field input[type="checkbox"] {
-  grid-row: 1;
-  grid-column: 2;
-  justify-self: start;
+.config-field-toggle {
+  display: block;
+}
+
+.config-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+}
+
+.config-toggle input[type="checkbox"] {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.config-toggle-track {
+  position: relative;
+  width: 32px;
+  height: 18px;
+  background: var(--border);
+  border-radius: 9px;
+  flex-shrink: 0;
+  transition: background 0.2s;
+}
+
+.config-toggle-track::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 14px;
+  height: 14px;
+  background: var(--text-dim);
+  border-radius: 50%;
+  transition: transform 0.2s, background 0.2s;
+}
+
+.config-toggle input:checked + .config-toggle-track {
+  background: #4a8af4;
+}
+
+.config-toggle input:checked + .config-toggle-track::after {
+  transform: translateX(14px);
+  background: #fff;
+}
+
+.config-toggle-label {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text);
 }
 
 .config-field-desc {

@@ -17,11 +17,11 @@ const DEFAULTS = {
 };
 
 export const FIELD_META = {
-  port:             { description: "Dashboard port" },
-  maxSessions:      { type: "number", nullable: true, description: "Max concurrent workspaces (null = unlimited)" },
-  defaultDirectory: { type: "string", nullable: true, description: "Default working directory (null = home)" },
-  "cmux.binary":    { type: "string", nullable: true, description: "cmux binary path (null = auto-detect)" },
-  "cmux.socket":    { type: "string", nullable: true, description: "cmux socket path (null = auto-detect)" },
+  port:             { description: "Requires restart. Default: 7777" },
+  maxSessions:      { type: "number", nullable: true, description: "Leave empty for unlimited" },
+  defaultDirectory: { type: "string", nullable: true, description: "Leave empty to use home directory" },
+  "cmux.binary":    { type: "string", nullable: true, description: "Leave empty to auto-detect. Requires restart" },
+  "cmux.socket":    { type: "string", nullable: true, description: "Leave empty to auto-detect. Requires restart" },
 };
 
 function inferType(value) {
