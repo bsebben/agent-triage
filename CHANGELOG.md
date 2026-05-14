@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.18.0] - 2026-05-14
+
+### Added
+
+- Schema-driven config editing modal — click "Edit" in settings to modify all config fields in a form
+- Toast notification system for confirming actions (config save, etc.)
+- `GET /api/config/schema` endpoint exposing config schema, raw values, and resolved values
+- `POST /api/config` endpoint for writing full config.json with auto-restart
+
+### Removed
+
+- Dedicated `POST /api/config/max-sessions` endpoint (superseded by `POST /api/config`)
+- Max sessions toggle in settings panel (now part of the config modal form)
+
 ## [1.17.1] - 2026-05-14
 
 ### Fixed
