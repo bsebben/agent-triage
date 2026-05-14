@@ -10,11 +10,14 @@ import * as cmux from "./cmux.js";
 import { execFile } from "node:child_process";
 import { readBody, serveStatic, jsonResponse } from "./utils.js";
 import { initLogs, getLines } from "./logs.js";
-import config, { HOME, updateConfigFile } from "./config.js";
+import config, { HOME, updateConfigFile, buildSchema, loadRawConfig, writeConfigFile } from "./config.js";
 import { UpdateChecker } from "./update-checker.js";
-import loops from "./tabs/loops.js";
-import pulls from "./tabs/pulls.js";
-import tickets from "./tabs/tickets.js";
+import loops, { defaults as loopsDefaults } from "./tabs/loops.js";
+import pulls, { defaults as pullsDefaults } from "./tabs/pulls.js";
+import tickets, { defaults as ticketsDefaults } from "./tabs/tickets.js";
+
+const tabDefaults = { loops: loopsDefaults, pulls: pullsDefaults, tickets: ticketsDefaults };
+const configSchema = buildSchema(tabDefaults);
 
 const __dirname = fileURLToPath(new URL(".", import.meta.url));
 const PUBLIC_DIR = join(__dirname, "..", "public");
@@ -113,6 +116,28 @@ const server = createServer(async (req, res) => {
         projectDir: join(__dirname, ".."),
         ...tabConfigs,
       });
+    }
+
+    if (req.url === "/api/config/schema" && req.method === "GET") {
+      return jsonResponse(res, {
+        schema: configSchema,
+        raw: loadRawConfig(),
+        resolved: config,
+      });
+    }
+
+    if (req.url === "/api/config" && req.method === "POST") {
+      const body = await readBody(req);
+      if (!body || typeof body !== "object") {
+        return jsonResponse(res, { error: "Invalid config object" }, 400);
+      }
+      writeConfigFile(body);
+      jsonResponse(res, { ok: true });
+      setTimeout(() => {
+        const now = new Date();
+        utimesSync(join(__dirname, "server.js"), now, now);
+      }, 100);
+      return;
     }
 
     if (req.url?.startsWith("/api/refresh/") && req.method === "POST") {
