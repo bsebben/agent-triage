@@ -39,7 +39,13 @@ function connect() {
       if (typeof handleLogMessage === "function") handleLogMessage(msg);
     }
   };
-  ws.onopen = () => loadAppConfig();
+  ws.onopen = () => {
+    loadAppConfig();
+    if (sessionStorage.getItem("configSaved")) {
+      sessionStorage.removeItem("configSaved");
+      showToast("Configuration updated");
+    }
+  };
   ws.onclose = () => setTimeout(connect, 2000);
 }
 

@@ -116,26 +116,8 @@ function handleLogMessage(msg) {
 }
 
 async function editSettings() {
-  if (!appConfig.projectDir) return;
-  const resolved = appConfig.resolved || {};
-  const configJson = JSON.stringify(resolved, null, 2);
-  const prompt = [
-    "I want to edit the Agent Triage dashboard config.",
-    "Here is the current resolved configuration:",
-    "",
-    "```json",
-    configJson,
-    "```",
-    "",
-    "Read config.json and CONFIG.md, show the current settings with a brief note on what each does,",
-    "then ask: \"What would you like to change?\"",
-  ].join("\n");
-  await apiPost("new-workspace", {
-    cwd: appConfig.projectDir,
-    command: "claude",
-    prompt,
-  });
   if (closeSettings) closeSettings();
+  openConfigModal();
 }
 
 async function restartServer() {
