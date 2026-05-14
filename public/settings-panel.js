@@ -47,22 +47,6 @@ function renderSettings() {
       <div class="settings-config">${tabRows}</div>
     </div>
     <div class="settings-section">
-      <h3>Max Sessions</h3>
-      <div class="settings-max-sessions">
-        <label class="settings-toggle-row">
-          <input type="checkbox" id="max-sessions-toggle"
-            ${resolved.maxSessions !== null ? "checked" : ""}
-            onchange="toggleMaxSessions(this.checked)">
-          <span>Limit concurrent workspaces</span>
-        </label>
-        <div class="settings-max-sessions-input" style="${resolved.maxSessions === null ? "display:none" : ""}">
-          <input type="number" id="max-sessions-value" min="1" step="1"
-            value="${resolved.maxSessions || 6}"
-            onchange="saveMaxSessions()">
-        </div>
-      </div>
-    </div>
-    <div class="settings-section">
       <div class="settings-section-header">
         <h3>Resolved Config</h3>
         <button class="settings-edit-btn" onclick="editSettings()">Edit</button>
@@ -128,17 +112,3 @@ async function restartServer() {
   } catch {}
 }
 
-function toggleMaxSessions(enabled) {
-  const inputDiv = document.querySelector(".settings-max-sessions-input");
-  if (inputDiv) inputDiv.style.display = enabled ? "" : "none";
-  const value = enabled ? parseInt(document.getElementById("max-sessions-value")?.value, 10) || 6 : null;
-  apiPost("config/max-sessions", { maxSessions: value });
-}
-
-function saveMaxSessions() {
-  const toggle = document.getElementById("max-sessions-toggle");
-  if (!toggle?.checked) return;
-  const value = parseInt(document.getElementById("max-sessions-value")?.value, 10);
-  if (!value || value < 1) return;
-  apiPost("config/max-sessions", { maxSessions: value });
-}

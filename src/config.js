@@ -151,13 +151,6 @@ function resolve(raw) {
   return config;
 }
 
-function updateConfigFile(key, value) {
-  const configPath = join(PROJECT_ROOT, "config.json");
-  const raw = JSON.parse(readFileSync(configPath, "utf-8"));
-  raw[key] = value;
-  writeFileSync(configPath, JSON.stringify(raw, null, 2) + "\n");
-}
-
 const config = resolve(loadConfigFile());
 export default config;
-export { HOME, PROJECT_ROOT, updateConfigFile };
+export { HOME, PROJECT_ROOT };

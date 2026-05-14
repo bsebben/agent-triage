@@ -10,7 +10,7 @@ import * as cmux from "./cmux.js";
 import { execFile } from "node:child_process";
 import { readBody, serveStatic, jsonResponse } from "./utils.js";
 import { initLogs, getLines } from "./logs.js";
-import config, { HOME, updateConfigFile, buildSchema, loadRawConfig, writeConfigFile } from "./config.js";
+import config, { HOME, buildSchema, loadRawConfig, writeConfigFile } from "./config.js";
 import { UpdateChecker } from "./update-checker.js";
 import loops, { defaults as loopsDefaults } from "./tabs/loops.js";
 import pulls, { defaults as pullsDefaults } from "./tabs/pulls.js";
@@ -306,17 +306,6 @@ const server = createServer(async (req, res) => {
       } catch (err) {
         return jsonResponse(res, { ok: false, error: err.message }, 500);
       }
-    }
-
-    if (req.url === "/api/config/max-sessions" && req.method === "POST") {
-      const { maxSessions } = await readBody(req);
-      if (maxSessions !== null && (!Number.isInteger(maxSessions) || maxSessions < 1)) {
-        return jsonResponse(res, { error: "maxSessions must be a positive integer or null" }, 400);
-      }
-      config.maxSessions = maxSessions;
-      updateConfigFile("maxSessions", maxSessions);
-      broadcast();
-      return jsonResponse(res, { ok: true, maxSessions });
     }
 
     if (req.url === "/api/dismiss" && req.method === "POST") {
