@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.17.1] - 2026-05-14
+
+### Fixed
+
+- `categorizeNotification` now falls back to body text parsing when cmux subtitle is empty (cmux 0.64.3 moved notification info from subtitle to body)
+- `listAgentWorkspaceIds` now detects Claude Code workspaces by title prefix (✳/⠂/⠐) when cmux workspace tags are empty (cmux 0.64.3 stopped setting process tags)
+
 ## [1.17.0] - 2026-05-12
 
 ### Added
