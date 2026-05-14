@@ -41,7 +41,7 @@ function renderSettings() {
       <div class="settings-section-header">
         <h3>Server ${version}</h3>
         <div class="settings-header-actions">
-          <button class="settings-edit-btn" onclick="editSettings()">Edit</button>
+          <button class="settings-edit-btn" onclick="editSettings()">Edit Configuration</button>
           <button class="settings-restart-btn" onclick="restartServer()">Restart</button>
         </div>
       </div>
