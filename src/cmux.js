@@ -143,8 +143,16 @@ export function categorizeNotification(n) {
   if (n.subtitle === "Permission") return "permission";
   if (n.subtitle?.startsWith("Completed")) return "completion";
   if (n.subtitle === "Waiting") return "waiting";
+
+  const body = (n.body || "").toLowerCase();
+  if (body.includes("permission") || body.includes("approval")) return "permission";
+  if (body.includes("waiting for your input")) return "waiting";
+  if (body.includes("completed") || body.includes("finished")) return "completion";
+
   return "unknown";
 }
+
+export const AGENT_TITLE_PREFIX = /^[✳⠂⠐]/;
 
 export async function listAgentWorkspaceIds() {
   try {
@@ -154,6 +162,9 @@ export async function listAgentWorkspaceIds() {
       for (const ws of win.workspaces || []) {
         for (const tag of ws.tags || []) {
           if (tag.key === "claude_code") ids.add(ws.id);
+        }
+        if (!ids.has(ws.id) && AGENT_TITLE_PREFIX.test(ws.title || "")) {
+          ids.add(ws.id);
         }
       }
     }

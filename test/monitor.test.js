@@ -92,6 +92,34 @@ describe("Monitor terminal detection", () => {
     assert.equal(items[0].category, "running");
   });
 
+  it("marks workspace with agent title prefix as running", async () => {
+    const cmuxApi = makeCmux({
+      workspaces: [{ id: "W1", title: "✳ zenpayroll", directory: "/home/user/project" }],
+      terminals: [{ workspaceId: "W1", paneId: "P1", directory: "/home/user/project", gitBranch: "main" }],
+      agentWorkspaceIds: new Set(["W1"]),
+    });
+    const monitor = new Monitor(queue, { cmuxApi });
+    await monitor.poll();
+
+    const items = queue.items();
+    assert.equal(items.length, 1);
+    assert.equal(items[0].category, "running");
+  });
+
+  it("marks workspace with idle braille prefix as running", async () => {
+    const cmuxApi = makeCmux({
+      workspaces: [{ id: "W1", title: "⠂ zenpayroll", directory: "/home/user/project" }],
+      terminals: [{ workspaceId: "W1", paneId: "P1", directory: "/home/user/project", gitBranch: "main" }],
+      agentWorkspaceIds: new Set(["W1"]),
+    });
+    const monitor = new Monitor(queue, { cmuxApi });
+    await monitor.poll();
+
+    const items = queue.items();
+    assert.equal(items.length, 1);
+    assert.equal(items[0].category, "running");
+  });
+
   it("reverts to terminal when claude_code tag disappears", async () => {
     const agentIds = new Set(["W1"]);
     const cmuxApi = makeCmux({
