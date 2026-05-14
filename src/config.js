@@ -22,6 +22,9 @@ export const FIELD_META = {
   defaultDirectory: { type: "string", nullable: true, description: "Working directory for new sessions" },
   "cmux.binary":    { type: "string", nullable: true, description: "<b>Requires restart.</b> Path to the cmux CLI binary" },
   "cmux.socket":    { type: "string", nullable: true, description: "<b>Requires restart.</b> Unix socket for cmux RPC" },
+  "tabs.loops.dataDir":    { type: "string", nullable: true, description: "Path to claude-loops plugin data" },
+  "tabs.loops.installUrl": { type: "string", nullable: true, description: "URL shown when the plugin isn't installed" },
+  "tabs.pulls.orgFilter":  { type: "string", nullable: true, description: "GitHub org to filter PRs by" },
 };
 
 function inferType(value) {
@@ -41,7 +44,7 @@ export function buildSchema(tabDefaults) {
       type: meta.type || inferType(value),
       default: value,
       group: "server",
-      description: meta.description || key,
+      description: meta.description || "",
       ...(meta.nullable && { nullable: true }),
     };
   }
@@ -53,7 +56,7 @@ export function buildSchema(tabDefaults) {
       type: meta.type || inferType(value),
       default: value,
       group: "cmux",
-      description: meta.description || key,
+      description: meta.description || "",
       ...(meta.nullable && { nullable: true }),
     };
   }
@@ -67,7 +70,7 @@ export function buildSchema(tabDefaults) {
         type: meta.type || (isNullDefault ? "string" : inferType(value)),
         default: value,
         group: `tabs.${tabName}`,
-        description: meta.description || key,
+        description: meta.description || "",
         ...((meta.nullable || isNullDefault) && { nullable: true }),
       };
     }
