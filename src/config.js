@@ -16,6 +16,66 @@ const DEFAULTS = {
   cmux: { binary: null, socket: null },
 };
 
+export const FIELD_META = {
+  port:             { description: "Dashboard port" },
+  maxSessions:      { type: "number", nullable: true, description: "Max concurrent workspaces (null = unlimited)" },
+  defaultDirectory: { type: "string", nullable: true, description: "Default working directory (null = home)" },
+  "cmux.binary":    { type: "string", nullable: true, description: "cmux binary path (null = auto-detect)" },
+  "cmux.socket":    { type: "string", nullable: true, description: "cmux socket path (null = auto-detect)" },
+};
+
+function inferType(value) {
+  if (value === null || value === undefined) return "string";
+  if (typeof value === "boolean") return "boolean";
+  if (typeof value === "number") return "number";
+  return "string";
+}
+
+export function buildSchema(tabDefaults) {
+  const schema = {};
+
+  for (const [key, value] of Object.entries(DEFAULTS)) {
+    if (key === "cmux" || key === "tabs") continue;
+    const meta = FIELD_META[key] || {};
+    schema[key] = {
+      type: meta.type || inferType(value),
+      default: value,
+      group: "server",
+      description: meta.description || key,
+      ...(meta.nullable && { nullable: true }),
+    };
+  }
+
+  for (const [key, value] of Object.entries(DEFAULTS.cmux)) {
+    const path = `cmux.${key}`;
+    const meta = FIELD_META[path] || {};
+    schema[path] = {
+      type: meta.type || inferType(value),
+      default: value,
+      group: "cmux",
+      description: meta.description || key,
+      ...(meta.nullable && { nullable: true }),
+    };
+  }
+
+  for (const [tabName, defaults] of Object.entries(tabDefaults)) {
+    for (const [key, value] of Object.entries(defaults)) {
+      const path = `tabs.${tabName}.${key}`;
+      const meta = FIELD_META[path] || {};
+      const isNullDefault = value === null;
+      schema[path] = {
+        type: meta.type || (isNullDefault ? "string" : inferType(value)),
+        default: value,
+        group: `tabs.${tabName}`,
+        description: meta.description || key,
+        ...((meta.nullable || isNullDefault) && { nullable: true }),
+      };
+    }
+  }
+
+  return schema;
+}
+
 function expandHome(p) {
   if (!p) return p;
   if (p === "~") return HOME;
