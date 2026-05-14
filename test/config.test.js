@@ -4,7 +4,9 @@ import assert from "node:assert/strict";
 
 // The config module has side effects (reads config.json, detects cmux), so
 // we test the resolve logic indirectly by validating the exported config.
-import config, { buildSchema, FIELD_META } from "../src/config.js";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+import config, { buildSchema, FIELD_META, loadRawConfig, writeConfigFile } from "../src/config.js";
 
 describe("config.maxSessions", () => {
   it("defaults to null when not set in config.json", () => {
@@ -61,5 +63,32 @@ describe("buildSchema", () => {
     for (const [key, entry] of Object.entries(schema)) {
       assert.ok(entry.description, `${key} missing description`);
     }
+  });
+});
+
+describe("loadRawConfig", () => {
+  it("returns the raw config.json contents without resolving", () => {
+    const raw = loadRawConfig();
+    assert.equal(typeof raw, "object");
+    assert.ok("port" in raw || "maxSessions" in raw || "tabs" in raw);
+  });
+});
+
+describe("writeConfigFile", () => {
+  it("round-trips config through write and read", () => {
+    const before = loadRawConfig();
+    const testValue = before.maxSessions === 99 ? 100 : 99;
+    writeConfigFile({ ...before, maxSessions: testValue });
+    const after = loadRawConfig();
+    assert.equal(after.maxSessions, testValue);
+    writeConfigFile(before);
+  });
+
+  it("preserves JSON formatting with 2-space indent", () => {
+    const raw = loadRawConfig();
+    writeConfigFile(raw);
+    const content = readFileSync(join(process.cwd(), "config.json"), "utf-8");
+    assert.ok(content.includes("\n  "), "should have 2-space indentation");
+    assert.ok(content.endsWith("\n"), "should end with newline");
   });
 });

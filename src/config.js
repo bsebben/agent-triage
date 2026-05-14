@@ -83,6 +83,16 @@ function expandHome(p) {
   return p;
 }
 
+export function loadRawConfig() {
+  const configPath = join(PROJECT_ROOT, "config.json");
+  return JSON.parse(readFileSync(configPath, "utf-8"));
+}
+
+export function writeConfigFile(configObj) {
+  const configPath = join(PROJECT_ROOT, "config.json");
+  writeFileSync(configPath, JSON.stringify(configObj, null, 2) + "\n");
+}
+
 function loadConfigFile() {
   const configPath = join(PROJECT_ROOT, "config.json");
   if (!existsSync(configPath)) {
@@ -90,7 +100,7 @@ function loadConfigFile() {
     console.error("  cp config.example.json config.json");
     process.exit(1);
   }
-  return JSON.parse(readFileSync(configPath, "utf-8"));
+  return loadRawConfig();
 }
 
 function detectCmuxBinary() {
