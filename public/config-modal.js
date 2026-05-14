@@ -43,7 +43,7 @@ function renderField(key, entry, rawValue, resolvedValue) {
         data-nullable="${!!entry.nullable}"
         value="${escapeHtml(String(value))}"
         placeholder="${escapeHtml(String(placeholder))}">
-      <span class="config-field-desc">${escapeHtml(entry.description)}</span>
+      <span class="config-field-desc">${entry.description}</span>
     </div>`;
 }
 

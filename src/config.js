@@ -17,11 +17,11 @@ const DEFAULTS = {
 };
 
 export const FIELD_META = {
-  port:             { description: "Requires restart. Default: 7777" },
-  maxSessions:      { type: "number", nullable: true, description: "Leave empty for unlimited" },
-  defaultDirectory: { type: "string", nullable: true, description: "Leave empty to use home directory" },
-  "cmux.binary":    { type: "string", nullable: true, description: "Leave empty to auto-detect. Requires restart" },
-  "cmux.socket":    { type: "string", nullable: true, description: "Leave empty to auto-detect. Requires restart" },
+  port:             { description: "<b>Requires restart.</b> HTTP port the dashboard listens on" },
+  maxSessions:      { type: "number", nullable: true, description: "Caps how many concurrent Claude Code workspaces can be open" },
+  defaultDirectory: { type: "string", nullable: true, description: "Working directory for new sessions" },
+  "cmux.binary":    { type: "string", nullable: true, description: "<b>Requires restart.</b> Path to the cmux CLI binary" },
+  "cmux.socket":    { type: "string", nullable: true, description: "<b>Requires restart.</b> Unix socket for cmux RPC" },
 };
 
 function inferType(value) {
