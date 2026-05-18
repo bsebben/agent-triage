@@ -154,6 +154,63 @@ describe("Monitor terminal detection", () => {
     assert.equal(w2.category, "terminal");
   });
 
+  it("preserves dismiss when notification ID rotates for the same workspace", async () => {
+    const state = {
+      notifications: [
+        { id: "notif-1", category: "permission", workspaceId: "W1", surfaceId: "S1", body: "approve?" },
+      ],
+      workspaces: [{ id: "W1", title: "claude-session", directory: "/home/user/project" }],
+    };
+    const cmuxApi = {
+      listNotifications: async () => state.notifications,
+      listWorkspaces: async () => state.workspaces,
+      listTerminals: async () => [],
+      listAgentWorkspaceIds: async () => new Set(),
+      readScreen: async () => null,
+    };
+    const monitor = new Monitor(queue, { cmuxApi });
+
+    await monitor.poll();
+    assert.equal(queue.items().length, 1);
+    queue.dismiss("notif-1");
+    assert.equal(queue.dismissedItems().length, 1);
+
+    state.notifications = [
+      { id: "notif-2", category: "permission", workspaceId: "W1", surfaceId: "S1", body: "approve?" },
+    ];
+    await monitor.poll();
+
+    assert.equal(queue.items().length, 0, "rotated notification should inherit dismiss");
+    assert.equal(queue.dismissedItems().length, 1, "should have one dismissed entry");
+    assert.equal(queue.dismissedItems()[0].id, "notif-2", "dismissed entry should use the new ID");
+  });
+
+  it("preserves dismiss when synthetic ID is stable across polls", async () => {
+    const state = {
+      notifications: [],
+      workspaces: [{ id: "W1", title: "claude-session", directory: "/home/user/project" }],
+      agentWorkspaceIds: new Set(["W1"]),
+    };
+    const cmuxApi = {
+      listNotifications: async () => state.notifications,
+      listWorkspaces: async () => state.workspaces,
+      listTerminals: async () => [],
+      listAgentWorkspaceIds: async () => state.agentWorkspaceIds,
+      readScreen: async () => null,
+    };
+    const monitor = new Monitor(queue, { cmuxApi });
+
+    await monitor.poll();
+    assert.equal(queue.items().length, 1);
+    assert.equal(queue.items()[0].id, "synthetic-W1");
+    queue.dismiss("synthetic-W1");
+    assert.equal(queue.dismissedItems().length, 1);
+
+    await monitor.poll();
+    assert.equal(queue.items().length, 0, "dismissed synthetic should stay dismissed");
+    assert.equal(queue.dismissedItems().length, 1);
+  });
+
   it("evicts a dismissed synthetic entry when the workspace starts producing notifications", async () => {
     const state = {
       notifications: [],
