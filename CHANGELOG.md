@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.19.0] - 2026-05-20
+
+### Added
+
+- Plugin config editor in the Settings panel — auto-discovers Claude Code plugins with `config.json` files and provides a raw JSON editor for viewing/editing user overrides
+- `GET /api/plugins` endpoint for listing configurable plugins with refresh support
+- `GET /api/plugins/:id/config` endpoint returning bundled defaults, user override, and resolved config
+- `POST /api/plugins/:id/config` endpoint for writing user config overrides
+- `DELETE /api/plugins/:id/config` endpoint for resetting to bundled defaults
+
 ## [1.18.1] - 2026-05-18
 
 ### Fixed
