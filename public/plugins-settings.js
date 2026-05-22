@@ -1,7 +1,7 @@
 // public/plugins-settings.js — Plugin config editor for settings panel
 
 let pluginsData = [];
-const expandedPlugins = new Set();
+let closePluginModal = null;
 
 async function fetchPlugins(refresh) {
   try {
@@ -24,6 +24,101 @@ async function fetchPluginConfig(id) {
   }
 }
 
+function inferFieldType(value) {
+  if (value === null || value === undefined) return "string";
+  if (typeof value === "boolean") return "boolean";
+  if (typeof value === "number") return "number";
+  return "string";
+}
+
+function flattenConfig(obj, prefix) {
+  const result = {};
+  for (const [key, value] of Object.entries(obj)) {
+    const path = prefix ? `${prefix}.${key}` : key;
+    if (value !== null && typeof value === "object" && !Array.isArray(value)) {
+      Object.assign(result, flattenConfig(value, path));
+    } else {
+      result[path] = value;
+    }
+  }
+  return result;
+}
+
+function setNestedValue(obj, dottedKey, value) {
+  const parts = dottedKey.split(".");
+  let cur = obj;
+  for (let i = 0; i < parts.length - 1; i++) {
+    if (!(parts[i] in cur)) cur[parts[i]] = {};
+    cur = cur[parts[i]];
+  }
+  cur[parts[parts.length - 1]] = value;
+}
+
+function renderPluginField(key, value) {
+  const id = `plugin-field-${key.replace(/\./g, "-")}`;
+  const label = key.split(".").pop().replace(/([A-Z])/g, " $1").replace(/_/g, " ").replace(/^./, (s) => s.toUpperCase());
+  const type = inferFieldType(value);
+
+  if (type === "boolean") {
+    return `
+      <div class="config-field config-field-toggle">
+        <label class="config-toggle" for="${id}">
+          <input type="checkbox" id="${id}" data-key="${key}" data-type="boolean"
+            ${value ? "checked" : ""}>
+          <span class="config-toggle-track"></span>
+          <span class="config-toggle-label">${escapeHtml(label)}</span>
+        </label>
+      </div>`;
+  }
+
+  if (Array.isArray(value)) {
+    return `
+      <div class="config-field">
+        <label class="config-field-label" for="${id}">${escapeHtml(label)}</label>
+        <input type="text" id="${id}" data-key="${key}" data-type="array"
+          value="${escapeHtml(JSON.stringify(value))}"
+          placeholder="JSON array">
+        <span class="config-field-desc">JSON array — e.g. ["a", "b"]</span>
+      </div>`;
+  }
+
+  const inputType = type === "number" ? "number" : "text";
+  const displayValue = value !== null && value !== undefined ? String(value) : "";
+
+  return `
+    <div class="config-field">
+      <label class="config-field-label" for="${id}">${escapeHtml(label)}</label>
+      <input type="${inputType}" id="${id}" data-key="${key}" data-type="${type}"
+        value="${escapeHtml(displayValue)}"
+        placeholder="${escapeHtml(displayValue)}">
+    </div>`;
+}
+
+function collectPluginFormValues(flatConfig) {
+  const result = {};
+  for (const [key, originalValue] of Object.entries(flatConfig)) {
+    const el = document.querySelector(`[data-key="${key}"]`);
+    if (!el) continue;
+
+    const type = el.dataset.type;
+    if (type === "boolean") {
+      setNestedValue(result, key, el.checked);
+    } else if (type === "array") {
+      try {
+        setNestedValue(result, key, JSON.parse(el.value));
+      } catch {
+        setNestedValue(result, key, originalValue);
+      }
+    } else if (type === "number") {
+      const num = Number(el.value);
+      setNestedValue(result, key, el.value === "" ? originalValue : num);
+    } else {
+      setNestedValue(result, key, el.value || originalValue);
+    }
+  }
+  return result;
+}
+
 function renderPluginsSection() {
   if (pluginsData.length === 0) {
     return `
@@ -37,36 +132,20 @@ function renderPluginsSection() {
   }
 
   const rows = pluginsData.map((p) => {
-    const expanded = expandedPlugins.has(p.id);
-    const chevron = expanded ? "\u25BC" : "\u25B6";
     const badge = p.marketplace ? `<span class="plugin-marketplace">${escapeHtml(p.marketplace)}</span>` : "";
     const modified = p.hasOverride ? '<span class="plugin-modified">modified</span>' : "";
     const version = p.version ? `<span class="plugin-version">${escapeHtml(p.version)}</span>` : "";
-    const editorId = `plugin-editor-${CSS.escape(p.id)}`;
-
-    let editor = "";
-    if (expanded) {
-      editor = `
-        <div class="plugin-editor" id="${editorId}">
-          <textarea class="plugin-config-textarea" id="plugin-textarea-${CSS.escape(p.id)}"
-            placeholder="Loading..."></textarea>
-          <div class="plugin-editor-actions">
-            <span class="plugin-error" id="plugin-error-${CSS.escape(p.id)}"></span>
-            <button class="settings-edit-btn plugin-reset-btn" onclick="resetPluginConfig('${escapeHtml(p.id)}')">Reset to Defaults</button>
-            <button class="settings-restart-btn plugin-save-btn" style="border-color: var(--clr-completion); color: var(--clr-completion);"
-              onclick="savePluginConfig('${escapeHtml(p.id)}')">Save</button>
-          </div>
-        </div>`;
-    }
 
     return `
       <div class="plugin-row">
-        <div class="plugin-header" onclick="togglePluginExpand('${escapeHtml(p.id)}')">
-          <span class="plugin-chevron">${chevron}</span>
+        <div class="plugin-header">
           <span class="plugin-name">${escapeHtml(p.name)}</span>
           ${version}${badge}${modified}
+          <span class="plugin-actions">
+            <button class="settings-edit-btn" onclick="openPluginConfigModal('${escapeHtml(p.id)}')">Edit</button>
+            ${p.hasOverride ? `<button class="settings-edit-btn" onclick="resetPluginConfig('${escapeHtml(p.id)}')">Reset</button>` : ""}
+          </span>
         </div>
-        ${editor}
       </div>`;
   }).join("");
 
@@ -80,82 +159,90 @@ function renderPluginsSection() {
     </div>`;
 }
 
-async function togglePluginExpand(id) {
-  if (expandedPlugins.has(id)) {
-    expandedPlugins.delete(id);
-  } else {
-    expandedPlugins.add(id);
-  }
-  renderSettings();
+async function openPluginConfigModal(id) {
+  if (closePluginModal) return;
 
-  if (expandedPlugins.has(id)) {
-    const config = await fetchPluginConfig(id);
-    const textarea = document.getElementById(`plugin-textarea-${CSS.escape(id)}`);
-    if (textarea && config) {
-      textarea.value = JSON.stringify(config.resolved, null, 2);
-    } else if (textarea) {
-      textarea.value = "// Could not load config";
-    }
-  }
-}
+  const plugin = pluginsData.find((p) => p.id === id);
+  const displayName = plugin ? plugin.name : id;
 
-async function savePluginConfig(id) {
-  const textarea = document.getElementById(`plugin-textarea-${CSS.escape(id)}`);
-  const errorEl = document.getElementById(`plugin-error-${CSS.escape(id)}`);
-  if (!textarea) return;
+  const panel = document.createElement("div");
+  panel.className = "modal-panel config-modal";
+  panel.innerHTML = `
+    <div class="modal-header">
+      <span class="modal-title">${escapeHtml(displayName)} — Config</span>
+      <button class="modal-close" type="button" aria-label="Close">&times;</button>
+    </div>
+    <div class="modal-body">Loading\u2026</div>
+    <div class="modal-footer">
+      <button class="btn" type="button" id="plugin-config-cancel">Cancel</button>
+      <button class="btn primary" type="button" id="plugin-config-save">Save</button>
+    </div>
+  `;
 
-  let parsed;
-  try {
-    parsed = JSON.parse(textarea.value);
-  } catch (e) {
-    if (errorEl) {
-      errorEl.textContent = `Invalid JSON: ${e.message}`;
-      errorEl.style.display = "inline";
-    }
+  panel.querySelector(".modal-close").addEventListener("click", () => closePluginModal?.());
+
+  closePluginModal = openOverlay(panel, {
+    onClose: () => { panel.remove(); closePluginModal = null; },
+  });
+
+  const body = panel.querySelector(".modal-body");
+  const config = await fetchPluginConfig(id);
+
+  if (!config || !config.resolved) {
+    body.textContent = "Could not load plugin config";
     return;
   }
-  if (errorEl) { errorEl.textContent = ""; errorEl.style.display = "none"; }
 
-  try {
-    const res = await fetch(`/api/plugins/${encodeURIComponent(id)}/config`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(parsed),
-    });
-    if (!res.ok) throw new Error(`status ${res.status}`);
-    showToast("Plugin config saved");
-    await refreshPlugins();
-  } catch (e) {
-    if (errorEl) {
-      errorEl.textContent = `Save failed: ${e.message}`;
-      errorEl.style.display = "inline";
-    }
+  const flat = flattenConfig(config.resolved, "");
+  const groups = new Map();
+  for (const [key, value] of Object.entries(flat)) {
+    const group = key.includes(".") ? key.split(".").slice(0, -1).join(".") : "general";
+    if (!groups.has(group)) groups.set(group, []);
+    groups.get(group).push({ key, value });
   }
+
+  let html = "";
+  for (const [group, fields] of groups) {
+    const label = group === "general"
+      ? "General"
+      : group.split(".").pop().replace(/_/g, " ").replace(/^./, (s) => s.toUpperCase());
+    html += `<div class="config-group">`;
+    html += `<h3 class="config-group-title">${escapeHtml(label)}</h3>`;
+    for (const { key, value } of fields) {
+      html += renderPluginField(key, value);
+    }
+    html += `</div>`;
+  }
+  body.innerHTML = html;
+
+  panel.querySelector("#plugin-config-cancel").addEventListener("click", () => closePluginModal?.());
+  panel.querySelector("#plugin-config-save").addEventListener("click", async () => {
+    const configObj = collectPluginFormValues(flat);
+    try {
+      const res = await fetch(`/api/plugins/${encodeURIComponent(id)}/config`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(configObj),
+      });
+      if (!res.ok) throw new Error(`status ${res.status}`);
+      showToast("Plugin config saved");
+      closePluginModal?.();
+      await refreshPlugins();
+    } catch (e) {
+      showToast(`Save failed: ${e.message}`);
+    }
+  });
 }
 
 async function resetPluginConfig(id) {
   if (!confirm("Reset to bundled defaults? This will remove your override.")) return;
-
-  const errorEl = document.getElementById(`plugin-error-${CSS.escape(id)}`);
   try {
-    const res = await fetch(`/api/plugins/${encodeURIComponent(id)}/config`, {
-      method: "DELETE",
-    });
+    const res = await fetch(`/api/plugins/${encodeURIComponent(id)}/config`, { method: "DELETE" });
     if (!res.ok) throw new Error(`status ${res.status}`);
     showToast("Plugin config reset to defaults");
     await refreshPlugins();
-    if (expandedPlugins.has(id)) {
-      const config = await fetchPluginConfig(id);
-      const textarea = document.getElementById(`plugin-textarea-${CSS.escape(id)}`);
-      if (textarea && config) {
-        textarea.value = JSON.stringify(config.resolved, null, 2);
-      }
-    }
   } catch (e) {
-    if (errorEl) {
-      errorEl.textContent = `Reset failed: ${e.message}`;
-      errorEl.style.display = "inline";
-    }
+    showToast(`Reset failed: ${e.message}`);
   }
 }
 
