@@ -1,6 +1,8 @@
 // public/tab-workspaces.js
 
 const collapsedGroups = new Set(["Dismissed"]);
+const refreshingWorkspaces = new Set();
+let refreshAllInFlight = false;
 
 function saveCollapseState() {
   const headers = queue.querySelectorAll(".group-header");
@@ -27,9 +29,12 @@ function renderWorkspaces() {
   }
 
   const disabledAttr = atLimit ? " disabled" : "";
+  const refreshAllDisabled = refreshAllInFlight ? " disabled" : "";
+  const refreshAllLabel = refreshAllInFlight ? "&#x21bb; Refreshing&hellip;" : "&#x21bb; Refresh All";
   html += `<div class="tab-toolbar">
     <button class="btn-new-workspace" onclick="newSession()" data-tip="New Session"${disabledAttr}>${claudeIcon()}</button>
     <button class="btn-new-workspace" onclick="newWorkspace()" data-tip="New Terminal"${disabledAttr}>&gt;_</button>
+    <button class="btn-new-workspace btn-refresh-all" onclick="refreshAllSessions()" data-tip="Refresh All Sessions"${refreshAllDisabled}>${refreshAllLabel}</button>
   </div>`;
 
   if (groups.length === 0 && (!dismissed || dismissed.length === 0)) {
@@ -112,10 +117,16 @@ function renderCard(item, { isDismissed = false } = {}) {
 
   const closeBtn = `<a class="card-close" onclick="event.stopPropagation();closeWorkspace('${item.workspaceId}')">close</a>`;
 
+  const isRefreshable = !isDismissed && item.category !== "terminal";
+  const refreshing = refreshingWorkspaces.has(item.workspaceId) || refreshAllInFlight;
+  const refreshBtn = isRefreshable
+    ? `<a class="card-refresh${refreshing ? " refreshing" : ""}" onclick="event.stopPropagation();refreshOneSession('${item.workspaceId}')"${refreshing ? " style=\"pointer-events:none\"" : ""}>&#x21bb;</a>`
+    : "";
+
   return `<div class="card${selectedClass} cat-${escapeHtml(item.category)}" data-workspace-id="${item.workspaceId}" onclick="cardClick(event,'${item.workspaceId}')">
     <div class="card-body-left">
       <div class="card-title-row"><span class="card-title-group"><span class="card-title">${escapeHtml(cardTitle)}</span><a class="card-edit" onclick="event.stopPropagation();startRename(this,'${item.workspaceId}','${escapeHtml(cardTitle)}')">&#9998;</a></span></div>
-    <span class="card-actions-right">${dismissBtn}${closeBtn}</span>
+    <span class="card-actions-right">${refreshBtn}${dismissBtn}${closeBtn}</span>
       <div class="card-header">
         <span class="card-category ${escapeHtml(item.category)}"><span class="card-icon">${categoryIcon(item.category)}</span> ${escapeHtml(item.category)}</span>
       </div>
@@ -193,4 +204,45 @@ async function dismiss(id) {
 
 async function restore(id) {
   await apiPost("restore", { id });
+}
+
+async function refreshOneSession(workspaceId) {
+  if (refreshingWorkspaces.has(workspaceId) || refreshAllInFlight) return;
+  refreshingWorkspaces.add(workspaceId);
+  render();
+  try {
+    const result = await apiPost("refresh-session", { workspaceId });
+    if (!result.ok) showToast(result.error || "Refresh failed");
+  } catch {
+    showToast("Refresh failed");
+  } finally {
+    refreshingWorkspaces.delete(workspaceId);
+    render();
+  }
+}
+
+async function refreshAllSessions() {
+  if (refreshAllInFlight) return;
+  refreshAllInFlight = true;
+  render();
+  try {
+    const result = await apiPost("refresh-all", {});
+    const results = result.results || [];
+    const ok = results.filter((r) => r.ok).length;
+    const failed = results.filter((r) => !r.ok).length;
+    if (failed === 0 && ok > 0) {
+      showToast(`Refreshed ${ok} session${ok === 1 ? "" : "s"}`);
+    } else if (failed > 0 && ok > 0) {
+      showToast(`Refreshed ${ok}/${ok + failed} sessions \u2014 ${failed} failed`);
+    } else if (failed > 0 && ok === 0) {
+      showToast(`All ${failed} refresh${failed === 1 ? "" : "es"} failed`);
+    } else {
+      showToast("No sessions to refresh");
+    }
+  } catch {
+    showToast("Refresh All failed");
+  } finally {
+    refreshAllInFlight = false;
+    render();
+  }
 }

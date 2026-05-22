@@ -13,6 +13,7 @@ import { initLogs, getLines } from "./logs.js";
 import config, { HOME, buildSchema, loadRawConfig, writeConfigFile } from "./config.js";
 import { UpdateChecker } from "./update-checker.js";
 import * as plugins from "./plugins.js";
+import { refreshSession, refreshAll } from "./refresh.js";
 import loops, { defaults as loopsDefaults } from "./tabs/loops.js";
 import pulls, { defaults as pullsDefaults } from "./tabs/pulls.js";
 import tickets, { defaults as ticketsDefaults } from "./tabs/tickets.js";
@@ -226,6 +227,17 @@ const server = createServer(async (req, res) => {
       await cmux.sendText(workspaceId, surfaceId, text);
       await cmux.sendKey(workspaceId, surfaceId, "Enter");
       return jsonResponse(res, { ok: true });
+    }
+
+    if (req.url === "/api/refresh-session" && req.method === "POST") {
+      const { workspaceId } = await readBody(req);
+      const result = await refreshSession(workspaceId);
+      return jsonResponse(res, result, result.ok ? 200 : 400);
+    }
+
+    if (req.url === "/api/refresh-all" && req.method === "POST") {
+      const result = await refreshAll();
+      return jsonResponse(res, result);
     }
 
     if (req.url === "/api/focus" && req.method === "POST") {
