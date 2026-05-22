@@ -1338,7 +1338,56 @@ main { padding: 8px; position: relative; }
   gap: 6px;
 }
 
+/* Plugin config editor */
 
+.plugins-empty {
+  font-size: 12px;
+  color: var(--text-dim);
+  font-style: italic;
+  padding: 4px 0;
+}
+
+.plugin-row {
+  border-bottom: 1px solid var(--border);
+}
+.plugin-row:last-child { border-bottom: none; }
+
+.plugin-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 0;
+  font-size: 12px;
+}
+
+.plugin-name { font-weight: 600; }
+
+.plugin-version {
+  color: var(--text-dim);
+  font-size: 11px;
+}
+
+.plugin-marketplace {
+  background: color-mix(in srgb, var(--clr-running) 20%, transparent);
+  color: var(--clr-running);
+  font-size: 10px;
+  padding: 1px 5px;
+  border-radius: 3px;
+}
+
+.plugin-modified {
+  background: color-mix(in srgb, var(--clr-permission) 20%, transparent);
+  color: var(--clr-permission);
+  font-size: 10px;
+  padding: 1px 5px;
+  border-radius: 3px;
+}
+
+.plugin-actions {
+  margin-left: auto;
+  display: flex;
+  gap: 4px;
+}
 
 /* Toast notifications */
 #toast-container {

@@ -12,6 +12,7 @@ import { readBody, serveStatic, jsonResponse } from "./utils.js";
 import { initLogs, getLines } from "./logs.js";
 import config, { HOME, buildSchema, loadRawConfig, writeConfigFile } from "./config.js";
 import { UpdateChecker } from "./update-checker.js";
+import * as plugins from "./plugins.js";
 import loops, { defaults as loopsDefaults } from "./tabs/loops.js";
 import pulls, { defaults as pullsDefaults } from "./tabs/pulls.js";
 import tickets, { defaults as ticketsDefaults } from "./tabs/tickets.js";
@@ -138,6 +139,50 @@ const server = createServer(async (req, res) => {
         utimesSync(join(__dirname, "server.js"), now, now);
       }, 100);
       return;
+    }
+
+    // --- Plugin config API ---
+
+    if (req.url?.startsWith("/api/plugins") && req.method === "GET") {
+      const url = new URL(req.url, `http://${req.headers.host}`);
+      const path = url.pathname;
+
+      if (path === "/api/plugins") {
+        const refresh = url.searchParams.get("refresh") === "1";
+        return jsonResponse(res, plugins.list(refresh));
+      }
+
+      const idMatch = path.match(/^\/api\/plugins\/([^/]+)\/config$/);
+      if (idMatch) {
+        const id = decodeURIComponent(idMatch[1]);
+        const config = plugins.getConfig(id);
+        if (!config) return jsonResponse(res, { error: "Plugin not found" }, 404);
+        return jsonResponse(res, config);
+      }
+    }
+
+    if (req.url?.match(/^\/api\/plugins\/[^/]+\/config$/) && req.method === "POST") {
+      const id = decodeURIComponent(req.url.match(/^\/api\/plugins\/([^/]+)\/config$/)[1]);
+      const body = await readBody(req);
+      if (!body || typeof body !== "object" || Array.isArray(body)) {
+        return jsonResponse(res, { error: "Body must be a JSON object" }, 400);
+      }
+      try {
+        plugins.writeConfig(id, body);
+        return jsonResponse(res, { ok: true });
+      } catch (err) {
+        return jsonResponse(res, { error: err.message }, 404);
+      }
+    }
+
+    if (req.url?.match(/^\/api\/plugins\/[^/]+\/config$/) && req.method === "DELETE") {
+      const id = decodeURIComponent(req.url.match(/^\/api\/plugins\/([^/]+)\/config$/)[1]);
+      try {
+        plugins.deleteConfig(id);
+        return jsonResponse(res, { ok: true });
+      } catch (err) {
+        return jsonResponse(res, { error: err.message }, 404);
+      }
     }
 
     if (req.url?.startsWith("/api/refresh/") && req.method === "POST") {
