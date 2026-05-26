@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.20.0] - 2026-05-22
+
+### Added
+
+- Session refresh: exit and resume Claude Code sessions to pick up plugin updates without losing conversation context
+- `POST /api/refresh-session` endpoint for refreshing a single session (async exit -> capture session ID -> resume)
+- `POST /api/refresh-all` endpoint for refreshing all Claude Code sessions concurrently
+- Per-card refresh button on Claude Code session cards (hidden for terminal workspaces)
+- Toolbar "Refresh All" button in the Workspaces tab
+- Spinner feedback on refresh buttons while in-flight, toast notifications on error or completion
+
 ## [1.19.0] - 2026-05-20
 
 ### Added

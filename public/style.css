@@ -414,6 +414,20 @@ main { padding: 8px; position: relative; }
 .card:hover .card-dismiss { opacity: 1; }
 .card-dismiss:hover { color: var(--text); text-decoration: underline; }
 
+.card-refresh {
+  font-size: 14px;
+  color: var(--text-dim);
+  cursor: pointer;
+  text-decoration: none;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+  display: inline-block;
+}
+
+.card:hover .card-refresh { opacity: 1; }
+.card-refresh:hover { color: var(--clr-running); }
+.card-refresh.refreshing { opacity: 1; animation: spin 1s linear infinite; color: var(--clr-running); }
+
 .card-close {
   font-size: 11px;
   color: var(--clr-error);
@@ -425,6 +439,8 @@ main { padding: 8px; position: relative; }
 
 .card:hover .card-close { opacity: 0.7; }
 .card-close:hover { opacity: 1; text-decoration: underline; }
+
+.btn-refresh-all.refreshing { color: var(--clr-running); border-color: var(--clr-running); }
 
 .card-subtitle {
   font-size: 11px;
@@ -462,6 +478,7 @@ main { padding: 8px; position: relative; }
 .card.cat-waiting { background: color-mix(in srgb, var(--clr-waiting) var(--card-tint), var(--card)); }
 .card.cat-completion { background: color-mix(in srgb, var(--clr-completion) var(--card-tint), var(--card)); }
 .card.cat-running { background: color-mix(in srgb, var(--clr-running) var(--card-tint), var(--card)); opacity: 0.6; }
+.card.cat-refreshing { background: color-mix(in srgb, var(--clr-running) var(--card-tint), var(--card)); opacity: 0.6; }
 .card.cat-terminal { background: #1e1830; border-color: #3a2a50; }
 .card-category.terminal .card-icon { color: var(--clr-terminal); }
 
