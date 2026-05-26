@@ -398,13 +398,18 @@ main { padding: 8px; position: relative; }
   outline: none;
 }
 
+.card-actions-col {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  flex-shrink: 0;
+  gap: 2px;
+}
+
 .card-actions-right {
   display: flex;
-  flex-wrap: wrap;
   align-items: center;
-  justify-content: flex-end;
-  gap: 4px 8px;
-  flex-shrink: 0;
+  gap: 8px;
   white-space: nowrap;
 }
 
@@ -492,8 +497,6 @@ main { padding: 8px; position: relative; }
   font-size: 11px;
   color: var(--text-dim);
   white-space: nowrap;
-  width: 100%;
-  text-align: right;
   min-width: 5.5em;
   text-align: left;
 }
