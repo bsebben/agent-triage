@@ -368,7 +368,7 @@ main { padding: 8px; position: relative; }
 }
 
 .card-title-group {
-  display: inline-flex;
+  display: flex;
   align-items: center;
   min-width: 0;
   flex: 1;
