@@ -126,8 +126,8 @@ function renderCard(item, { isDismissed = false } = {}) {
 
   const displayCategory = refreshing ? "refreshing" : item.category;
   return `<div class="card${selectedClass} cat-${escapeHtml(displayCategory)}" data-workspace-id="${item.workspaceId}" onclick="cardClick(event,'${item.workspaceId}')">
-    <div class="card-body-left">
-      <div class="card-title-row"><span class="card-title-group"><span class="card-title">${escapeHtml(cardTitle)}</span><a class="card-edit" onclick="event.stopPropagation();startRename(this,'${item.workspaceId}','${escapeHtml(cardTitle)}')">&#9998;</a></span><span class="card-actions-right">${refreshBtn}${dismissBtn}${closeBtn}</span></div>
+    <div class="card-title-row"><span class="card-title-group"><span class="card-title">${escapeHtml(cardTitle)}</span><a class="card-edit" onclick="event.stopPropagation();startRename(this,'${item.workspaceId}','${escapeHtml(cardTitle)}')">&#9998;</a></span><span class="card-actions-right">${refreshBtn}${dismissBtn}${closeBtn}</span></div>
+    <div class="card-content">
       <div class="card-header">
         <span class="card-category ${escapeHtml(displayCategory)}"><span class="card-icon">${categoryIcon(displayCategory)}</span> ${escapeHtml(displayCategory)}</span>
       </div>
@@ -136,8 +136,8 @@ function renderCard(item, { isDismissed = false } = {}) {
     ${!hasQuestion && item.body && !isGenericBody(item.body) ? `<div class="card-body">${escapeHtml(item.body)}</div>` : ""}
     ${optionsHtml}
     ${approveButtons}
-    </div>
     ${item.createdAt ? `<div class="card-time">\u{1f559} ${timeAgo(item.createdAt)}</div>` : ""}
+    </div>
   </div>`;
 }
 

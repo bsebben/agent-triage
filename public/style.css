@@ -334,13 +334,12 @@ main { padding: 8px; position: relative; }
   cursor: pointer;
   transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
   display: flex;
-  align-items: center;
-  gap: 12px;
+  flex-direction: column;
+  gap: 4px;
   position: relative;
 }
 
-.card-body-left {
-  flex: 1;
+.card-content {
   min-width: 0;
 }
 
