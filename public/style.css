@@ -334,13 +334,12 @@ main { padding: 8px; position: relative; }
   cursor: pointer;
   transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
   display: flex;
-  align-items: center;
-  gap: 12px;
+  flex-direction: column;
+  gap: 4px;
   position: relative;
 }
 
-.card-body-left {
-  flex: 1;
+.card-content {
   min-width: 0;
 }
 
@@ -353,7 +352,8 @@ main { padding: 8px; position: relative; }
 .card-title-row {
   display: flex;
   justify-content: space-between;
-  align-items: center;
+  align-items: flex-start;
+  gap: 8px;
   margin-bottom: 4px;
 }
 
@@ -361,11 +361,16 @@ main { padding: 8px; position: relative; }
   font-size: 14px;
   font-weight: 600;
   color: var(--text);
+  overflow-wrap: break-word;
+  word-break: break-word;
+  min-width: 0;
 }
 
 .card-title-group {
-  display: inline-flex;
+  display: flex;
   align-items: center;
+  min-width: 0;
+  flex: 1;
 }
 
 .card-edit {
@@ -393,13 +398,19 @@ main { padding: 8px; position: relative; }
   outline: none;
 }
 
+.card-actions-col {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  flex-shrink: 0;
+  gap: 2px;
+}
+
 .card-actions-right {
   display: flex;
   align-items: center;
   gap: 8px;
-  position: absolute;
-  top: 8px;
-  right: 12px;
+  white-space: nowrap;
 }
 
 .card-dismiss {
@@ -486,7 +497,6 @@ main { padding: 8px; position: relative; }
   font-size: 11px;
   color: var(--text-dim);
   white-space: nowrap;
-  flex-shrink: 0;
   min-width: 5.5em;
   text-align: left;
 }
