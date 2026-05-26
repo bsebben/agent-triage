@@ -10,8 +10,14 @@ ZSHRC="${HOME}/.zshrc"
 MARKER="# agent-triage auto-start"
 
 if grep -qF "$MARKER" "$ZSHRC" 2>/dev/null; then
-  echo "Already installed in $ZSHRC"
-  exit 0
+  if grep -q 'CMUX_WORKSPACE_ID.*\] && return' "$ZSHRC" 2>/dev/null && \
+     ! grep -q '__CFBundleIdentifier' "$ZSHRC" 2>/dev/null; then
+    echo "Upgrading outdated hook in $ZSHRC..."
+    sed -i '' "/$MARKER/,/^precmd_functions+=.*$/d" "$ZSHRC"
+  else
+    echo "Already installed in $ZSHRC"
+    exit 0
+  fi
 fi
 
 cat >> "$ZSHRC" << 'HOOK'
