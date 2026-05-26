@@ -18,14 +18,14 @@ cat >> "$ZSHRC" << 'HOOK'
 
 # agent-triage auto-start (runs via precmd so cmux socket is ready)
 _agent_triage_precmd() {
-  [[ -z "$CMUX_WORKSPACE_ID" ]] && return
-  local marker="/tmp/agent-triage-started.$(stat -f%B "$CMUX_SOCKET" 2>/dev/null)"
+  [[ "$__CFBundleIdentifier" != "com.cmuxterm.app" && -z "$CMUX_WORKSPACE_ID" ]] && return
+  local sock="${CMUX_SOCKET_PATH:-$HOME/Library/Application Support/cmux/cmux.sock}"
+  local marker="/tmp/agent-triage-started.$(stat -f%B "$sock" 2>/dev/null)"
   if [[ -f "$marker" ]]; then
     precmd_functions=(${precmd_functions:#_agent_triage_precmd})
     return
   fi
-  # Only attempt once cmux is actually responsive
-  "${CMUX_BUNDLED_CLI_PATH:-cmux}" list-workspaces &>/dev/null || return
+  cmux list-workspaces &>/dev/null || return
   command rm -f /tmp/agent-triage-started.*(N) 2>/dev/null
   touch "$marker"
   AUTOSTART_SCRIPT &>/dev/null &

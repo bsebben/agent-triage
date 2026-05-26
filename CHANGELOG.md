@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.20.2] - 2026-05-26
+
+### Fixed
+
+- Auto-start hook no longer depends on `CMUX_WORKSPACE_ID` env var (not set in cmux 0.64.10+); detects cmux via `__CFBundleIdentifier` with fallback to `CMUX_WORKSPACE_ID` for older versions
+- Uninstall script now removes the full hook block instead of only 5 lines
+
 ## [1.20.1] - 2026-05-26
 
 ### Fixed

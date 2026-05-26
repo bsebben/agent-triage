@@ -11,10 +11,10 @@ if ! grep -qF "$MARKER" "$ZSHRC" 2>/dev/null; then
   exit 0
 fi
 
-# Remove the marker line and the following 4 lines (if/export/script/fi)
-sed -i '' "/$MARKER/,+4d" "$ZSHRC"
+# Remove the full block: marker comment through precmd_functions+=(...) line
+sed -i '' "/$MARKER/,/^precmd_functions+=.*$/d" "$ZSHRC"
 
-# Remove trailing blank line left behind
+# Remove trailing blank lines left behind
 sed -i '' -e :a -e '/^\n*$/{$d;N;ba' -e '}' "$ZSHRC"
 
 echo "Removed auto-start hook from $ZSHRC"
