@@ -355,6 +355,7 @@ main { padding: 8px; position: relative; }
   justify-content: space-between;
   align-items: center;
   margin-bottom: 4px;
+  padding-right: 120px;
 }
 
 .card-title {
