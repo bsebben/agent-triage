@@ -400,8 +400,10 @@ main { padding: 8px; position: relative; }
 
 .card-actions-right {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 8px;
+  justify-content: flex-end;
+  gap: 4px 8px;
   flex-shrink: 0;
   white-space: nowrap;
 }
@@ -490,7 +492,8 @@ main { padding: 8px; position: relative; }
   font-size: 11px;
   color: var(--text-dim);
   white-space: nowrap;
-  flex-shrink: 0;
+  width: 100%;
+  text-align: right;
   min-width: 5.5em;
   text-align: left;
 }
