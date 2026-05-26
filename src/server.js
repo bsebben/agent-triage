@@ -13,7 +13,7 @@ import { initLogs, getLines } from "./logs.js";
 import config, { HOME, buildSchema, loadRawConfig, writeConfigFile } from "./config.js";
 import { UpdateChecker } from "./update-checker.js";
 import * as plugins from "./plugins.js";
-import { refreshSession, refreshAll } from "./refresh.js";
+import { refreshSession, refreshAll, refreshingIds } from "./refresh.js";
 import loops, { defaults as loopsDefaults } from "./tabs/loops.js";
 import pulls, { defaults as pullsDefaults } from "./tabs/pulls.js";
 import tickets, { defaults as ticketsDefaults } from "./tabs/tickets.js";
@@ -78,6 +78,7 @@ function getFullData() {
     maxSessions: config.maxSessions,
     sessionCount: getSessionCount(),
     updateStatus: updateChecker.data,
+    refreshing: [...refreshingIds()],
     ...tabData,
     tabStatus,
   };

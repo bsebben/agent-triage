@@ -1,6 +1,9 @@
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
 import * as cmux from "./cmux.js";
 
-const SESSION_ID_PATTERN = /(?:Session ID|session_id|Resumable session):\s*([0-9a-f-]{36})/i;
+const execFileAsync = promisify(execFile);
+const SESSION_ID_PATTERN = /claude --resume\s+([0-9a-f-]{36})/i;
 const POLL_INTERVAL_MS = 500;
 const TIMEOUT_MS = 30000;
 
@@ -22,10 +25,49 @@ export class Refresher {
     this.#timeoutMs = timeoutMs;
   }
 
-  async #resolveSurface(workspaceId) {
-    const terminals = await this.#cmux.listTerminals();
-    const match = terminals.find((t) => t.workspaceId === workspaceId);
-    return match?.paneRef || null;
+  get refreshingIds() {
+    return new Set(this.#inFlight);
+  }
+
+  async #resolveWorkspace(workspaceId) {
+    const raw = await this.#cmux.rpc("system.top");
+    for (const win of raw.windows || []) {
+      for (const ws of win.workspaces || []) {
+        if (ws.id !== workspaceId) continue;
+        let surfaceRef = null;
+        let tty = null;
+        for (const pane of ws.panes || []) {
+          for (const surface of pane.surfaces || []) {
+            if (surface.type === "terminal") {
+              surfaceRef = surface.ref;
+              tty = surface.tty || null;
+              break;
+            }
+          }
+          if (surfaceRef) break;
+        }
+        if (!surfaceRef) return null;
+        return { surfaceRef, workspaceRef: ws.ref, tty, title: ws.title || null };
+      }
+    }
+    return null;
+  }
+
+  async #findClaudePid(tty) {
+    try {
+      const { stdout } = await execFileAsync("ps", ["-t", tty, "-o", "pid,comm"]);
+      for (const line of stdout.split("\n")) {
+        if (line.includes("/claude") || line.match(/\bclaude\b/)) {
+          const pid = parseInt(line.trim(), 10);
+          if (pid > 0) return pid;
+        }
+      }
+    } catch {}
+    return null;
+  }
+
+  async #isClaudeRunning(tty) {
+    return (await this.#findClaudePid(tty)) !== null;
   }
 
   async refreshSession(workspaceId) {
@@ -38,39 +80,70 @@ export class Refresher {
       return { ok: false, error: "Already refreshing" };
     }
 
-    const surfaceId = await this.#resolveSurface(workspaceId);
-    if (!surfaceId) {
+    const resolved = await this.#resolveWorkspace(workspaceId);
+    if (!resolved) {
       return { ok: false, error: "Workspace not found" };
+    }
+    const { surfaceRef, workspaceRef, tty, title } = resolved;
+
+    if (!tty) {
+      return { ok: false, error: "No tty found for workspace" };
     }
 
     this.#inFlight.add(workspaceId);
     try {
-      await this.#cmux.sendText(workspaceId, surfaceId, "/exit");
-      await this.#cmux.sendKey(workspaceId, surfaceId, "Enter");
+      // Kill the Claude Code process on this tty
+      const pid = await this.#findClaudePid(tty);
+      if (pid) {
+        try { process.kill(pid, "SIGTERM"); } catch {}
+      }
 
-      const deadline = Date.now() + this.#timeoutMs;
+      // Wait for Claude Code to exit and print session ID
+      let deadline = Date.now() + this.#timeoutMs;
       let sessionId = null;
 
       while (Date.now() < deadline) {
         await sleep(this.#pollIntervalMs);
-        const screen = await this.#cmux.readScreen(surfaceId);
-        if (!screen) continue;
 
-        const match = screen.match(SESSION_ID_PATTERN);
-        if (match) {
-          sessionId = match[1];
-          break;
+        if (await this.#isClaudeRunning(tty)) continue;
+
+        // Claude exited — read screen for session ID
+        const screen = await this.#cmux.readScreenByWorkspace(workspaceRef);
+        if (screen) {
+          const match = screen.match(SESSION_ID_PATTERN);
+          if (match) sessionId = match[1];
         }
+        break;
       }
 
-      if (!sessionId) {
-        return { ok: false, error: "Timeout waiting for session ID" };
+      if (await this.#isClaudeRunning(tty)) {
+        return { ok: false, error: "Timeout waiting for Claude Code to exit" };
       }
 
-      await this.#cmux.sendText(workspaceId, surfaceId, `claude --resume ${sessionId}`);
-      await this.#cmux.sendKey(workspaceId, surfaceId, "Enter");
+      await sleep(500);
 
-      return { ok: true, sessionId };
+      // Relaunch Claude Code
+      if (sessionId) {
+        await this.#cmux.sendText(workspaceId, surfaceRef, `claude --resume ${sessionId}`);
+      } else {
+        await this.#cmux.sendText(workspaceId, surfaceRef, "claude --continue");
+      }
+      await this.#cmux.sendKey(workspaceId, surfaceRef, "Enter");
+
+      // Wait for Claude Code to be fully running (claude_code tag appears)
+      deadline = Date.now() + this.#timeoutMs;
+      while (Date.now() < deadline) {
+        await sleep(this.#pollIntervalMs);
+        const ids = await this.#cmux.listAgentWorkspaceIds();
+        if (ids.has(workspaceId)) break;
+      }
+
+      // Restore the workspace title
+      if (title) {
+        try { await this.#cmux.renameWorkspace(workspaceId, title); } catch {}
+      }
+
+      return { ok: true, sessionId: sessionId || null };
     } finally {
       this.#inFlight.delete(workspaceId);
     }
@@ -99,6 +172,7 @@ export class Refresher {
 }
 
 // Default singleton for server use
-const defaultRefresher = new Refresher();
+export const defaultRefresher = new Refresher();
 export const refreshSession = (id) => defaultRefresher.refreshSession(id);
 export const refreshAll = () => defaultRefresher.refreshAll();
+export const refreshingIds = () => defaultRefresher.refreshingIds;

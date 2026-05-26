@@ -478,6 +478,7 @@ main { padding: 8px; position: relative; }
 .card.cat-waiting { background: color-mix(in srgb, var(--clr-waiting) var(--card-tint), var(--card)); }
 .card.cat-completion { background: color-mix(in srgb, var(--clr-completion) var(--card-tint), var(--card)); }
 .card.cat-running { background: color-mix(in srgb, var(--clr-running) var(--card-tint), var(--card)); opacity: 0.6; }
+.card.cat-refreshing { background: color-mix(in srgb, var(--clr-running) var(--card-tint), var(--card)); opacity: 0.6; }
 .card.cat-terminal { background: #1e1830; border-color: #3a2a50; }
 .card-category.terminal .card-icon { color: var(--clr-terminal); }
 

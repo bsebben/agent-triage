@@ -227,6 +227,21 @@ export async function readScreen(surfaceId, lines = 30) {
   }
 }
 
+export async function readScreenByWorkspace(workspaceRef, lines = 30) {
+  try {
+    const { stdout } = await runCli([
+      "read-screen",
+      "--workspace",
+      workspaceRef,
+      "--lines",
+      String(lines),
+    ]);
+    return stripAnsi(stdout);
+  } catch {
+    return null;
+  }
+}
+
 export async function sendText(workspaceId, surfaceId, text) {
   await socketRpc("surface.send_text", { surface_id: surfaceId, text });
 }
