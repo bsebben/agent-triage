@@ -353,20 +353,25 @@ main { padding: 8px; position: relative; }
 .card-title-row {
   display: flex;
   justify-content: space-between;
-  align-items: center;
+  align-items: flex-start;
+  gap: 8px;
   margin-bottom: 4px;
-  padding-right: 120px;
 }
 
 .card-title {
   font-size: 14px;
   font-weight: 600;
   color: var(--text);
+  overflow-wrap: break-word;
+  word-break: break-word;
+  min-width: 0;
 }
 
 .card-title-group {
   display: inline-flex;
   align-items: center;
+  min-width: 0;
+  flex: 1;
 }
 
 .card-edit {
@@ -398,9 +403,8 @@ main { padding: 8px; position: relative; }
   display: flex;
   align-items: center;
   gap: 8px;
-  position: absolute;
-  top: 8px;
-  right: 12px;
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 
 .card-dismiss {
