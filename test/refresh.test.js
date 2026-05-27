@@ -2,11 +2,11 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { Refresher, SESSION_ID_PATTERN } from "../src/refresh.js";
 
-function makeWorkspace(id, surfaceRef, wsRef, tty) {
+function makeWorkspace(id, surfaceRef, wsRef) {
   return {
     id,
     ref: wsRef || `workspace:${id}`,
-    panes: [{ surfaces: [{ type: "terminal", ref: surfaceRef, tty: tty || `ttys${id}` }] }],
+    panes: [{ surfaces: [{ type: "terminal", ref: surfaceRef }] }],
   };
 }
 
@@ -68,26 +68,6 @@ describe("Refresher.refreshSession", () => {
     assert.equal(result.error, "Workspace not found");
   });
 
-  it("rejects when workspace has no tty", async () => {
-    const ws = makeWorkspace("W1", "surface:1");
-    ws.panes[0].surfaces[0].tty = null;
-    const cmuxApi = {
-      listAgentWorkspaceIds: async () => new Set(["W1"]),
-      rpc: async (method) => {
-        if (method === "system.top") return makeTopData([ws]);
-        return {};
-      },
-      sendText: async () => {},
-      sendKey: async () => {},
-      readScreenByWorkspace: async () => null,
-    };
-    const refresher = new Refresher({ cmuxApi });
-
-    const result = await refresher.refreshSession("W1");
-    assert.equal(result.ok, false);
-    assert.equal(result.error, "No tty found for workspace");
-  });
-
   it("rejects duplicate refresh for the same workspace", async () => {
     let blockResolve;
     const block = new Promise((r) => { blockResolve = r; });
@@ -95,7 +75,7 @@ describe("Refresher.refreshSession", () => {
     const cmuxApi = {
       listAgentWorkspaceIds: async () => new Set(["W1"]),
       rpc: async (method) => {
-        if (method === "system.top") return makeTopData([makeWorkspace("W1", "surface:1", null, "ttysTest")]);
+        if (method === "system.top") return makeTopData([makeWorkspace("W1", "surface:1")]);
         return {};
       },
       sendText: async () => {},
@@ -106,12 +86,8 @@ describe("Refresher.refreshSession", () => {
       },
     };
 
-    // Override findClaudePid to simulate a process that takes a while to exit
-    let pidCalls = 0;
-    const origExec = await import("node:child_process");
     const refresher = new Refresher({ cmuxApi, pollIntervalMs: 10, timeoutMs: 5000 });
 
-    // Monkey-patch the private method indirectly: the first call will block on readScreen
     const first = refresher.refreshSession("W1");
     await new Promise((r) => setTimeout(r, 50));
 
@@ -121,6 +97,77 @@ describe("Refresher.refreshSession", () => {
 
     blockResolve();
     await first.catch(() => {});
+  });
+
+  it("sends ctrl+c and ctrl+d to stop Claude", async () => {
+    const keysSent = [];
+    let pollCount = 0;
+
+    const cmuxApi = {
+      listAgentWorkspaceIds: async () => {
+        pollCount++;
+        if (pollCount <= 2) return new Set(["W1"]);
+        return new Set();
+      },
+      rpc: async (method) => {
+        if (method === "system.top") return makeTopData([makeWorkspace("W1", "surface:1")]);
+        return {};
+      },
+      sendText: async () => {},
+      sendKey: async (_ws, _surface, key) => { keysSent.push(key); },
+      readScreenByWorkspace: async () => null,
+      renameWorkspace: async () => {},
+    };
+    const refresher = new Refresher({ cmuxApi, pollIntervalMs: 10, timeoutMs: 2000 });
+
+    const result = await refresher.refreshSession("W1");
+    assert.equal(result.ok, true);
+    assert.equal(result.sessionId, null);
+    assert.ok(keysSent.includes("ctrl+c"), "should send ctrl+c");
+    assert.ok(keysSent.includes("ctrl+d"), "should send ctrl+d");
+  });
+
+  it("detects exit via session ID on screen", async () => {
+    let pollCount = 0;
+    const cmuxApi = {
+      listAgentWorkspaceIds: async () => new Set(["W1"]),
+      rpc: async (method) => {
+        if (method === "system.top") return makeTopData([makeWorkspace("W1", "surface:1")]);
+        return {};
+      },
+      sendText: async () => {},
+      sendKey: async () => {},
+      readScreenByWorkspace: async () => {
+        pollCount++;
+        if (pollCount >= 2) return "To resume:\nclaude --resume aabbccdd-1122-3344-5566-778899aabbcc\n➜";
+        return "working...";
+      },
+      renameWorkspace: async () => {},
+    };
+    const refresher = new Refresher({ cmuxApi, pollIntervalMs: 10, timeoutMs: 2000 });
+
+    const result = await refresher.refreshSession("W1");
+    assert.equal(result.ok, true);
+    assert.equal(result.sessionId, "aabbccdd-1122-3344-5566-778899aabbcc");
+  });
+
+  it("times out when Claude does not exit", async () => {
+    const cmuxApi = {
+      listAgentWorkspaceIds: async () => new Set(["W1"]),
+      rpc: async (method) => {
+        if (method === "system.top") return makeTopData([makeWorkspace("W1", "surface:1")]);
+        return {};
+      },
+      sendText: async () => {},
+      sendKey: async () => {},
+      readScreenByWorkspace: async () => "still running...",
+      renameWorkspace: async () => {},
+    };
+    const refresher = new Refresher({ cmuxApi, pollIntervalMs: 10, timeoutMs: 100 });
+
+    const result = await refresher.refreshSession("W1");
+    assert.equal(result.ok, false);
+    assert.equal(result.error, "Timeout waiting for Claude Code to exit");
   });
 });
 

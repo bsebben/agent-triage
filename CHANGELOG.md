@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.20.3] - 2026-05-27
+
+### Fixed
+
+- Session refresh no longer requires `tty` field from cmux `system.top` (always null in cmux 0.64.10+); now stops Claude via surface keyboard signals (Ctrl+C/Ctrl+D) and detects exit via screen content or tag removal
+
 ## [1.20.2] - 2026-05-26
 
 ### Fixed
