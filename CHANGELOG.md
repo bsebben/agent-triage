@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
-- Session refresh no longer requires `tty` field from cmux `system.top` (always null in cmux 0.64.10+); now stops Claude via surface keyboard signals (Ctrl+C/Ctrl+D) and detects exit via screen content or tag removal
+- Session refresh uses surface signals instead of tty-based PID lookup for cmux 0.64.10+ compatibility; finds Claude process via workspace cwd matching when tty is unavailable, preserving the reliable SIGTERM exit mechanism
 
 ## [1.20.2] - 2026-05-26
 
