@@ -10,7 +10,7 @@ function renderCmuxCompatIndicator() {
     container.innerHTML = `<span class="cmux-compat-badge">
       <button class="cmux-compat-btn cmux-restart-needed"
         title="cmux was updated \u2014 restart cmux to use the new version"
-        onclick="event.stopPropagation(); showToast('Quit and reopen cmux to complete the update', 8000)">Restart cmux</button>
+        onclick="event.stopPropagation(); restartCmux(this)">Restart cmux</button>
     </span>`;
     container.style.opacity = "1";
     return;
@@ -43,6 +43,14 @@ function renderCmuxCompatIndicator() {
       onclick="event.stopPropagation(); installCmux(this)">${label}</button>
   </span>`;
   container.style.opacity = "1";
+}
+
+async function restartCmux(btn) {
+  btn.textContent = "Restarting\u2026";
+  btn.disabled = true;
+  try {
+    await apiPost("restart-cmux", {});
+  } catch {}
 }
 
 async function installCmux(btn) {

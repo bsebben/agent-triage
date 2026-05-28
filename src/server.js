@@ -289,6 +289,15 @@ const server = createServer(async (req, res) => {
       }
     }
 
+    if (req.url === "/api/restart-cmux" && req.method === "POST") {
+      const { spawn } = await import("node:child_process");
+      spawn("bash", ["-c", "sleep 1 && osascript -e 'tell application \"cmux\" to quit' && sleep 2 && open /Applications/cmux.app"], {
+        detached: true,
+        stdio: "ignore",
+      }).unref();
+      return jsonResponse(res, { ok: true });
+    }
+
     if (req.url === "/api/close" && req.method === "POST") {
       const { workspaceId } = await readBody(req);
       await cmux.closeWorkspace(workspaceId);
