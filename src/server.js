@@ -279,7 +279,7 @@ const server = createServer(async (req, res) => {
         if (!mountPoint) throw new Error("Failed to determine mount point");
 
         await exec("rm", ["-rf", "/Applications/cmux.app"]);
-        await exec("cp", ["-R", `${mountPoint}/cmux.app`, "/Applications/cmux.app"]);
+        await exec("ditto", [`${mountPoint}/cmux.app`, "/Applications/cmux.app"]);
         await exec("hdiutil", ["detach", mountPoint, "-quiet"]);
         await exec("rm", ["-f", tmpDmg]);
 
