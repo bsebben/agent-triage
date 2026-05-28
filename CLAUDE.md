@@ -79,6 +79,15 @@ npm test              # Run tests
 npm run version-check # Verify version bump before pushing
 ```
 
+## cmux Version Compatibility
+
+The dashboard checks the installed cmux version at startup against a supported range defined in `src/cmux-version.js` as `CMUX_VERSION_RANGE` (`{ min, max }`). An orange header pill warns users when their version is outside this range.
+
+When updating the supported range:
+1. Edit `CMUX_VERSION_RANGE` in `src/cmux-version.js`
+2. Bump the package version and add a changelog entry
+3. Test both "too old" and "too new" pill states by temporarily narrowing the range
+
 ## Architecture
 
 - `src/server.js` - HTTP + WebSocket server, tab registry, polling
