@@ -26,18 +26,29 @@ function renderCmuxCompatIndicator() {
 
   container.innerHTML = `<span class="cmux-compat-badge">
     <button class="cmux-compat-btn" title="${escapeHtml(tooltip)}"
-      onclick="event.stopPropagation(); downloadCmux(this)">${label}</button>
+      onclick="event.stopPropagation(); installCmux(this)">${label}</button>
   </span>`;
   container.style.opacity = "1";
 }
 
-function downloadCmux(btn) {
-  const info = state.cmuxVersion || appConfig.cmuxVersion;
-  if (!info?.downloadUrl) return;
-
-  window.open(info.downloadUrl, "_blank");
-
+async function installCmux(btn) {
   btn.textContent = "Installing\u2026";
   btn.classList.add("installing");
-  btn.title = "Open the downloaded DMG, drag cmux to Applications, restart cmux";
+  btn.disabled = true;
+
+  try {
+    const res = await apiPost("install-cmux", {});
+    if (res.ok) {
+      btn.textContent = "\u2713 Installed";
+      showToast("cmux updated \u2014 restart cmux to complete", 8000);
+    } else {
+      btn.textContent = "\u2717 Failed";
+      showToast(res.error || "Install failed", 5000);
+      setTimeout(() => { btn.classList.remove("installing"); btn.disabled = false; renderCmuxCompatIndicator(); }, 3000);
+    }
+  } catch {
+    btn.textContent = "\u2717 Failed";
+    showToast("Install failed \u2014 check server logs", 5000);
+    setTimeout(() => { btn.classList.remove("installing"); btn.disabled = false; renderCmuxCompatIndicator(); }, 3000);
+  }
 }

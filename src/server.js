@@ -262,6 +262,33 @@ const server = createServer(async (req, res) => {
       return jsonResponse(res, { ok: true });
     }
 
+    if (req.url === "/api/install-cmux" && req.method === "POST") {
+      if (!cmuxVersion?.downloadUrl) {
+        return jsonResponse(res, { error: "No download URL available" }, 400);
+      }
+      const tmpDmg = "/tmp/cmux-macos-install.dmg";
+      try {
+        const exec = (cmd, args) => new Promise((resolve, reject) =>
+          execFile(cmd, args, { timeout: 120_000 }, (err, stdout) => err ? reject(err) : resolve(stdout)));
+
+        await exec("curl", ["-fsSL", "-o", tmpDmg, cmuxVersion.downloadUrl]);
+
+        const mountOut = await exec("hdiutil", ["attach", tmpDmg, "-nobrowse", "-quiet"]);
+        const mountLine = mountOut.trim().split("\n").pop();
+        const mountPoint = mountLine?.split(/\t/).pop()?.trim();
+        if (!mountPoint) throw new Error("Failed to determine mount point");
+
+        await exec("rm", ["-rf", "/Applications/cmux.app"]);
+        await exec("cp", ["-R", `${mountPoint}/cmux.app`, "/Applications/cmux.app"]);
+        await exec("hdiutil", ["detach", mountPoint, "-quiet"]);
+        await exec("rm", ["-f", tmpDmg]);
+
+        return jsonResponse(res, { ok: true, message: "cmux updated — restart cmux to complete" });
+      } catch (err) {
+        return jsonResponse(res, { ok: false, error: err.message }, 500);
+      }
+    }
+
     if (req.url === "/api/close" && req.method === "POST") {
       const { workspaceId } = await readBody(req);
       await cmux.closeWorkspace(workspaceId);
