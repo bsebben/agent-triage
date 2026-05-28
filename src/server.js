@@ -273,7 +273,7 @@ const server = createServer(async (req, res) => {
 
         await exec("curl", ["-fsSL", "-o", tmpDmg, cmuxVersion.downloadUrl]);
 
-        const mountOut = await exec("hdiutil", ["attach", tmpDmg, "-nobrowse", "-quiet"]);
+        const mountOut = await exec("hdiutil", ["attach", tmpDmg, "-nobrowse"]);
         const mountLine = mountOut.trim().split("\n").pop();
         const mountPoint = mountLine?.split(/\t/).pop()?.trim();
         if (!mountPoint) throw new Error("Failed to determine mount point");

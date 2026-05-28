@@ -1447,7 +1447,7 @@ main { padding: 8px; position: relative; }
 /* Toast notifications */
 #toast-container {
   position: fixed;
-  bottom: 24px;
+  top: 64px;
   left: 50%;
   transform: translateX(-50%);
   z-index: 2000;
@@ -1467,7 +1467,7 @@ main { padding: 8px; position: relative; }
   font-weight: 500;
   padding: 8px 16px;
   opacity: 0;
-  transform: translateY(8px);
+  transform: translateY(-8px);
   transition: opacity 0.3s, transform 0.3s;
   pointer-events: auto;
 }

@@ -1,8 +1,19 @@
 // public/cmux-compat-indicator.js — cmux version compatibility pill
 
+let cmuxInstallState = null;
+
 function renderCmuxCompatIndicator() {
   const container = document.getElementById("cmux-compat-indicator");
   if (!container) return;
+
+  if (cmuxInstallState === "installed") {
+    container.innerHTML = `<span class="cmux-compat-badge">
+      <button class="cmux-compat-btn installing" disabled
+        title="Restart cmux to complete the update">\u2713 Installed</button>
+    </span>`;
+    container.style.opacity = "1";
+    return;
+  }
 
   const info = state.cmuxVersion || appConfig.cmuxVersion;
   if (!info || info.compatible !== false) {
@@ -10,6 +21,8 @@ function renderCmuxCompatIndicator() {
     container.style.opacity = "0";
     return;
   }
+
+  if (cmuxInstallState === "installing") return;
 
   const rangeText = `${info.range.min}\u2013${info.range.max}`;
   let label, tooltip;
@@ -32,6 +45,7 @@ function renderCmuxCompatIndicator() {
 }
 
 async function installCmux(btn) {
+  cmuxInstallState = "installing";
   btn.textContent = "Installing\u2026";
   btn.classList.add("installing");
   btn.disabled = true;
@@ -39,16 +53,17 @@ async function installCmux(btn) {
   try {
     const res = await apiPost("install-cmux", {});
     if (res.ok) {
-      btn.textContent = "\u2713 Installed";
-      showToast("cmux updated \u2014 restart cmux to complete", 8000);
+      cmuxInstallState = "installed";
+      renderCmuxCompatIndicator();
+      showToast("cmux updated \u2014 restart cmux to complete", 10000);
     } else {
-      btn.textContent = "\u2717 Failed";
+      cmuxInstallState = null;
       showToast(res.error || "Install failed", 5000);
-      setTimeout(() => { btn.classList.remove("installing"); btn.disabled = false; renderCmuxCompatIndicator(); }, 3000);
+      renderCmuxCompatIndicator();
     }
   } catch {
-    btn.textContent = "\u2717 Failed";
+    cmuxInstallState = null;
     showToast("Install failed \u2014 check server logs", 5000);
-    setTimeout(() => { btn.classList.remove("installing"); btn.disabled = false; renderCmuxCompatIndicator(); }, 3000);
+    renderCmuxCompatIndicator();
   }
 }
