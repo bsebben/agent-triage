@@ -69,6 +69,35 @@ header h1 {
 
 .app-version:hover { color: var(--text); }
 
+#cmux-compat-indicator {
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.cmux-compat-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.cmux-compat-btn {
+  background: var(--clr-permission);
+  border: none;
+  border-radius: 4px;
+  color: #1a1a2e;
+  cursor: pointer;
+  font-size: 11px;
+  font-family: inherit;
+  font-weight: 600;
+  padding: 2px 8px;
+  line-height: 1.4;
+  white-space: nowrap;
+}
+
+.cmux-compat-btn:hover { opacity: 0.85; }
+.cmux-compat-btn.installing { opacity: 0.5; cursor: default; }
+.cmux-compat-btn.cmux-restart-needed { background: var(--clr-completion); cursor: pointer; opacity: 1; }
+
 #update-indicator {
   opacity: 0;
   transition: opacity 0.3s ease;
@@ -1419,7 +1448,7 @@ main { padding: 8px; position: relative; }
 /* Toast notifications */
 #toast-container {
   position: fixed;
-  bottom: 24px;
+  top: 64px;
   left: 50%;
   transform: translateX(-50%);
   z-index: 2000;
@@ -1439,7 +1468,7 @@ main { padding: 8px; position: relative; }
   font-weight: 500;
   padding: 8px 16px;
   opacity: 0;
-  transform: translateY(8px);
+  transform: translateY(-8px);
   transition: opacity 0.3s, transform 0.3s;
   pointer-events: auto;
 }

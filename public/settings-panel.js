@@ -25,6 +25,16 @@ function toggleSettingsPanel() {
 function renderSettings() {
   if (!settingsPanel) return;
 
+  const cmuxInfo = state.cmuxVersion || appConfig.cmuxVersion;
+  const cmuxRow = cmuxInfo ? (() => {
+    const ver = cmuxInfo.version || "not detected";
+    const rangeText = `${cmuxInfo.range.min}\u2013${cmuxInfo.range.max}`;
+    const statusSpan = cmuxInfo.compatible
+      ? `<span class="log-info">${escapeHtml(ver)}</span> <span style="color:var(--text-dim)">(supported: ${escapeHtml(rangeText)})</span>`
+      : `<span class="log-error">${escapeHtml(ver)}</span> — requires ${escapeHtml(rangeText)}`;
+    return `<div class="settings-config-row">cmux: ${statusSpan}</div>`;
+  })() : "";
+
   const tabStatuses = state.tabStatus || {};
   const tabRows = Object.entries(tabStatuses).map(([name, s]) => {
     const status = s.available ? '<span class="log-info">available</span>' : `<span class="log-error">unavailable</span>`;
@@ -49,7 +59,7 @@ function renderSettings() {
           <button class="settings-restart-btn" onclick="restartServer()">Restart</button>
         </div>
       </div>
-      <div class="settings-config">${tabRows}</div>
+      <div class="settings-config">${cmuxRow}${tabRows}</div>
     </div>
     ${pluginsHtml}
     <div class="settings-section settings-logs-section">

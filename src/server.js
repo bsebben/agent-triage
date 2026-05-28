@@ -12,6 +12,7 @@ import { readBody, serveStatic, jsonResponse } from "./utils.js";
 import { initLogs, getLines } from "./logs.js";
 import config, { HOME, buildSchema, loadRawConfig, writeConfigFile } from "./config.js";
 import { UpdateChecker } from "./update-checker.js";
+import { detectCmuxVersion } from "./cmux-version.js";
 import * as plugins from "./plugins.js";
 import { refreshSession, refreshAll, refreshingIds } from "./refresh.js";
 import loops, { defaults as loopsDefaults } from "./tabs/loops.js";
@@ -55,6 +56,12 @@ function broadcast() {
 }
 
 const updateChecker = new UpdateChecker();
+const cmuxVersion = await detectCmuxVersion(config.cmux.binary);
+if (cmuxVersion.compatible) {
+  console.log(`Config: cmux version = ${cmuxVersion.version} (compatible)`);
+} else {
+  console.log(`Config: cmux version = ${cmuxVersion.version || "unknown"} (${cmuxVersion.reason} — supported: ${cmuxVersion.range.min}–${cmuxVersion.range.max})`);
+}
 const monitor = new Monitor(queue, { onUpdate: broadcast });
 
 function getSessionCount() {
@@ -78,6 +85,7 @@ function getFullData() {
     maxSessions: config.maxSessions,
     sessionCount: getSessionCount(),
     updateStatus: updateChecker.data,
+    cmuxVersion,
     refreshing: [...refreshingIds()],
     ...tabData,
     tabStatus,
@@ -117,6 +125,7 @@ const server = createServer(async (req, res) => {
         version: JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf-8")).version,
         resolved: config,
         projectDir: join(__dirname, ".."),
+        cmuxVersion,
         ...tabConfigs,
       });
     }
@@ -251,6 +260,30 @@ const server = createServer(async (req, res) => {
       const { workspaceId, title } = await readBody(req);
       await cmux.renameWorkspace(workspaceId, title);
       return jsonResponse(res, { ok: true });
+    }
+
+    if (req.url === "/api/install-cmux" && req.method === "POST") {
+      if (!cmuxVersion?.downloadUrl) {
+        return jsonResponse(res, { error: "No download URL available" }, 400);
+      }
+      const tmpDmg = "/tmp/cmux-macos-install.dmg";
+      try {
+        const exec = (cmd, args) => new Promise((resolve, reject) =>
+          execFile(cmd, args, { timeout: 120_000 }, (err, stdout) => err ? reject(err) : resolve(stdout)));
+
+        await exec("curl", ["-fsSL", "-o", tmpDmg, cmuxVersion.downloadUrl]);
+
+        const mountOut = await exec("hdiutil", ["attach", tmpDmg]);
+        const mountLine = mountOut.trim().split("\n").pop();
+        const mountPoint = mountLine?.split(/\t/).pop()?.trim();
+        if (!mountPoint) throw new Error("Failed to determine mount point");
+
+        execFile("open", [mountPoint]);
+
+        return jsonResponse(res, { ok: true });
+      } catch (err) {
+        return jsonResponse(res, { ok: false, error: err.message }, 500);
+      }
     }
 
     if (req.url === "/api/close" && req.method === "POST") {
