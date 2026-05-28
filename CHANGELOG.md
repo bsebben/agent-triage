@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.21.0] - 2026-05-28
+
+### Added
+
+- cmux version compatibility indicator: orange warning pill in header when installed cmux version is outside the supported range (too old or too new)
+- Clicking the pill downloads the recommended cmux DMG directly from GitHub
+- Settings panel now shows detected cmux version alongside the supported range
+
 ## [1.20.3] - 2026-05-28
 
 ### Fixed

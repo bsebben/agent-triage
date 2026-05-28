@@ -17,6 +17,7 @@ async function loadAppConfig() {
     if (appConfig.version) {
       document.querySelector(".app-version").textContent = `v${appConfig.version}`;
     }
+    if (typeof renderCmuxCompatIndicator === "function") renderCmuxCompatIndicator();
     for (const tab of ["loops", "tickets", "pulls"]) {
       const btn = document.querySelector(`.tab[data-tab="${tab}"]`);
       if (btn) btn.style.display = appConfig[tab]?.enabled === false ? "none" : "";
@@ -34,6 +35,7 @@ function connect() {
       applyRenames();
       applyCloses();
       if (!renaming) render();
+      if (typeof renderCmuxCompatIndicator === "function") renderCmuxCompatIndicator();
       if (typeof renderUpdateIndicator === "function") renderUpdateIndicator();
     } else if (msg.type === "log" || msg.type === "logs") {
       if (typeof handleLogMessage === "function") handleLogMessage(msg);
