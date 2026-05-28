@@ -9,8 +9,8 @@ function renderCmuxCompatIndicator() {
   if (cmuxInstallState === "installed") {
     container.innerHTML = `<span class="cmux-compat-badge">
       <button class="cmux-compat-btn cmux-restart-needed"
-        title="cmux was updated \u2014 restart cmux to use the new version"
-        onclick="event.stopPropagation(); restartCmux(this)">Restart cmux</button>
+        title="Drag cmux to Applications, then restart cmux"
+        onclick="event.stopPropagation(); showToast('Drag cmux to Applications, then restart cmux', 8000)">Restart cmux</button>
     </span>`;
     container.style.opacity = "1";
     return;
@@ -45,17 +45,9 @@ function renderCmuxCompatIndicator() {
   container.style.opacity = "1";
 }
 
-async function restartCmux(btn) {
-  btn.textContent = "Restarting\u2026";
-  btn.disabled = true;
-  try {
-    await apiPost("restart-cmux", {});
-  } catch {}
-}
-
 async function installCmux(btn) {
   cmuxInstallState = "installing";
-  btn.textContent = "Installing\u2026";
+  btn.textContent = "Downloading\u2026";
   btn.classList.add("installing");
   btn.disabled = true;
 
@@ -64,7 +56,7 @@ async function installCmux(btn) {
     if (res.ok) {
       cmuxInstallState = "installed";
       renderCmuxCompatIndicator();
-      showToast("cmux updated \u2014 restart cmux to complete", 10000);
+      showToast("Drag cmux to Applications, then restart cmux", 10000);
     } else {
       cmuxInstallState = null;
       showToast(res.error || "Install failed", 5000);

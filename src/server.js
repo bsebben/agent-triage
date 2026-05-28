@@ -273,29 +273,17 @@ const server = createServer(async (req, res) => {
 
         await exec("curl", ["-fsSL", "-o", tmpDmg, cmuxVersion.downloadUrl]);
 
-        const mountOut = await exec("hdiutil", ["attach", tmpDmg, "-nobrowse"]);
+        const mountOut = await exec("hdiutil", ["attach", tmpDmg]);
         const mountLine = mountOut.trim().split("\n").pop();
         const mountPoint = mountLine?.split(/\t/).pop()?.trim();
         if (!mountPoint) throw new Error("Failed to determine mount point");
 
-        await exec("rm", ["-rf", "/Applications/cmux.app"]);
-        await exec("ditto", [`${mountPoint}/cmux.app`, "/Applications/cmux.app"]);
-        await exec("hdiutil", ["detach", mountPoint, "-quiet"]);
-        await exec("rm", ["-f", tmpDmg]);
+        execFile("open", [mountPoint]);
 
-        return jsonResponse(res, { ok: true, message: "cmux updated — restart cmux to complete" });
+        return jsonResponse(res, { ok: true });
       } catch (err) {
         return jsonResponse(res, { ok: false, error: err.message }, 500);
       }
-    }
-
-    if (req.url === "/api/restart-cmux" && req.method === "POST") {
-      const { spawn } = await import("node:child_process");
-      spawn("bash", ["-c", "sleep 1 && osascript -e 'tell application \"cmux\" to quit' && sleep 2 && open /Applications/cmux.app"], {
-        detached: true,
-        stdio: "ignore",
-      }).unref();
-      return jsonResponse(res, { ok: true });
     }
 
     if (req.url === "/api/close" && req.method === "POST") {
