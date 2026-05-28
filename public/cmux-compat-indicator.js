@@ -8,8 +8,9 @@ function renderCmuxCompatIndicator() {
 
   if (cmuxInstallState === "installed") {
     container.innerHTML = `<span class="cmux-compat-badge">
-      <button class="cmux-compat-btn installing" disabled
-        title="Restart cmux to complete the update">\u2713 Installed</button>
+      <button class="cmux-compat-btn cmux-restart-needed"
+        title="cmux was updated \u2014 restart cmux to use the new version"
+        onclick="event.stopPropagation(); showToast('Quit and reopen cmux to complete the update', 8000)">Restart cmux</button>
     </span>`;
     container.style.opacity = "1";
     return;

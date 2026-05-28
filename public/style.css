@@ -96,6 +96,7 @@ header h1 {
 
 .cmux-compat-btn:hover { opacity: 0.85; }
 .cmux-compat-btn.installing { opacity: 0.5; cursor: default; }
+.cmux-compat-btn.cmux-restart-needed { background: var(--clr-completion); cursor: pointer; opacity: 1; }
 
 #update-indicator {
   opacity: 0;
