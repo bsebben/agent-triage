@@ -251,28 +251,26 @@ export async function sendKey(workspaceId, surfaceId, key) {
 }
 
 export async function createWorkspace({ cwd, command } = {}) {
+  let workspaceId;
   if (cwd || command) {
-    const args = ["new-workspace"];
+    const args = ["new-workspace", "--focus", "true"];
     if (cwd) args.push("--cwd", cwd);
     if (command) args.push("--command", command);
     const { stdout } = await runCli(args);
-    const ref = stdout.match(/workspace:\d+/)?.[0];
-    if (ref) {
-      const result = await socketRpc("workspace.select", { workspace_id: ref });
-      if (result?.window_id) {
-        await socketRpc("window.focus", { window_id: result.window_id });
-      }
-    }
-    return ref ? { workspace_id: ref } : null;
+    workspaceId = stdout.match(/workspace:\d+/)?.[0];
+    if (!workspaceId) return null;
+  } else {
+    const result = await socketRpc("workspace.create", {});
+    workspaceId = result?.workspace_id;
+    if (!workspaceId) return result;
+    await selectWorkspace(workspaceId);
   }
-  const result = await socketRpc("workspace.create", {});
-  if (result?.workspace_id) {
-    await socketRpc("workspace.select", { workspace_id: result.workspace_id });
-    if (result.window_id) {
-      await socketRpc("window.focus", { window_id: result.window_id });
-    }
-  }
-  return result;
+  activateCmux();
+  return { workspace_id: workspaceId };
+}
+
+function activateCmux() {
+  execFile("osascript", ["-e", 'tell application "cmux" to activate'], () => {});
 }
 
 function stripAnsi(str) {

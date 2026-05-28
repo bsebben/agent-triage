@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.20.3] - 2026-05-28
+
+### Fixed
+
+- New workspaces now receive keyboard focus immediately via cmux `--focus` flag
+
 ## [1.20.2] - 2026-05-26
 
 ### Fixed
