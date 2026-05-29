@@ -2,6 +2,8 @@
   "port": 7777,
   "defaultDirectory": null,
   "maxSessions": null,
+  "maxVisibleGroups": 8,
+  "showRecentGroups": true,
   "cmux": {
     "binary": null,
     "socket": null
