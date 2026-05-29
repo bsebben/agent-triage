@@ -4,7 +4,7 @@ let activeTab = "workspaces";
 let appConfig = {};
 
 let ws;
-let state = { groups: [], dismissed: [], stats: { total: 0, pending: 0, completed: 0, dismissed: 0 } };
+let state = { groups: [], recentGroups: [], dismissed: [], stats: { total: 0, pending: 0, completed: 0, dismissed: 0 } };
 let renaming = false;
 const recentRenames = new Map();
 const recentCloses = new Map();

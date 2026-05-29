@@ -620,6 +620,28 @@ main { padding: 8px; position: relative; }
   display: none;
 }
 
+.recent-divider {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 8px 0;
+}
+
+.recent-group .group-header > span {
+  opacity: 0.5;
+}
+
+.recent-group .group-header:hover > span {
+  opacity: 0.7;
+}
+
+.recent-group .group-header > .group-actions {
+  opacity: 0;
+}
+
+.recent-group .group-header:hover > .group-actions {
+  opacity: 1;
+}
+
 .loops-section {
   margin-top: 16px;
   border-top: 1px solid var(--border);
