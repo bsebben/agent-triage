@@ -58,7 +58,13 @@ function applyCloses() {
     for (const g of state.groups) {
       g.items = g.items.filter((item) => item.workspaceId !== wsId);
     }
+    const emptied = state.groups.filter((g) => g.items.length === 0);
     state.groups = state.groups.filter((g) => g.items.length > 0);
+    for (const g of emptied) {
+      if (!state.recentGroups.some((r) => r.title === g.title)) {
+        state.recentGroups.push({ title: g.title, directory: g.directory, items: [], recent: true });
+      }
+    }
     if (state.dismissed) {
       state.dismissed = state.dismissed.filter((item) => item.workspaceId !== wsId);
     }

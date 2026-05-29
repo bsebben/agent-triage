@@ -43,6 +43,14 @@ function renderWorkspaces() {
     return;
   }
 
+  for (const g of groups) {
+    const title = g.title || "Unknown";
+    if (recentDefaultCollapsed.has(title)) {
+      recentDefaultCollapsed.delete(title);
+      collapsedGroups.delete(title);
+    }
+  }
+
   html += groups
     .map(
       (g) => {
