@@ -4,6 +4,7 @@ let closeConfigModal = null;
 
 function groupLabel(group) {
   if (group === "server") return "Server";
+  if (group === "recentGroups") return "Recent Groups";
   if (group === "cmux") return "cmux";
   if (group.startsWith("tabs.")) {
     const name = group.split(".").pop();
