@@ -66,7 +66,7 @@ function renderWorkspaces() {
 
   if (recentGroups && recentGroups.length > 0) {
     if (groups.length > 0) {
-      html += `<hr class="recent-divider">`;
+      html += `<div class="recent-divider"><span>Recent directories</span></div>`;
     }
     for (const g of recentGroups) {
       const title = g.title || "Unknown";
