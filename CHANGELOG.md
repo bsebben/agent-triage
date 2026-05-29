@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.22.0] - 2026-05-29
+
+### Added
+
+- Recent workspace groups: directories that had active sessions remain visible (dimmed, collapsed) after sessions close, keeping "New Session" and "New Terminal" buttons accessible
+- `maxVisibleGroups` config option (default 8) to control how many total workspace groups are displayed
+- `showRecentGroups` config option (default true) to toggle recent group display on/off
+
 ## [1.21.0] - 2026-05-28
 
 ### Added

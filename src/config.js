@@ -13,12 +13,16 @@ const DEFAULTS = {
   port: 7777,
   defaultDirectory: null,
   maxSessions: null,
+  maxVisibleGroups: 8,
+  showRecentGroups: true,
   cmux: { binary: null, socket: null },
 };
 
 export const FIELD_META = {
   port:             { description: "<b>Requires restart.</b> HTTP port the dashboard listens on" },
   maxSessions:      { type: "number", nullable: true, description: "Caps how many concurrent Claude Code workspaces can be open" },
+  maxVisibleGroups: { type: "number", group: "recentGroups", description: "Target number of workspace groups to display. Remaining slots are filled with recently-used empty groups." },
+  showRecentGroups: { type: "boolean", group: "recentGroups", description: "Show recently-used workspace groups that have no active sessions" },
   defaultDirectory: { type: "string", nullable: true, description: "Working directory for new sessions" },
   "cmux.binary":    { type: "string", nullable: true, description: "<b>Requires restart.</b> Path to the cmux CLI binary" },
   "cmux.socket":    { type: "string", nullable: true, description: "<b>Requires restart.</b> Unix socket for cmux RPC" },
@@ -43,7 +47,7 @@ export function buildSchema(tabDefaults) {
     schema[key] = {
       type: meta.type || inferType(value),
       default: value,
-      group: "server",
+      group: meta.group || "server",
       description: meta.description || "",
       ...(meta.nullable && { nullable: true }),
     };
@@ -128,10 +132,15 @@ function resolve(raw) {
     process.exit(1);
   }
 
+  const maxVisibleGroups = raw.maxVisibleGroups ?? DEFAULTS.maxVisibleGroups;
+  const showRecentGroups = raw.showRecentGroups ?? DEFAULTS.showRecentGroups;
+
   const config = {
     port: raw.port ?? DEFAULTS.port,
     defaultDirectory: expandHome(raw.defaultDirectory) || HOME,
     maxSessions,
+    maxVisibleGroups,
+    showRecentGroups,
     cmux: { ...DEFAULTS.cmux, ...raw.cmux },
     tabs: raw.tabs || {},
   };

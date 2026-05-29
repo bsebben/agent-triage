@@ -1,6 +1,7 @@
 // public/tab-workspaces.js
 
 const collapsedGroups = new Set(["Dismissed"]);
+const recentDefaultCollapsed = new Set();
 const refreshingWorkspaces = new Set();
 let refreshAllInFlight = false;
 
@@ -18,7 +19,7 @@ function saveCollapseState() {
 }
 
 function renderWorkspaces() {
-  const { groups, dismissed } = state;
+  const { groups, dismissed, recentGroups } = state;
   const atLimit = state.maxSessions !== null && state.sessionCount >= state.maxSessions;
 
   saveCollapseState();
@@ -37,9 +38,17 @@ function renderWorkspaces() {
     <button class="btn-new-workspace btn-refresh-all" onclick="refreshAllSessions()" data-tip="Refresh All Sessions"${refreshAllDisabled}>${refreshAllLabel}</button>
   </div>`;
 
-  if (groups.length === 0 && (!dismissed || dismissed.length === 0)) {
+  if (groups.length === 0 && (!recentGroups || recentGroups.length === 0) && (!dismissed || dismissed.length === 0)) {
     queue.innerHTML = html + `<div class="empty-state">No agent activity detected</div>`;
     return;
+  }
+
+  for (const g of groups) {
+    const title = g.title || "Unknown";
+    if (recentDefaultCollapsed.has(title)) {
+      recentDefaultCollapsed.delete(title);
+      collapsedGroups.delete(title);
+    }
   }
 
   html += groups
@@ -62,6 +71,37 @@ function renderWorkspaces() {
       }
     )
     .join("");
+
+  if (recentGroups && recentGroups.length > 0) {
+    if (groups.length > 0) {
+      html += `<div class="recent-divider"><span>Recent directories</span></div>`;
+    }
+    for (const g of recentGroups) {
+      const title = g.title || "Unknown";
+      if (!recentDefaultCollapsed.has(title)) {
+        recentDefaultCollapsed.add(title);
+        collapsedGroups.add(title);
+      }
+    }
+    html += recentGroups
+      .map((g) => {
+        const title = g.title || "Unknown";
+        const isCollapsed = collapsedGroups.has(title);
+        const dir = g.directory || "";
+        return `<div class="group recent-group">
+        <div class="group-header" onclick="toggleGroup(this)">
+          <span class="chevron${isCollapsed ? " collapsed" : ""}">\u25bc</span> <span>${escapeHtml(title)}</span>
+          <span class="count">(0)</span>
+          <span class="group-actions" onclick="event.stopPropagation()">
+            <button class="btn-group-add" data-cwd="${escapeHtml(dir)}" onclick="newSession(this.dataset.cwd)" data-tip="New Session"${disabledAttr}>${claudeIcon()}</button>
+            <button class="btn-group-add" data-cwd="${escapeHtml(dir)}" onclick="newWorkspace(this.dataset.cwd)" data-tip="New Terminal"${disabledAttr}>&gt;_</button>
+          </span>
+        </div>
+        <div class="group-items${isCollapsed ? " collapsed" : ""}"></div>
+      </div>`;
+      })
+      .join("");
+  }
 
   if (dismissed && dismissed.length > 0) {
     const dismissedCollapsed = collapsedGroups.has("Dismissed");

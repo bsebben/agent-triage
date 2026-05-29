@@ -620,6 +620,41 @@ main { padding: 8px; position: relative; }
   display: none;
 }
 
+.recent-divider {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 12px 8px 4px;
+  color: var(--text-dim);
+  font-size: 11px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.recent-divider::after {
+  content: "";
+  flex: 1;
+  border-top: 1px solid var(--text-dim);
+  opacity: 0.3;
+}
+
+.recent-group .group-header > span {
+  opacity: 0.5;
+}
+
+.recent-group .group-header:hover > span {
+  opacity: 0.7;
+}
+
+.recent-group .group-header > .group-actions {
+  opacity: 0;
+}
+
+.recent-group .group-header:hover > .group-actions {
+  opacity: 1;
+}
+
 .loops-section {
   margin-top: 16px;
   border-top: 1px solid var(--border);
