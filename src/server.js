@@ -79,7 +79,7 @@ function getFullData() {
     tabStatus[name] = status;
   }
   return {
-    ...queue.grouped(config.showRecentGroups ? config.maxVisibleGroups : 0),
+    ...queue.grouped(config.showRecentGroups ? config.maxRecentGroups : 0),
     dismissed: queue.dismissedItems(),
     stats: queue.stats(),
     maxSessions: config.maxSessions,
