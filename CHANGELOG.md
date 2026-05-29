@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.22.1] - 2026-05-29
+
+### Changed
+
+- Replaced `maxVisibleGroups` config option with `maxRecentGroups` (default 4) — directly caps how many recently-used empty groups are shown, independent of active group count
+
 ## [1.22.0] - 2026-05-29
 
 ### Added

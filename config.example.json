@@ -2,7 +2,7 @@
   "port": 7777,
   "defaultDirectory": null,
   "maxSessions": null,
-  "maxVisibleGroups": 8,
+  "maxRecentGroups": 4,
   "showRecentGroups": true,
   "cmux": {
     "binary": null,

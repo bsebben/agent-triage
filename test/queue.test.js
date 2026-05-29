@@ -124,7 +124,7 @@ describe("Queue", () => {
     assert.equal(recentGroups.length, 0);
   });
 
-  it("limits recentGroups to maxGroups minus active count", () => {
+  it("limits recentGroups to maxRecent", () => {
     queue.upsert({ id: "A", category: "running", workspaceId: "W1", workspaceDir: `${HOME}/workspace/a`, body: "" });
     queue.upsert({ id: "B", category: "running", workspaceId: "W2", workspaceDir: `${HOME}/workspace/b`, body: "" });
     queue.upsert({ id: "C", category: "running", workspaceId: "W3", workspaceDir: `${HOME}/workspace/c`, body: "" });
@@ -136,14 +136,14 @@ describe("Queue", () => {
     assert.equal(recentGroups.length, 2);
   });
 
-  it("shows zero recentGroups when active groups fill maxGroups", () => {
+  it("shows recentGroups independently of active group count", () => {
     queue.upsert({ id: "A", category: "running", workspaceId: "W1", workspaceDir: `${HOME}/workspace/a`, body: "" });
     queue.upsert({ id: "B", category: "running", workspaceId: "W2", workspaceDir: `${HOME}/workspace/b`, body: "" });
     queue.upsert({ id: "C", category: "running", workspaceId: "W3", workspaceDir: `${HOME}/workspace/c`, body: "" });
     queue.grouped();
     queue.remove("C");
     const { recentGroups } = queue.grouped(2);
-    assert.equal(recentGroups.length, 0);
+    assert.equal(recentGroups.length, 1);
   });
 
   it("sorts recentGroups by most recently active first", () => {

@@ -69,7 +69,7 @@ export class Queue {
     return this.#recentDirs.size;
   }
 
-  grouped(maxGroups = 8) {
+  grouped(maxRecent = 4) {
     const groups = new Map();
     for (const item of this.items()) {
       const dir = item.workspaceDir || "Unknown";
@@ -90,11 +90,10 @@ export class Queue {
       a.title.localeCompare(b.title, undefined, { sensitivity: "base" })
     );
 
-    const recentSlots = Math.max(0, maxGroups - activeGroups.length);
     const recentGroups = [...this.#recentDirs.values()]
       .filter((d) => !groups.has(d.label))
       .sort((a, b) => b.lastSeenAt - a.lastSeenAt)
-      .slice(0, recentSlots)
+      .slice(0, maxRecent)
       .map((d) => ({ title: d.label, directory: d.directory, items: [], recent: true }));
 
     return { groups: activeGroups, recentGroups };
