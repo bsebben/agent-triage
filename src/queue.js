@@ -120,7 +120,10 @@ export class Queue {
   }
 
   async save(filePath) {
-    const data = Object.fromEntries(this.#items);
+    const data = {
+      items: Object.fromEntries(this.#items),
+      recentDirs: Object.fromEntries(this.#recentDirs),
+    };
     await writeFile(filePath, JSON.stringify(data, null, 2));
   }
 
@@ -128,8 +131,19 @@ export class Queue {
     try {
       const raw = await readFile(filePath, "utf-8");
       const data = JSON.parse(raw);
-      for (const [id, item] of Object.entries(data)) {
-        this.#items.set(id, item);
+      if (data.items && typeof data.items === "object" && !Array.isArray(data.items)) {
+        for (const [id, item] of Object.entries(data.items)) {
+          this.#items.set(id, item);
+        }
+        if (data.recentDirs) {
+          for (const [label, entry] of Object.entries(data.recentDirs)) {
+            this.#recentDirs.set(label, entry);
+          }
+        }
+      } else {
+        for (const [id, item] of Object.entries(data)) {
+          this.#items.set(id, item);
+        }
       }
     } catch {
       // No saved state, start fresh

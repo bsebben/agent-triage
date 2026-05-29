@@ -1,7 +1,9 @@
 // test/queue.test.js
 import { describe, it, beforeEach } from "node:test";
 import assert from "node:assert/strict";
-import { homedir } from "node:os";
+import { homedir, tmpdir } from "node:os";
+import { join } from "node:path";
+import { unlink } from "node:fs/promises";
 import { Queue } from "../src/queue.js";
 
 const HOME = homedir();
@@ -182,6 +184,25 @@ describe("Queue", () => {
       assert.ok(titles.includes("~/workspace/dir3"));
     } finally {
       Queue.MAX_RECENT_DIRS = original;
+    }
+  });
+
+  it("persists recentDirs across save/load", async () => {
+    const tmpFile = join(tmpdir(), `queue-test-${Date.now()}.json`);
+    try {
+      queue.upsert({ id: "A", category: "running", workspaceId: "W1", workspaceDir: `${HOME}/workspace/zenpayroll`, body: "" });
+      queue.grouped();
+      queue.remove("A");
+      await queue.save(tmpFile);
+
+      const loaded = new Queue();
+      await loaded.load(tmpFile);
+      const { recentGroups } = loaded.grouped();
+      assert.equal(recentGroups.length, 1);
+      assert.equal(recentGroups[0].title, "~/workspace/zenpayroll");
+      assert.equal(recentGroups[0].directory, `${HOME}/workspace/zenpayroll`);
+    } finally {
+      await unlink(tmpFile).catch(() => {});
     }
   });
 });
