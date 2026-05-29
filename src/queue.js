@@ -16,6 +16,8 @@ function dirLabel(dir) {
 
 export class Queue {
   #items = new Map();
+  #recentDirs = new Map();
+  static MAX_RECENT_DIRS = 20;
 
   upsert(item) {
     const existing = this.#items.get(item.id);
@@ -63,7 +65,11 @@ export class Queue {
       .sort((a, b) => (b.dismissedAt || 0) - (a.dismissedAt || 0));
   }
 
-  grouped() {
+  get recentDirCount() {
+    return this.#recentDirs.size;
+  }
+
+  grouped(maxGroups = 8) {
     const groups = new Map();
     for (const item of this.items()) {
       const dir = item.workspaceDir || "Unknown";
@@ -73,9 +79,33 @@ export class Queue {
       }
       groups.get(label).items.push(item);
     }
-    return [...groups.values()].sort((a, b) =>
+
+    const now = Date.now();
+    for (const [label, group] of groups) {
+      this.#recentDirs.set(label, { label, directory: group.directory, lastSeenAt: now });
+    }
+    this.#pruneRecentDirs();
+
+    const activeGroups = [...groups.values()].sort((a, b) =>
       a.title.localeCompare(b.title, undefined, { sensitivity: "base" })
     );
+
+    const recentSlots = Math.max(0, maxGroups - activeGroups.length);
+    const recentGroups = [...this.#recentDirs.values()]
+      .filter((d) => !groups.has(d.label))
+      .sort((a, b) => b.lastSeenAt - a.lastSeenAt)
+      .slice(0, recentSlots)
+      .map((d) => ({ title: d.label, directory: d.directory, items: [], recent: true }));
+
+    return { groups: activeGroups, recentGroups };
+  }
+
+  #pruneRecentDirs() {
+    if (this.#recentDirs.size <= Queue.MAX_RECENT_DIRS) return;
+    const sorted = [...this.#recentDirs.entries()].sort((a, b) => a[1].lastSeenAt - b[1].lastSeenAt);
+    while (this.#recentDirs.size > Queue.MAX_RECENT_DIRS) {
+      this.#recentDirs.delete(sorted.shift()[0]);
+    }
   }
 
   stats() {

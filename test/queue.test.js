@@ -60,7 +60,7 @@ describe("Queue", () => {
     queue.upsert({ id: "A", category: "waiting", workspaceId: "W1", workspaceDir: `${HOME}/workspace/zenpayroll`, body: "q1" });
     queue.upsert({ id: "B", category: "waiting", workspaceId: "W2", workspaceDir: `${HOME}/workspace/web`, body: "q2" });
     queue.upsert({ id: "C", category: "waiting", workspaceId: "W3", workspaceDir: `${HOME}/workspace/zenpayroll`, body: "q3" });
-    const grouped = queue.grouped();
+    const { groups: grouped } = queue.grouped();
     assert.equal(grouped.length, 2);
     const zp = grouped.find((g) => g.title === "~/workspace/zenpayroll");
     assert.equal(zp.items.length, 2);
@@ -87,12 +87,38 @@ describe("Queue", () => {
     queue.upsert({ id: "Z1", category: "running", workspaceId: "W1", workspaceDir: `${HOME}/workspace/zenpayroll`, body: "" });
     queue.upsert({ id: "A1", category: "terminal", workspaceId: "W2", workspaceDir: `${HOME}/workspace/agent-triage`, body: "" });
     queue.upsert({ id: "M1", category: "error", workspaceId: "W3", workspaceDir: `${HOME}/workspace/middle`, body: "boom" });
-    const initial = queue.grouped().map((g) => g.title);
-    assert.deepEqual(initial, ["~/workspace/agent-triage", "~/workspace/middle", "~/workspace/zenpayroll"]);
+    const { groups: initial } = queue.grouped();
+    assert.deepEqual(initial.map((g) => g.title), ["~/workspace/agent-triage", "~/workspace/middle", "~/workspace/zenpayroll"]);
 
     queue.upsert({ id: "M1", category: "completion", workspaceId: "W3", workspaceDir: `${HOME}/workspace/middle`, body: "done" });
     queue.upsert({ id: "A1", category: "permission", workspaceId: "W2", workspaceDir: `${HOME}/workspace/agent-triage`, body: "approve?" });
-    const after = queue.grouped().map((g) => g.title);
-    assert.deepEqual(after, ["~/workspace/agent-triage", "~/workspace/middle", "~/workspace/zenpayroll"]);
+    const { groups: after } = queue.grouped();
+    assert.deepEqual(after.map((g) => g.title), ["~/workspace/agent-triage", "~/workspace/middle", "~/workspace/zenpayroll"]);
+  });
+
+  it("tracks directories seen via grouped()", () => {
+    queue.upsert({ id: "A", category: "running", workspaceId: "W1", workspaceDir: `${HOME}/workspace/zenpayroll`, body: "" });
+    queue.grouped();
+    assert.equal(queue.recentDirCount, 1);
+  });
+
+  it("returns recentGroups for directories with no active items", () => {
+    queue.upsert({ id: "A", category: "running", workspaceId: "W1", workspaceDir: `${HOME}/workspace/zenpayroll`, body: "" });
+    queue.grouped();
+    queue.remove("A");
+    const { groups, recentGroups } = queue.grouped();
+    assert.equal(groups.length, 0);
+    assert.equal(recentGroups.length, 1);
+    assert.equal(recentGroups[0].title, "~/workspace/zenpayroll");
+    assert.equal(recentGroups[0].items.length, 0);
+    assert.equal(recentGroups[0].recent, true);
+  });
+
+  it("does not duplicate a directory in both groups and recentGroups", () => {
+    queue.upsert({ id: "A", category: "running", workspaceId: "W1", workspaceDir: `${HOME}/workspace/zenpayroll`, body: "" });
+    queue.grouped();
+    const { groups, recentGroups } = queue.grouped();
+    assert.equal(groups.length, 1);
+    assert.equal(recentGroups.length, 0);
   });
 });
