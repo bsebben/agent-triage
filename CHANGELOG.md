@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.23.2] - 2026-06-01
+
+### Added
+
+- Recent directories now show relative timestamps (e.g., "3h ago", "2d ago") indicating when they were last active
+
+### Changed
+
+- `timeAgo` helper now scales through days and weeks instead of capping at hours
+
 ## [1.23.1] - 2026-06-01
 
 ### Fixed

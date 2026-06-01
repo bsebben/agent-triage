@@ -71,9 +71,10 @@ function renderWorkspaces() {
       .map((g) => {
         const title = g.title || "Unknown";
         const dir = g.directory || "";
+        const ago = g.lastSeenAt ? ` (${timeAgo(g.lastSeenAt)})` : "";
         return `<div class="group recent-group">
         <div class="group-header">
-          <span>${escapeHtml(title)}</span>
+          <span>${escapeHtml(title)}<span class="recent-ago">${ago}</span></span>
           <span class="group-actions">
             <button class="btn-group-add" data-cwd="${escapeHtml(dir)}" onclick="newSession(this.dataset.cwd)" data-tip="New Session"${disabledAttr}>${claudeIcon()}</button>
             <button class="btn-group-add" data-cwd="${escapeHtml(dir)}" onclick="newWorkspace(this.dataset.cwd)" data-tip="New Terminal"${disabledAttr}>&gt;_</button>
