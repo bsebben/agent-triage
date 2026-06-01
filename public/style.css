@@ -647,6 +647,10 @@ main { padding: 8px; position: relative; }
   opacity: 0.7;
 }
 
+.recent-group .group-header {
+  cursor: default;
+}
+
 .recent-group .group-header > .group-actions {
   opacity: 0;
 }
