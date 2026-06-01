@@ -11,7 +11,7 @@ const HOME = homedir();
 
 const DEFAULTS = {
   port: 7777,
-  defaultDirectory: null,
+  defaultDirectory: "~/workspace",
   maxSessions: null,
   maxRecentGroups: 4,
   showRecentGroups: true,
@@ -23,7 +23,7 @@ export const FIELD_META = {
   maxSessions:      { type: "number", nullable: true, description: "Caps how many concurrent Claude Code workspaces can be open" },
   maxRecentGroups: { type: "number", group: "recentGroups", description: "Maximum number of recently-used workspace groups to show when they have no active sessions" },
   showRecentGroups: { type: "boolean", group: "recentGroups", description: "Show recently-used workspace groups that have no active sessions" },
-  defaultDirectory: { type: "string", nullable: true, description: "Working directory for new sessions" },
+  defaultDirectory: { type: "string", nullable: true, description: "Working directory for new sessions (falls back to home directory if path doesn't exist)" },
   "cmux.binary":    { type: "string", nullable: true, description: "<b>Requires restart.</b> Path to the cmux CLI binary" },
   "cmux.socket":    { type: "string", nullable: true, description: "<b>Requires restart.</b> Unix socket for cmux RPC" },
   "tabs.loops.dataDir":    { type: "string", nullable: true, description: "Path to claude-loops plugin data" },
@@ -90,6 +90,12 @@ function expandHome(p) {
   return p;
 }
 
+function resolveDirectory(raw) {
+  const expanded = expandHome(raw);
+  if (expanded && existsSync(expanded)) return expanded;
+  return HOME;
+}
+
 export function loadRawConfig() {
   const configPath = join(PROJECT_ROOT, "config.json");
   return JSON.parse(readFileSync(configPath, "utf-8"));
@@ -137,7 +143,7 @@ function resolve(raw) {
 
   const config = {
     port: raw.port ?? DEFAULTS.port,
-    defaultDirectory: expandHome(raw.defaultDirectory) || HOME,
+    defaultDirectory: resolveDirectory(raw.defaultDirectory ?? DEFAULTS.defaultDirectory),
     maxSessions,
     maxRecentGroups,
     showRecentGroups,

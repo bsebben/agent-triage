@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.23.0] - 2026-06-01
+
+### Changed
+
+- Default `defaultDirectory` is now `~/workspace` instead of home directory — avoids Claude Code trust prompts for new sessions
+- Falls back to home directory if the configured path doesn't exist
+
 ## [1.22.2] - 2026-06-01
 
 ### Changed
