@@ -1,6 +1,6 @@
 {
   "port": 7777,
-  "defaultDirectory": null,
+  "defaultDirectory": "~/workspace",
   "maxSessions": null,
   "maxRecentGroups": 4,
   "showRecentGroups": true,
