@@ -659,6 +659,12 @@ main { padding: 8px; position: relative; }
   opacity: 1;
 }
 
+.recent-ago {
+  font-size: 0.85em;
+  opacity: 0.6;
+  margin-left: 4px;
+}
+
 .loops-section {
   margin-top: 16px;
   border-top: 1px solid var(--border);

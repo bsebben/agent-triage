@@ -94,7 +94,7 @@ export class Queue {
       .filter((d) => !groups.has(d.label))
       .sort((a, b) => b.lastSeenAt - a.lastSeenAt)
       .slice(0, maxRecent)
-      .map((d) => ({ title: d.label, directory: d.directory, items: [], recent: true }));
+      .map((d) => ({ title: d.label, directory: d.directory, items: [], recent: true, lastSeenAt: d.lastSeenAt }));
 
     return { groups: activeGroups, recentGroups };
   }
