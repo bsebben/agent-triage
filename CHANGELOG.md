@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.23.1] - 2026-06-01
+
+### Fixed
+
+- Refresh now sends `/reload-plugins` after resuming a session, ensuring updated plugins are picked up
+
 ## [1.23.0] - 2026-06-01
 
 ### Changed
