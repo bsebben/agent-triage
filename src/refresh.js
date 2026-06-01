@@ -138,6 +138,11 @@ export class Refresher {
         if (ids.has(workspaceId)) break;
       }
 
+      // Reload plugins so the resumed session picks up any updates
+      await sleep(1000);
+      await this.#cmux.sendText(workspaceId, surfaceRef, "/reload-plugins");
+      await this.#cmux.sendKey(workspaceId, surfaceRef, "Enter");
+
       // Restore the workspace title
       if (title) {
         try { await this.#cmux.renameWorkspace(workspaceId, title); } catch {}
