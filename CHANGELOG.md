@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.22.2] - 2026-06-01
+
+### Changed
+
+- Removed accordion chevron, `(0)` count badge, and empty collapsible container from recent directory groups — they now render as flat labels with hover-revealed action buttons
+
 ## [1.22.1] - 2026-05-29
 
 ### Changed
