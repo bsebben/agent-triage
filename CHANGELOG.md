@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.23.3] - 2026-06-02
+
+### Fixed
+
+- Auto-reload the page after pulling an update so new frontend code takes effect immediately
+
 ## [1.23.2] - 2026-06-01
 
 ### Added

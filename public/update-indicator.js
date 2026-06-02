@@ -48,6 +48,11 @@ async function performUpdate(btn, opts = {}) {
 
   try {
     const res = await apiPost("update", opts);
+    if (res.ok) {
+      btn.innerHTML = "Restarting…";
+      pendingReload = true;
+      return;
+    }
     if (!res.ok) {
       btn.innerHTML = original;
       btn.disabled = false;
