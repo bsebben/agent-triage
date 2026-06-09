@@ -87,7 +87,7 @@ export class Refresher {
         continue;
       }
       if (prev !== UNSET && screen === prev) {
-        if (!stableSince) stableSince = Date.now();
+        stableSince ??= Date.now();
         if (Date.now() - stableSince >= stableMs) return;
       } else {
         stableSince = null;
