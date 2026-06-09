@@ -124,6 +124,54 @@ describe("Refresher.refreshSession", () => {
   });
 });
 
+describe("Refresher.waitForScreenStable (via refreshSession)", () => {
+  it("sends /reload-plugins only after screen content stops changing", async () => {
+    const ws = makeWorkspace("W1", "surface:1", "workspace:W1", "ttysTest");
+    const sentTexts = [];
+    let screenCallCountAtReload = null;
+    let screenCallCount = 0;
+
+    // Screen sequence: two distinct values, then stabilizes at "> " for 3+ reads.
+    // Stability requires seeing the same value twice with stableMs elapsed between them,
+    // so /reload-plugins must not be sent until at least the 4th read (index 3).
+    const screens = ["loading...", "still loading", "> ", "> ", "> ", "> "];
+    const cmuxApi = {
+      listAgentWorkspaceIds: async () => new Set(["W1"]),
+      rpc: async (method) => {
+        if (method === "system.top") return makeTopData([ws]);
+        return {};
+      },
+      sendText: async (_wsId, _surfaceId, text) => {
+        if (text === "/reload-plugins") screenCallCountAtReload = screenCallCount;
+        sentTexts.push(text);
+      },
+      sendKey: async () => {},
+      readScreenByWorkspace: async () => {
+        const screen = screens[Math.min(screenCallCount, screens.length - 1)];
+        screenCallCount++;
+        return screen;
+      },
+      renameWorkspace: async () => {},
+    };
+
+    // Provide an execFileFn mock so ps returns no output — Claude appears not running,
+    // and the kill path is deterministically skipped (no real process on this tty).
+    const mockExecFile = (_cmd, _args, cb) => cb(null, { stdout: "" });
+
+    const refresher = new Refresher({ cmuxApi, execFileFn: mockExecFile, pollIntervalMs: 10, timeoutMs: 5000 });
+    const result = await refresher.refreshSession("W1");
+
+    // /reload-plugins must be sent after screen stabilizes
+    assert.ok(sentTexts.includes("/reload-plugins"), "should send /reload-plugins");
+    // At the moment /reload-plugins was queued, the screen must have been read at least 4
+    // times — enough to observe 2 content changes followed by a stable match.
+    assert.ok(
+      screenCallCountAtReload >= 4,
+      `expected screenCallCount >= 4 when /reload-plugins was sent, got ${screenCallCountAtReload}`,
+    );
+  });
+});
+
 describe("Refresher.refreshAll", () => {
   it("returns empty results when no agent sessions exist", async () => {
     const cmuxApi = {

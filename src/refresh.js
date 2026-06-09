@@ -15,12 +15,14 @@ function sleep(ms) {
 
 export class Refresher {
   #cmux;
+  #execFileAsync;
   #inFlight = new Set();
   #pollIntervalMs;
   #timeoutMs;
 
-  constructor({ cmuxApi = null, pollIntervalMs = POLL_INTERVAL_MS, timeoutMs = TIMEOUT_MS } = {}) {
+  constructor({ cmuxApi = null, execFileFn = null, pollIntervalMs = POLL_INTERVAL_MS, timeoutMs = TIMEOUT_MS } = {}) {
     this.#cmux = cmuxApi || cmux;
+    this.#execFileAsync = execFileFn ? promisify(execFileFn) : execFileAsync;
     this.#pollIntervalMs = pollIntervalMs;
     this.#timeoutMs = timeoutMs;
   }
@@ -55,7 +57,7 @@ export class Refresher {
 
   async #findClaudePid(tty) {
     try {
-      const { stdout } = await execFileAsync("ps", ["-t", tty, "-o", "pid,comm"]);
+      const { stdout } = await this.#execFileAsync("ps", ["-t", tty, "-o", "pid,comm"]);
       for (const line of stdout.split("\n")) {
         if (line.includes("/claude") || line.match(/\bclaude\b/)) {
           const pid = parseInt(line.trim(), 10);
@@ -68,6 +70,30 @@ export class Refresher {
 
   async #isClaudeRunning(tty) {
     return (await this.#findClaudePid(tty)) !== null;
+  }
+
+  async #waitForScreenStable(workspaceRef, { stableMs = 800, timeoutMs = 15000 } = {}) {
+    const UNSET = Symbol();
+    const deadline = Date.now() + timeoutMs;
+    let prev = UNSET;
+    let stableSince = null;
+    while (Date.now() < deadline) {
+      await sleep(this.#pollIntervalMs);
+      const screen = await this.#cmux.readScreenByWorkspace(workspaceRef);
+      if (screen === null) {
+        // Treat an unreadable screen as still changing
+        stableSince = null;
+        prev = UNSET;
+        continue;
+      }
+      if (prev !== UNSET && screen === prev) {
+        stableSince ??= Date.now();
+        if (Date.now() - stableSince >= stableMs) return;
+      } else {
+        stableSince = null;
+        prev = screen;
+      }
+    }
   }
 
   async refreshSession(workspaceId) {
@@ -138,8 +164,11 @@ export class Refresher {
         if (ids.has(workspaceId)) break;
       }
 
-      // Reload plugins so the resumed session picks up any updates
-      await sleep(1000);
+      // Wait for the terminal screen to stabilize — the claude_code tag appears
+      // when the process starts, but Claude isn't ready for slash commands until
+      // the resume/initialization flow finishes and the input prompt is active.
+      await this.#waitForScreenStable(workspaceRef, { timeoutMs: this.#timeoutMs });
+
       await this.#cmux.sendText(workspaceId, surfaceRef, "/reload-plugins");
       await this.#cmux.sendKey(workspaceId, surfaceRef, "Enter");
 

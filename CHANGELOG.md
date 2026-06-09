@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.23.4] - 2026-06-09
+
+### Fixed
+
+- Replace fixed 1-second sleep before `/reload-plugins` with a screen-stability poll so the command is sent only once the terminal output has settled after session resume
+
 ## [1.23.3] - 2026-06-02
 
 ### Fixed
