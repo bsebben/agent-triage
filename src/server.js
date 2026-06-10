@@ -330,9 +330,12 @@ const server = createServer(async (req, res) => {
       const body = await readBody(req).catch(() => ({}));
       const cwd = body.cwd || config.defaultDirectory;
       let { command } = body;
-      if (command === "claude" && body.prompt) {
-        const escaped = "'" + body.prompt.replace(/'/g, "'\\''") + "'";
-        command = `claude ${escaped}`;
+      if (command === "claude") {
+        if (body.dangerous) command += " --dangerously-skip-permissions";
+        if (body.prompt) {
+          const escaped = "'" + body.prompt.replace(/'/g, "'\\''") + "'";
+          command += ` ${escaped}`;
+        }
       }
       await cmux.createWorkspace({ cwd, command });
       await monitor.poll();

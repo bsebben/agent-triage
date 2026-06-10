@@ -32,7 +32,7 @@ function renderWorkspaces() {
   const refreshAllDisabled = refreshAllInFlight ? " disabled" : "";
   const refreshAllLabel = refreshAllInFlight ? "&#x21bb; Refreshing&hellip;" : "&#x21bb; Refresh All";
   html += `<div class="tab-toolbar">
-    <button class="btn-new-workspace" onclick="newSession()" data-tip="New Session"${disabledAttr}>${claudeIcon()}</button>
+    <button class="btn-new-workspace btn-new-session" onclick="newSession(undefined, event.shiftKey)" data-tip="New Session"${disabledAttr}>${claudeIcon()}</button>
     <button class="btn-new-workspace" onclick="newWorkspace()" data-tip="New Terminal"${disabledAttr}>&gt;_</button>
     <button class="btn-new-workspace btn-refresh-all" onclick="refreshAllSessions()" data-tip="Refresh All Sessions"${refreshAllDisabled}>${refreshAllLabel}</button>
   </div>`;
@@ -53,7 +53,7 @@ function renderWorkspaces() {
         <span class="chevron${isCollapsed ? " collapsed" : ""}">\u25bc</span> <span>${escapeHtml(title)}</span>
         <span class="count">(${g.items.length})</span>
         <span class="group-actions" onclick="event.stopPropagation()">
-          <button class="btn-group-add" data-cwd="${escapeHtml(dir)}" onclick="newSession(this.dataset.cwd)" data-tip="New Session"${disabledAttr}>${claudeIcon()}</button>
+          <button class="btn-group-add btn-new-session" data-cwd="${escapeHtml(dir)}" onclick="newSession(this.dataset.cwd, event.shiftKey)" data-tip="New Session"${disabledAttr}>${claudeIcon()}</button>
           <button class="btn-group-add" data-cwd="${escapeHtml(dir)}" onclick="newWorkspace(this.dataset.cwd)" data-tip="New Terminal"${disabledAttr}>&gt;_</button>
         </span>
       </div>
@@ -76,7 +76,7 @@ function renderWorkspaces() {
         <div class="group-header">
           <span>${escapeHtml(title)}<span class="recent-ago">${ago}</span></span>
           <span class="group-actions">
-            <button class="btn-group-add" data-cwd="${escapeHtml(dir)}" onclick="newSession(this.dataset.cwd)" data-tip="New Session"${disabledAttr}>${claudeIcon()}</button>
+            <button class="btn-group-add btn-new-session" data-cwd="${escapeHtml(dir)}" onclick="newSession(this.dataset.cwd, event.shiftKey)" data-tip="New Session"${disabledAttr}>${claudeIcon()}</button>
             <button class="btn-group-add" data-cwd="${escapeHtml(dir)}" onclick="newWorkspace(this.dataset.cwd)" data-tip="New Terminal"${disabledAttr}>&gt;_</button>
           </span>
         </div>
