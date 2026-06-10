@@ -203,9 +203,10 @@ async function apiPost(endpoint, body) {
   return res.json();
 }
 
-async function newSession(cwd) {
+async function newSession(cwd, dangerous) {
   const body = { command: "claude" };
   if (cwd) body.cwd = cwd;
+  if (dangerous) body.dangerous = true;
   const res = await apiPost("new-workspace", body);
   if (res.error && res.limit) showSessionLimitAlert(res);
 }
@@ -253,6 +254,15 @@ function updateKeyboardSelection(index) {
   card.classList.add("keyboard-focus");
   card.scrollIntoView({ block: "nearest", behavior: "smooth" });
 }
+
+function syncShiftKey(e) {
+  document.body.classList.toggle("shift-held", e.shiftKey);
+}
+document.addEventListener("keydown", syncShiftKey);
+document.addEventListener("keyup", syncShiftKey);
+window.addEventListener("blur", () => {
+  document.body.classList.remove("shift-held");
+});
 
 document.addEventListener("keydown", (e) => {
   if (e.target.tagName === "INPUT") return;

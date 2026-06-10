@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.24.0] - 2026-06-10
+
+### Added
+
+- Shift+click on any "New Session" button launches a session with `--dangerously-skip-permissions`. Buttons turn red while Shift is held as a visual warning.
+
 ## [1.23.4] - 2026-06-09
 
 ### Fixed
