@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.25.0] - 2026-06-11
+
+### Added
+
+- Shift+click on refresh buttons (per-session and Refresh All) relaunches sessions with `--dangerously-skip-permissions`. Refresh affordances turn red while Shift is held as a visual warning.
+
 ## [1.24.0] - 2026-06-10
 
 ### Added

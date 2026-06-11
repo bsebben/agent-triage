@@ -169,6 +169,15 @@ body.shift-held .btn-new-session {
   border-color: var(--clr-error);
 }
 
+body.shift-held .card-refresh {
+  color: var(--clr-error);
+}
+
+body.shift-held .btn-refresh-all {
+  color: var(--clr-error);
+  border-color: var(--clr-error);
+}
+
 [data-tip] {
   position: relative;
 }
