@@ -32,9 +32,9 @@ function renderWorkspaces() {
   const refreshAllDisabled = refreshAllInFlight ? " disabled" : "";
   const refreshAllLabel = refreshAllInFlight ? "&#x21bb; Refreshing&hellip;" : "&#x21bb; Refresh All";
   html += `<div class="tab-toolbar">
-    <button class="btn-new-workspace btn-new-session" onclick="newSession(undefined, event.shiftKey)" data-tip="New Session"${disabledAttr}>${claudeIcon()}</button>
+    <button class="btn-new-workspace btn-new-session" onclick="newSession(undefined, event.shiftKey)" data-tip="New Session" data-tip-dangerous="New Session (dangerously)"${disabledAttr}>${claudeIcon()}</button>
     <button class="btn-new-workspace" onclick="newWorkspace()" data-tip="New Terminal"${disabledAttr}>&gt;_</button>
-    <button class="btn-new-workspace btn-refresh-all" onclick="refreshAllSessions()" data-tip="Refresh All Sessions"${refreshAllDisabled}>${refreshAllLabel}</button>
+    <button class="btn-new-workspace btn-refresh-all" onclick="refreshAllSessions(event.shiftKey)" data-tip="Refresh All Sessions" data-tip-dangerous="Refresh All Sessions (dangerously)"${refreshAllDisabled}>${refreshAllLabel}</button>
   </div>`;
 
   if (groups.length === 0 && (!recentGroups || recentGroups.length === 0) && (!dismissed || dismissed.length === 0)) {
@@ -53,7 +53,7 @@ function renderWorkspaces() {
         <span class="chevron${isCollapsed ? " collapsed" : ""}">\u25bc</span> <span>${escapeHtml(title)}</span>
         <span class="count">(${g.items.length})</span>
         <span class="group-actions" onclick="event.stopPropagation()">
-          <button class="btn-group-add btn-new-session" data-cwd="${escapeHtml(dir)}" onclick="newSession(this.dataset.cwd, event.shiftKey)" data-tip="New Session"${disabledAttr}>${claudeIcon()}</button>
+          <button class="btn-group-add btn-new-session" data-cwd="${escapeHtml(dir)}" onclick="newSession(this.dataset.cwd, event.shiftKey)" data-tip="New Session" data-tip-dangerous="New Session (dangerously)"${disabledAttr}>${claudeIcon()}</button>
           <button class="btn-group-add" data-cwd="${escapeHtml(dir)}" onclick="newWorkspace(this.dataset.cwd)" data-tip="New Terminal"${disabledAttr}>&gt;_</button>
         </span>
       </div>
@@ -76,7 +76,7 @@ function renderWorkspaces() {
         <div class="group-header">
           <span>${escapeHtml(title)}<span class="recent-ago">${ago}</span></span>
           <span class="group-actions">
-            <button class="btn-group-add btn-new-session" data-cwd="${escapeHtml(dir)}" onclick="newSession(this.dataset.cwd, event.shiftKey)" data-tip="New Session"${disabledAttr}>${claudeIcon()}</button>
+            <button class="btn-group-add btn-new-session" data-cwd="${escapeHtml(dir)}" onclick="newSession(this.dataset.cwd, event.shiftKey)" data-tip="New Session" data-tip-dangerous="New Session (dangerously)"${disabledAttr}>${claudeIcon()}</button>
             <button class="btn-group-add" data-cwd="${escapeHtml(dir)}" onclick="newWorkspace(this.dataset.cwd)" data-tip="New Terminal"${disabledAttr}>&gt;_</button>
           </span>
         </div>
@@ -143,7 +143,7 @@ function renderCard(item, { isDismissed = false } = {}) {
   const isRefreshable = !isDismissed && item.category !== "terminal";
   const refreshing = refreshingWorkspaces.has(item.workspaceId) || refreshAllInFlight || serverRefreshing;
   const refreshBtn = isRefreshable
-    ? `<a class="card-refresh${refreshing ? " refreshing" : ""}" data-tip="Refresh session" onclick="event.stopPropagation();refreshOneSession('${item.workspaceId}')"${refreshing ? " style=\"pointer-events:none\"" : ""}>&#x21bb;</a>`
+    ? `<a class="card-refresh${refreshing ? " refreshing" : ""}" data-tip="Refresh session" data-tip-dangerous="Refresh session (dangerously)" onclick="event.stopPropagation();refreshOneSession('${item.workspaceId}', event.shiftKey)"${refreshing ? " style=\"pointer-events:none\"" : ""}>&#x21bb;</a>`
     : "";
 
   const displayCategory = refreshing ? "refreshing" : item.category;
@@ -228,12 +228,14 @@ async function restore(id) {
   await apiPost("restore", { id });
 }
 
-async function refreshOneSession(workspaceId) {
+async function refreshOneSession(workspaceId, dangerous) {
   if (refreshingWorkspaces.has(workspaceId) || refreshAllInFlight) return;
   refreshingWorkspaces.add(workspaceId);
   render();
+  const body = { workspaceId };
+  if (dangerous) body.dangerous = true;
   try {
-    const result = await apiPost("refresh-session", { workspaceId });
+    const result = await apiPost("refresh-session", body);
     if (!result.ok) showToast(result.error || "Refresh failed");
   } catch {
     showToast("Refresh failed");
@@ -243,12 +245,12 @@ async function refreshOneSession(workspaceId) {
   }
 }
 
-async function refreshAllSessions() {
+async function refreshAllSessions(dangerous) {
   if (refreshAllInFlight) return;
   refreshAllInFlight = true;
   render();
   try {
-    const result = await apiPost("refresh-all", {});
+    const result = await apiPost("refresh-all", dangerous ? { dangerous: true } : {});
     const results = result.results || [];
     const ok = results.filter((r) => r.ok).length;
     const failed = results.filter((r) => !r.ok).length;

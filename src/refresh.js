@@ -96,7 +96,7 @@ export class Refresher {
     }
   }
 
-  async refreshSession(workspaceId) {
+  async refreshSession(workspaceId, { dangerous = false } = {}) {
     const agentIds = await this.#cmux.listAgentWorkspaceIds();
     if (!agentIds.has(workspaceId)) {
       return { ok: false, error: "Not a Claude Code session" };
@@ -149,10 +149,11 @@ export class Refresher {
       await sleep(500);
 
       // Relaunch Claude Code
+      const dangerousSuffix = dangerous ? " --dangerously-skip-permissions" : "";
       if (sessionId) {
-        await this.#cmux.sendText(workspaceId, surfaceRef, `claude --resume ${sessionId}`);
+        await this.#cmux.sendText(workspaceId, surfaceRef, `claude --resume ${sessionId}${dangerousSuffix}`);
       } else {
-        await this.#cmux.sendText(workspaceId, surfaceRef, "claude --continue");
+        await this.#cmux.sendText(workspaceId, surfaceRef, `claude --continue${dangerousSuffix}`);
       }
       await this.#cmux.sendKey(workspaceId, surfaceRef, "Enter");
 
@@ -183,13 +184,13 @@ export class Refresher {
     }
   }
 
-  async refreshAll() {
+  async refreshAll({ dangerous = false } = {}) {
     const agentIds = await this.#cmux.listAgentWorkspaceIds();
     const workspaceIds = [...agentIds];
 
     const results = await Promise.allSettled(
       workspaceIds.map(async (id) => {
-        const result = await this.refreshSession(id);
+        const result = await this.refreshSession(id, { dangerous });
         return { workspaceId: id, ...result };
       }),
     );
@@ -207,6 +208,6 @@ export class Refresher {
 
 // Default singleton for server use
 export const defaultRefresher = new Refresher();
-export const refreshSession = (id) => defaultRefresher.refreshSession(id);
-export const refreshAll = () => defaultRefresher.refreshAll();
+export const refreshSession = (id, opts) => defaultRefresher.refreshSession(id, opts);
+export const refreshAll = (opts) => defaultRefresher.refreshAll(opts);
 export const refreshingIds = () => defaultRefresher.refreshingIds;

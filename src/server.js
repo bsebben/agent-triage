@@ -240,13 +240,14 @@ const server = createServer(async (req, res) => {
     }
 
     if (req.url === "/api/refresh-session" && req.method === "POST") {
-      const { workspaceId } = await readBody(req);
-      const result = await refreshSession(workspaceId);
+      const { workspaceId, dangerous } = await readBody(req);
+      const result = await refreshSession(workspaceId, { dangerous: !!dangerous });
       return jsonResponse(res, result, result.ok ? 200 : 400);
     }
 
     if (req.url === "/api/refresh-all" && req.method === "POST") {
-      const result = await refreshAll();
+      const { dangerous } = await readBody(req).catch(() => ({}));
+      const result = await refreshAll({ dangerous: !!dangerous });
       return jsonResponse(res, result);
     }
 

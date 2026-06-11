@@ -169,6 +169,15 @@ body.shift-held .btn-new-session {
   border-color: var(--clr-error);
 }
 
+body.shift-held .card-refresh {
+  color: var(--clr-error);
+}
+
+body.shift-held .btn-refresh-all {
+  color: var(--clr-error);
+  border-color: var(--clr-error);
+}
+
 [data-tip] {
   position: relative;
 }
@@ -194,6 +203,10 @@ body.shift-held .btn-new-session {
 }
 
 [data-tip]:hover::after { opacity: 1; }
+
+body.shift-held [data-tip-dangerous]:hover::after {
+  content: attr(data-tip-dangerous);
+}
 
 .tabs {
   display: flex;

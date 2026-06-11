@@ -122,6 +122,54 @@ describe("Refresher.refreshSession", () => {
     blockResolve();
     await first.catch(() => {});
   });
+
+  it("appends --dangerously-skip-permissions when dangerous=true (with session ID)", async () => {
+    const ws = makeWorkspace("W1", "surface:1", "workspace:W1", "ttysTest");
+    const sentTexts = [];
+    const cmuxApi = {
+      listAgentWorkspaceIds: async () => new Set(["W1"]),
+      rpc: async (method) => {
+        if (method === "system.top") return makeTopData([ws]);
+        return {};
+      },
+      sendText: async (_wsId, _surfaceId, text) => { sentTexts.push(text); },
+      sendKey: async () => {},
+      readScreenByWorkspace: async () => "claude --resume abc-def-123",
+      renameWorkspace: async () => {},
+    };
+    const mockExecFile = (_cmd, _args, cb) => cb(null, { stdout: "" });
+    const refresher = new Refresher({ cmuxApi, execFileFn: mockExecFile, pollIntervalMs: 10, timeoutMs: 3000 });
+
+    const result = await refresher.refreshSession("W1", { dangerous: true });
+    assert.equal(result.ok, true);
+    const relaunchCmd = sentTexts.find((t) => t.startsWith("claude"));
+    assert.ok(relaunchCmd, "should have sent a relaunch command");
+    assert.ok(relaunchCmd.includes("--dangerously-skip-permissions"), `relaunch cmd should include flag, got: ${relaunchCmd}`);
+  });
+
+  it("does not append --dangerously-skip-permissions by default", async () => {
+    const ws = makeWorkspace("W1", "surface:1", "workspace:W1", "ttysTest");
+    const sentTexts = [];
+    const cmuxApi = {
+      listAgentWorkspaceIds: async () => new Set(["W1"]),
+      rpc: async (method) => {
+        if (method === "system.top") return makeTopData([ws]);
+        return {};
+      },
+      sendText: async (_wsId, _surfaceId, text) => { sentTexts.push(text); },
+      sendKey: async () => {},
+      readScreenByWorkspace: async () => "claude --resume abc-def-123",
+      renameWorkspace: async () => {},
+    };
+    const mockExecFile = (_cmd, _args, cb) => cb(null, { stdout: "" });
+    const refresher = new Refresher({ cmuxApi, execFileFn: mockExecFile, pollIntervalMs: 10, timeoutMs: 3000 });
+
+    const result = await refresher.refreshSession("W1");
+    assert.equal(result.ok, true);
+    const relaunchCmd = sentTexts.find((t) => t.startsWith("claude"));
+    assert.ok(relaunchCmd, "should have sent a relaunch command");
+    assert.ok(!relaunchCmd.includes("--dangerously-skip-permissions"), `relaunch cmd should not include flag, got: ${relaunchCmd}`);
+  });
 });
 
 describe("Refresher.waitForScreenStable (via refreshSession)", () => {
