@@ -246,7 +246,7 @@ const server = createServer(async (req, res) => {
     }
 
     if (req.url === "/api/refresh-all" && req.method === "POST") {
-      const { dangerous } = await readBody(req);
+      const { dangerous } = await readBody(req).catch(() => ({}));
       const result = await refreshAll({ dangerous: !!dangerous });
       return jsonResponse(res, result);
     }

@@ -204,6 +204,10 @@ body.shift-held .btn-refresh-all {
 
 [data-tip]:hover::after { opacity: 1; }
 
+body.shift-held [data-tip-dangerous]:hover::after {
+  content: attr(data-tip-dangerous);
+}
+
 .tabs {
   display: flex;
   gap: 2px;
