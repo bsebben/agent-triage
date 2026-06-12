@@ -371,7 +371,8 @@ const server = createServer(async (req, res) => {
         execFile("git", args, { cwd: repoCwd }, (err, stdout) => err ? reject(err) : resolve(stdout)));
       try {
         const status = await git(["status", "--porcelain"]);
-        if (status.trim()) {
+        const tracked = status.split("\n").filter((l) => l && !l.startsWith("??")).join("\n");
+        if (tracked.trim()) {
           return jsonResponse(res, { ok: false, error: "Working tree has uncommitted changes" });
         }
         await git(["pull", "origin", "master"]);

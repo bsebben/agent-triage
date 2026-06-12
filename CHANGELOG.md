@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.26.0] - 2026-06-12
+
+### Changed
+
+- Unified workspace group visibility into a single `maxVisibleGroups` config field. Active groups are always shown; remaining slots are filled with recently-used empty groups.
+
+### Removed
+
+- `maxRecentGroups` and `showRecentGroups` config fields, replaced by `maxVisibleGroups`.
+
 ## [1.25.0] - 2026-06-11
 
 ### Added

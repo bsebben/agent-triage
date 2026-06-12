@@ -2,8 +2,7 @@
   "port": 7777,
   "defaultDirectory": "~/workspace",
   "maxSessions": null,
-  "maxRecentGroups": 4,
-  "showRecentGroups": true,
+  "maxVisibleGroups": 8,
   "cmux": {
     "binary": null,
     "socket": null
