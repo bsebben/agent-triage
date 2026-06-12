@@ -35,6 +35,8 @@ describe("SESSION_ID_PATTERN", () => {
 });
 
 describe("Refresher.refreshSession", () => {
+  const mockExecFile = (_cmd, _args, cb) => cb(null, { stdout: "" });
+
   it("rejects non-Claude Code workspaces", async () => {
     const cmuxApi = {
       listAgentWorkspaceIds: async () => new Set(),
@@ -123,6 +125,53 @@ describe("Refresher.refreshSession", () => {
     await first.catch(() => {});
   });
 
+  it("starts a fresh claude session when no session ID is found (no --continue)", async () => {
+    const ws = makeWorkspace("W1", "surface:1", "workspace:W1", "ttysTest");
+    const sentTexts = [];
+    const cmuxApi = {
+      listAgentWorkspaceIds: async () => new Set(["W1"]),
+      rpc: async (method) => {
+        if (method === "system.top") return makeTopData([ws]);
+        return {};
+      },
+      sendText: async (_wsId, _surfaceId, text) => { sentTexts.push(text); },
+      sendKey: async () => {},
+      readScreenByWorkspace: async () => "no session info here",
+      renameWorkspace: async () => {},
+    };
+    const refresher = new Refresher({ cmuxApi, execFileFn: mockExecFile, pollIntervalMs: 10, timeoutMs: 3000 });
+
+    const result = await refresher.refreshSession("W1");
+    assert.equal(result.ok, true);
+    assert.equal(result.sessionId, null);
+    const relaunchCmd = sentTexts.find((t) => t.startsWith("claude"));
+    assert.ok(relaunchCmd, "should have sent a relaunch command");
+    assert.equal(relaunchCmd, "claude", "should start fresh without --continue or --resume");
+  });
+
+  it("starts fresh with --dangerously-skip-permissions when no session ID and dangerous=true", async () => {
+    const ws = makeWorkspace("W1", "surface:1", "workspace:W1", "ttysTest");
+    const sentTexts = [];
+    const cmuxApi = {
+      listAgentWorkspaceIds: async () => new Set(["W1"]),
+      rpc: async (method) => {
+        if (method === "system.top") return makeTopData([ws]);
+        return {};
+      },
+      sendText: async (_wsId, _surfaceId, text) => { sentTexts.push(text); },
+      sendKey: async () => {},
+      readScreenByWorkspace: async () => "no session info here",
+      renameWorkspace: async () => {},
+    };
+    const refresher = new Refresher({ cmuxApi, execFileFn: mockExecFile, pollIntervalMs: 10, timeoutMs: 3000 });
+
+    const result = await refresher.refreshSession("W1", { dangerous: true });
+    assert.equal(result.ok, true);
+    const relaunchCmd = sentTexts.find((t) => t.startsWith("claude"));
+    assert.ok(relaunchCmd, "should have sent a relaunch command");
+    assert.equal(relaunchCmd, "claude --dangerously-skip-permissions", "should start fresh with dangerous flag");
+  });
+
   it("appends --dangerously-skip-permissions when dangerous=true (with session ID)", async () => {
     const ws = makeWorkspace("W1", "surface:1", "workspace:W1", "ttysTest");
     const sentTexts = [];
@@ -137,7 +186,6 @@ describe("Refresher.refreshSession", () => {
       readScreenByWorkspace: async () => "claude --resume abc-def-123",
       renameWorkspace: async () => {},
     };
-    const mockExecFile = (_cmd, _args, cb) => cb(null, { stdout: "" });
     const refresher = new Refresher({ cmuxApi, execFileFn: mockExecFile, pollIntervalMs: 10, timeoutMs: 3000 });
 
     const result = await refresher.refreshSession("W1", { dangerous: true });
@@ -161,7 +209,6 @@ describe("Refresher.refreshSession", () => {
       readScreenByWorkspace: async () => "claude --resume abc-def-123",
       renameWorkspace: async () => {},
     };
-    const mockExecFile = (_cmd, _args, cb) => cb(null, { stdout: "" });
     const refresher = new Refresher({ cmuxApi, execFileFn: mockExecFile, pollIntervalMs: 10, timeoutMs: 3000 });
 
     const result = await refresher.refreshSession("W1");
