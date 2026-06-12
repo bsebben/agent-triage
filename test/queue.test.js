@@ -124,7 +124,7 @@ describe("Queue", () => {
     assert.equal(recentGroups.length, 0);
   });
 
-  it("limits recentGroups to maxRecent", () => {
+  it("limits recentGroups to available slots within maxGroups", () => {
     queue.upsert({ id: "A", category: "running", workspaceId: "W1", workspaceDir: `${HOME}/workspace/a`, body: "" });
     queue.upsert({ id: "B", category: "running", workspaceId: "W2", workspaceDir: `${HOME}/workspace/b`, body: "" });
     queue.upsert({ id: "C", category: "running", workspaceId: "W3", workspaceDir: `${HOME}/workspace/c`, body: "" });

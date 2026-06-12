@@ -137,6 +137,10 @@ function resolve(raw) {
   }
 
   const maxVisibleGroups = raw.maxVisibleGroups ?? DEFAULTS.maxVisibleGroups;
+  if (!Number.isInteger(maxVisibleGroups) || maxVisibleGroups < 1) {
+    console.error("maxVisibleGroups must be a positive integer.");
+    process.exit(1);
+  }
 
   const config = {
     port: raw.port ?? DEFAULTS.port,
