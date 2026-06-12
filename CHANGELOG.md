@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.26.1] - 2026-06-12
+
+### Fixed
+
+- Dangerous session refresh no longer falls back to `--continue` when no session UUID is found. A workspace with no prior session now launches a fresh `claude` process instead of incorrectly resuming an unrelated session.
+
 ## [1.25.0] - 2026-06-11
 
 ### Added
