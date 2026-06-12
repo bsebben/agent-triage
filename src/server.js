@@ -79,7 +79,7 @@ function getFullData() {
     tabStatus[name] = status;
   }
   return {
-    ...queue.grouped(config.showRecentGroups ? config.maxRecentGroups : 0),
+    ...queue.grouped(config.maxVisibleGroups),
     dismissed: queue.dismissedItems(),
     stats: queue.stats(),
     maxSessions: config.maxSessions,
@@ -367,31 +367,16 @@ const server = createServer(async (req, res) => {
 
     if (req.url === "/api/update" && req.method === "POST") {
       const repoCwd = join(__dirname, "..");
-      const body = await readBody(req).catch(() => ({}));
       const git = (args) => new Promise((resolve, reject) =>
         execFile("git", args, { cwd: repoCwd }, (err, stdout) => err ? reject(err) : resolve(stdout)));
       try {
-        const branch = (await git(["rev-parse", "--abbrev-ref", "HEAD"])).trim();
-        if (branch !== "master" && !body.switchBranch) {
-          return jsonResponse(res, { ok: false, needsBranchSwitch: true, branch });
-        }
         const status = await git(["status", "--porcelain"]);
-        const tracked = status.split("\n").filter((l) => l && !l.startsWith("??")).join("\n");
-        if (tracked.trim()) {
+        if (status.trim()) {
           return jsonResponse(res, { ok: false, error: "Working tree has uncommitted changes" });
         }
-        const switched = branch !== "master" && body.switchBranch;
-        if (switched) {
-          await git(["checkout", "master"]);
-        }
-        try {
-          await git(["pull", "origin", "master"]);
-          await new Promise((resolve, reject) =>
-            execFile("npm", ["install"], { cwd: repoCwd }, (err) => err ? reject(err) : resolve()));
-        } catch (err) {
-          if (switched) await git(["checkout", branch]).catch(() => {});
-          throw err;
-        }
+        await git(["pull", "origin", "master"]);
+        await new Promise((resolve, reject) =>
+          execFile("npm", ["install"], { cwd: repoCwd }, (err) => err ? reject(err) : resolve()));
         jsonResponse(res, { ok: true });
         setTimeout(() => {
           const now = new Date();

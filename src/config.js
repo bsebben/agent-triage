@@ -13,16 +13,14 @@ const DEFAULTS = {
   port: 7777,
   defaultDirectory: "~/workspace",
   maxSessions: null,
-  maxRecentGroups: 4,
-  showRecentGroups: true,
+  maxVisibleGroups: 8,
   cmux: { binary: null, socket: null },
 };
 
 export const FIELD_META = {
   port:             { description: "<b>Requires restart.</b> HTTP port the dashboard listens on" },
-  maxSessions:      { type: "number", nullable: true, description: "Caps how many concurrent Claude Code workspaces can be open" },
-  maxRecentGroups: { type: "number", group: "recentGroups", description: "Maximum number of recently-used workspace groups to show when they have no active sessions" },
-  showRecentGroups: { type: "boolean", group: "recentGroups", description: "Show recently-used workspace groups that have no active sessions" },
+  maxSessions:       { type: "number", nullable: true, description: "Caps how many concurrent Claude Code workspaces can be open" },
+  maxVisibleGroups:  { type: "number", group: "recentGroups", description: "Target number of workspace groups to display. Active groups are always shown; remaining slots are filled with recently-used empty groups." },
   defaultDirectory: { type: "string", nullable: true, description: "Working directory for new sessions (falls back to home directory if path doesn't exist)" },
   "cmux.binary":    { type: "string", nullable: true, description: "<b>Requires restart.</b> Path to the cmux CLI binary" },
   "cmux.socket":    { type: "string", nullable: true, description: "<b>Requires restart.</b> Unix socket for cmux RPC" },
@@ -138,15 +136,13 @@ function resolve(raw) {
     process.exit(1);
   }
 
-  const maxRecentGroups = raw.maxRecentGroups ?? DEFAULTS.maxRecentGroups;
-  const showRecentGroups = raw.showRecentGroups ?? DEFAULTS.showRecentGroups;
+  const maxVisibleGroups = raw.maxVisibleGroups ?? DEFAULTS.maxVisibleGroups;
 
   const config = {
     port: raw.port ?? DEFAULTS.port,
     defaultDirectory: resolveDirectory(raw.defaultDirectory ?? DEFAULTS.defaultDirectory),
     maxSessions,
-    maxRecentGroups,
-    showRecentGroups,
+    maxVisibleGroups,
     cmux: { ...DEFAULTS.cmux, ...raw.cmux },
     tabs: raw.tabs || {},
   };
