@@ -136,14 +136,15 @@ describe("Queue", () => {
     assert.equal(recentGroups.length, 2);
   });
 
-  it("shows recentGroups independently of active group count", () => {
+  it("shows no recentGroups when active groups fill all maxGroups slots", () => {
     queue.upsert({ id: "A", category: "running", workspaceId: "W1", workspaceDir: `${HOME}/workspace/a`, body: "" });
     queue.upsert({ id: "B", category: "running", workspaceId: "W2", workspaceDir: `${HOME}/workspace/b`, body: "" });
     queue.upsert({ id: "C", category: "running", workspaceId: "W3", workspaceDir: `${HOME}/workspace/c`, body: "" });
     queue.grouped();
     queue.remove("C");
+    // 2 active groups fill maxGroups=2, so no slots remain for recent groups
     const { recentGroups } = queue.grouped(2);
-    assert.equal(recentGroups.length, 1);
+    assert.equal(recentGroups.length, 0);
   });
 
   it("sorts recentGroups by most recently active first", () => {
