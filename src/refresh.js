@@ -153,7 +153,7 @@ export class Refresher {
       if (sessionId) {
         await this.#cmux.sendText(workspaceId, surfaceRef, `claude --resume ${sessionId}${dangerousSuffix}`);
       } else {
-        await this.#cmux.sendText(workspaceId, surfaceRef, `claude --continue${dangerousSuffix}`);
+        await this.#cmux.sendText(workspaceId, surfaceRef, `claude${dangerousSuffix}`);
       }
       await this.#cmux.sendKey(workspaceId, surfaceRef, "Enter");
 
