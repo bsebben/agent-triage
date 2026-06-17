@@ -18,7 +18,12 @@ jobs:
 
       - run: npm install
 
-      - run: cp config.example.json config.json
+      - run: |
+          node -e "
+            const c = JSON.parse(require('fs').readFileSync('config.example.json','utf8'));
+            c.cmux = { binary: '/usr/bin/true', socket: '/tmp/cmux.sock' };
+            require('fs').writeFileSync('config.json', JSON.stringify(c, null, 2));
+          "
 
       - run: npm run version-check
 
