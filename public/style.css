@@ -138,6 +138,19 @@ header h1 {
 .update-action-btn:hover { opacity: 0.85; }
 .update-action-btn:disabled { opacity: 0.5; cursor: default; }
 
+.update-progress {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--clr-completion);
+  white-space: nowrap;
+  animation: update-progress-pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes update-progress-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
 .update-error {
   font-size: 11px;
   color: var(--clr-error);
