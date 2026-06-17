@@ -18,6 +18,8 @@ jobs:
 
       - run: npm install
 
+      - run: cp config.example.json config.json
+
       - run: npm run version-check
 
       - run: npm test
