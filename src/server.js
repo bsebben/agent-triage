@@ -387,7 +387,7 @@ const server = createServer(async (req, res) => {
         try {
           await git(["pull", "origin", "master"]);
           await new Promise((resolve, reject) =>
-            execFile("npm", ["install"], { cwd: repoCwd }, (err) => err ? reject(err) : resolve()));
+            execFile("npm", ["ci"], { cwd: repoCwd }, (err) => err ? reject(err) : resolve()));
         } catch (err) {
           if (switched) await git(["checkout", branch]).catch(() => {});
           throw err;

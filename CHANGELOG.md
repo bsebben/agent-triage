@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.26.2] - 2026-06-17
+
+### Fixed
+
+- In-app update no longer leaves `package-lock.json` dirty, so updates stop requiring a manual `git checkout package-lock.json` first. The update now runs `npm ci` (which never rewrites the lockfile) instead of `npm install`, `package-lock.json`'s version is synced with `package.json`, and `version-check` fails if the two drift.
+
+### Changed
+
+- Document `npm version --no-git-tag-version` as the correct way to bump versions (keeps `package.json` and `package-lock.json` in sync); hand-editing `package.json` is what caused the lockfile drift.
+
 ## [1.26.1] - 2026-06-12
 
 ### Fixed

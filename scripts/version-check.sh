@@ -25,6 +25,16 @@ REMOTE_VERSION=$(git show "$REMOTE_BRANCH:package.json" 2>/dev/null | node -e "
   let d=''; process.stdin.on('data',c=>d+=c); process.stdin.on('end',()=>console.log(JSON.parse(d).version))
 " 2>/dev/null || echo "0.0.0")
 
+# Verify package-lock.json version is in sync with package.json
+LOCK_VERSION=$(node -e "console.log(require('./package-lock.json').version)")
+if [[ "$LOCAL_VERSION" != "$LOCK_VERSION" ]]; then
+  echo ""
+  echo "ERROR: package-lock.json version ($LOCK_VERSION) out of sync with package.json ($LOCAL_VERSION)"
+  echo ""
+  echo "Run 'npm install' and commit the updated lockfile."
+  exit 1
+fi
+
 # Check if there are code changes compared to remote
 CHANGED_FILES=$(git diff --name-only "$REMOTE_BRANCH"...HEAD -- \
   'src/' 'public/' 'package.json' 'test/' 2>/dev/null || true)
@@ -42,10 +52,10 @@ if [[ "$LOCAL_VERSION" == "$REMOTE_VERSION" ]]; then
   echo ""
   echo "ERROR: Code changes detected but version not bumped (currently $LOCAL_VERSION)"
   echo ""
-  echo "Bump the version in package.json before pushing:"
-  echo "  Patch (bug fix):     x.y.Z"
-  echo "  Minor (new feature): x.Y.0"
-  echo "  Major (breaking):    X.0.0"
+  echo "Bump the version before pushing:"
+  echo "  npm version patch --no-git-tag-version   # bug fix (x.y.Z)"
+  echo "  npm version minor --no-git-tag-version   # new feature (x.Y.0)"
+  echo "  npm version major --no-git-tag-version   # breaking change (X.0.0)"
   exit 1
 fi
 

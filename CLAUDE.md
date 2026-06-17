@@ -60,7 +60,17 @@ This project uses semantic versioning. **Every PR must bump the version** — th
 
 The check compares `package.json` version against `origin/master`. If code in `src/`, `public/`, or `test/` changed without a version bump, it fails.
 
-When bumping, update the version in `package.json` and add a corresponding entry in `CHANGELOG.md`. The server reads the version at startup and exposes it via `/api/config`.
+Bump versions using `npm version` to keep `package.json` and `package-lock.json` in sync:
+
+```bash
+npm version patch --no-git-tag-version   # bug fix
+npm version minor --no-git-tag-version   # new feature
+npm version major --no-git-tag-version   # breaking change
+```
+
+Do **not** edit the version in `package.json` by hand — that leaves `package-lock.json` out of sync. The version-check script will catch this before you push.
+
+Add a corresponding entry in `CHANGELOG.md`. The server reads the version at startup and exposes it via `/api/config`.
 
 ## Changelog
 
