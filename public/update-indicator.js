@@ -1,8 +1,18 @@
 // public/update-indicator.js — update available indicator + "What's New" modal
 
+let updating = false;
+
 function renderUpdateIndicator() {
   const container = document.getElementById("update-indicator");
   if (!container) return;
+
+  // While an update is in flight, show a sticky "Updating…" pill that survives
+  // broadcast re-renders. It stays until the page reloads on the new version.
+  if (updating) {
+    container.innerHTML = `<span class="update-badge"><span class="update-progress">Updating…</span></span>`;
+    container.style.opacity = "1";
+    return;
+  }
 
   const status = state.updateStatus;
   if (!status?.available) {
@@ -42,37 +52,37 @@ function openWhatsNewModal() {
 }
 
 async function performUpdate(btn, opts = {}) {
-  const original = btn.innerHTML;
-  btn.innerHTML = "Updating\u2026";
-  btn.disabled = true;
+  updating = true;
+  renderUpdateIndicator();
 
   try {
     const res = await apiPost("update", opts);
     if (res.ok) {
-      btn.innerHTML = "Restarting…";
+      // Stay in the "Updating…" state until the server restarts and the
+      // reconnecting WebSocket triggers a reload onto the new version.
       pendingReload = true;
       return;
     }
-    if (!res.ok) {
-      btn.innerHTML = original;
-      btn.disabled = false;
-      if (res.needsBranchSwitch) {
-        openBranchSwitchModal(res.branch, btn);
-        return;
-      }
-      const badge = btn.closest(".update-badge");
-      let err = badge.querySelector(".update-error");
-      if (!err) {
-        err = document.createElement("span");
-        err.className = "update-error";
-        badge.appendChild(err);
-      }
+
+    updating = false;
+    renderUpdateIndicator();
+
+    if (res.needsBranchSwitch) {
+      openBranchSwitchModal(res.branch, document.querySelector(".update-action-btn") || btn);
+      return;
+    }
+
+    const badge = document.querySelector(".update-badge");
+    if (badge) {
+      const err = document.createElement("span");
+      err.className = "update-error";
       err.textContent = res.error || "Update failed";
+      badge.appendChild(err);
       setTimeout(() => err.remove(), 5000);
     }
   } catch {
-    btn.innerHTML = original;
-    btn.disabled = false;
+    updating = false;
+    renderUpdateIndicator();
   }
 }
 

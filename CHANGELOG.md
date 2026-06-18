@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.27.1] - 2026-06-17
+
+### Fixed
+
+- Clicking the header update button now shows a sticky "Updating…" indicator that persists through polling cycles until the page reloads on the new version, instead of the progress state being clobbered by the next broadcast.
+
 ## [1.27.0] - 2026-06-17
 
 ### Added
