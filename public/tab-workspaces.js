@@ -125,11 +125,6 @@ function renderCard(item, { isDismissed = false } = {}) {
     </div>`;
   }
 
-  const approveButtons = !isDismissed && item.category === "permission"
-    ? `<button class="btn primary" onclick="respond('${item.workspaceId}','${item.surfaceId}','y')">Approve</button>
-       <button class="btn danger" onclick="respond('${item.workspaceId}','${item.surfaceId}','n')">Deny</button>`
-    : "";
-
   const cardTitle = item.workspaceTitle || "Unknown";
   const subtitle = item.gitBranch || null;
 
@@ -157,7 +152,6 @@ function renderCard(item, { isDismissed = false } = {}) {
     ${hasQuestion ? `<div class="card-question">"${escapeHtml(item.parsedQuestion.question)}"</div>` : ""}
     ${!hasQuestion && item.body && !isGenericBody(item.body) ? `<div class="card-body">${escapeHtml(item.body)}</div>` : ""}
     ${optionsHtml}
-    ${approveButtons}
     </div>
   </div>`;
 }

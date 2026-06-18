@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.27.2] - 2026-06-18
+
+### Removed
+
+- Removed the non-functional Approve/Deny buttons from permission cards. They sent `y`/`n` keystrokes that don't match Claude Code's numbered permission menu, so clicking them did nothing. Click the card to jump to the workspace and answer the prompt in the terminal.
+
 ## [1.27.1] - 2026-06-17
 
 ### Fixed
