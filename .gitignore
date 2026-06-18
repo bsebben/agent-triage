@@ -3,3 +3,5 @@ config.json
 data/queue.json
 data/audit.log
 .idea/
+.superpowers/
+docs/superpowers/
