@@ -101,23 +101,32 @@ async function detectJiraServer() {
   const { stdout } = await execFileAsync("mcpproxy", ["upstream", "list", "--json"], { timeout: 5000 });
   const servers = JSON.parse(stdout);
   return servers.find((s) =>
-    /jira/i.test(s.name) && s.connected === true && s.health?.level === "healthy"
+    /jira/i.test(s.name) && s.health?.level === "healthy"
   );
 }
 
 async function detectCloudInfo(serverName) {
   const tool = `${serverName}:getAccessibleAtlassianResources`;
-  const { stdout } = await execFileAsync(
-    "mcpproxy",
-    ["call", "tool-read", "-t", tool, "-j", "{}", "-o", "json"],
-    { timeout: 10000 },
-  );
-  // mcpproxy double-wraps MCP responses: outer JSON → text field with Go map[] → inner JSON → text with resources.
-  // Peel each layer by JSON-parsing, then extracting the text field, repeating until we find the resources array.
-  const resources = unwrapMcpResponse(stdout);
-  if (!resources.length) throw new Error("No accessible Atlassian resources found");
-  const site = resources[0];
-  return { cloudId: site.id, jiraSite: site.url };
+  let lastErr;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    if (attempt > 0) await new Promise((r) => setTimeout(r, 5000));
+    try {
+      const { stdout } = await execFileAsync(
+        "mcpproxy",
+        ["call", "tool-read", "-t", tool, "-j", "{}", "-o", "json"],
+        { timeout: 10000 },
+      );
+      // mcpproxy double-wraps MCP responses: outer JSON → text field with Go map[] → inner JSON → text with resources.
+      // Peel each layer by JSON-parsing, then extracting the text field, repeating until we find the resources array.
+      const resources = unwrapMcpResponse(stdout);
+      if (!resources.length) throw new Error("No accessible Atlassian resources found");
+      const site = resources[0];
+      return { cloudId: site.id, jiraSite: site.url };
+    } catch (err) {
+      lastErr = err;
+    }
+  }
+  throw lastErr;
 }
 
 function unwrapMcpResponse(raw) {
@@ -141,7 +150,7 @@ function unwrapMcpResponse(raw) {
       } catch { /* not valid JSON, try extracting from Go map[] */ }
     }
     // Handle Go map[] serialization: map[text:{...} type:text]
-    const mapMatch = text.match(/map\[text:(\{.+\})\s+type:text\]/s);
+    const mapMatch = text.match(/map\[text:(\[.+\]|\{.+\})\s+type:text\]/s);
     if (mapMatch) { text = mapMatch[1]; continue; }
     break;
   }
@@ -168,9 +177,57 @@ function unescapeJsonString(escaped) {
   return out;
 }
 
+function parseIssueArray(src, arrayStart) {
+  const issues = [];
+  let depth = 0;
+  let objStart = -1;
+  for (let k = arrayStart + 1; k < src.length; k++) {
+    const ch = src[k];
+    if (ch === '"') {
+      k++;
+      while (k < src.length && src[k] !== '"') {
+        if (src[k] === "\\") k++;
+        k++;
+      }
+      continue;
+    }
+    if (ch === "{") {
+      if (depth === 0) objStart = k;
+      depth++;
+    } else if (ch === "}") {
+      depth--;
+      if (depth === 0 && objStart >= 0) {
+        try {
+          issues.push(JSON.parse(src.slice(objStart, k + 1)));
+        } catch { /* partial object at truncation boundary */ }
+        objStart = -1;
+      }
+    }
+  }
+  return issues;
+}
+
 function extractIssues(text) {
   const marker = '"text":"';
   let pos = text.indexOf(marker);
+
+  // No "text":"..." wrapper — Go map format where content[0].text contains the issues
+  // JSON directly (e.g. [map[text:{"issues":[...]} type:text]]). Parse without unwrapping.
+  if (pos === -1) {
+    const issuesIdx = text.indexOf('"issues"');
+    if (issuesIdx === -1) return [];
+    const arrayStart = text.indexOf("[", issuesIdx);
+    if (arrayStart === -1) return [];
+    try {
+      const objStart = text.lastIndexOf("{", issuesIdx);
+      if (objStart !== -1) {
+        const parsed = JSON.parse(text.slice(objStart));
+        if (parsed.issues) return parsed.issues;
+      }
+    } catch { /* truncated — fall through to char-by-char */ }
+    return parseIssueArray(text, arrayStart);
+  }
+
   while (pos !== -1) {
     const start = pos + marker.length;
     let i = start;
@@ -196,34 +253,7 @@ function extractIssues(text) {
     if (issuesStart === -1) return [];
     const arrayStart = unescaped.indexOf("[", issuesStart);
     if (arrayStart === -1) return [];
-
-    const issues = [];
-    let depth = 0;
-    let objStart = -1;
-    for (let k = arrayStart + 1; k < unescaped.length; k++) {
-      const ch = unescaped[k];
-      if (ch === '"') {
-        k++;
-        while (k < unescaped.length && unescaped[k] !== '"') {
-          if (unescaped[k] === "\\") k++;
-          k++;
-        }
-        continue;
-      }
-      if (ch === "{") {
-        if (depth === 0) objStart = k;
-        depth++;
-      } else if (ch === "}") {
-        depth--;
-        if (depth === 0 && objStart >= 0) {
-          try {
-            issues.push(JSON.parse(unescaped.slice(objStart, k + 1)));
-          } catch { /* partial object at truncation boundary */ }
-          objStart = -1;
-        }
-      }
-    }
-    return issues;
+    return parseIssueArray(unescaped, arrayStart);
   }
   return [];
 }

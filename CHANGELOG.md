@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.27.4] - 2026-06-24
+
+### Fixed
+
+- Tickets tab now reliably detects and loads Jira issues. Four bugs fixed: (1) `unwrapMcpResponse` only matched object-shaped Go map values but the Atlassian resources endpoint returns an array; (2) server health check required `connected === true`, which is unstable for HTTP-backed servers; (3) no retry on detection failures caused startup races to block for the full 3-minute poll interval; (4) `extractIssues` only looked for a `"text":"<escaped JSON>"` wrapper but the search endpoint now returns issues JSON directly in the Go map text field.
+
 ## [1.27.3] - 2026-06-24
 
 ### Fixed
