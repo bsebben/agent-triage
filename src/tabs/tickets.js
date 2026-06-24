@@ -177,9 +177,57 @@ function unescapeJsonString(escaped) {
   return out;
 }
 
+function parseIssueArray(src, arrayStart) {
+  const issues = [];
+  let depth = 0;
+  let objStart = -1;
+  for (let k = arrayStart + 1; k < src.length; k++) {
+    const ch = src[k];
+    if (ch === '"') {
+      k++;
+      while (k < src.length && src[k] !== '"') {
+        if (src[k] === "\\") k++;
+        k++;
+      }
+      continue;
+    }
+    if (ch === "{") {
+      if (depth === 0) objStart = k;
+      depth++;
+    } else if (ch === "}") {
+      depth--;
+      if (depth === 0 && objStart >= 0) {
+        try {
+          issues.push(JSON.parse(src.slice(objStart, k + 1)));
+        } catch { /* partial object at truncation boundary */ }
+        objStart = -1;
+      }
+    }
+  }
+  return issues;
+}
+
 function extractIssues(text) {
   const marker = '"text":"';
   let pos = text.indexOf(marker);
+
+  // No "text":"..." wrapper — Go map format where content[0].text contains the issues
+  // JSON directly (e.g. [map[text:{"issues":[...]} type:text]]). Parse without unwrapping.
+  if (pos === -1) {
+    const issuesIdx = text.indexOf('"issues"');
+    if (issuesIdx === -1) return [];
+    const arrayStart = text.indexOf("[", issuesIdx);
+    if (arrayStart === -1) return [];
+    try {
+      const objStart = text.lastIndexOf("{", issuesIdx);
+      if (objStart !== -1) {
+        const parsed = JSON.parse(text.slice(objStart));
+        if (parsed.issues) return parsed.issues;
+      }
+    } catch { /* truncated — fall through to char-by-char */ }
+    return parseIssueArray(text, arrayStart);
+  }
+
   while (pos !== -1) {
     const start = pos + marker.length;
     let i = start;
@@ -205,34 +253,7 @@ function extractIssues(text) {
     if (issuesStart === -1) return [];
     const arrayStart = unescaped.indexOf("[", issuesStart);
     if (arrayStart === -1) return [];
-
-    const issues = [];
-    let depth = 0;
-    let objStart = -1;
-    for (let k = arrayStart + 1; k < unescaped.length; k++) {
-      const ch = unescaped[k];
-      if (ch === '"') {
-        k++;
-        while (k < unescaped.length && unescaped[k] !== '"') {
-          if (unescaped[k] === "\\") k++;
-          k++;
-        }
-        continue;
-      }
-      if (ch === "{") {
-        if (depth === 0) objStart = k;
-        depth++;
-      } else if (ch === "}") {
-        depth--;
-        if (depth === 0 && objStart >= 0) {
-          try {
-            issues.push(JSON.parse(unescaped.slice(objStart, k + 1)));
-          } catch { /* partial object at truncation boundary */ }
-          objStart = -1;
-        }
-      }
-    }
-    return issues;
+    return parseIssueArray(unescaped, arrayStart);
   }
   return [];
 }
