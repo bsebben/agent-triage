@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.27.4] - 2026-06-24
+
+### Fixed
+
+- Tickets tab now reliably detects and loads Jira issues. Fixed two bugs in Jira auto-detection: the response parser (`unwrapMcpResponse`) only matched object-shaped Go map values but the Atlassian resources endpoint returns an array, causing "No accessible Atlassian resources found" on every poll. Also relaxed the server health check to not require `connected === true`, which is unstable for HTTP-backed servers. Added retry logic (3 attempts, 5 s apart) so transient failures at server startup no longer block detection for the full 3-minute poll interval.
+
 ## [1.27.3] - 2026-06-24
 
 ### Fixed

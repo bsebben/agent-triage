@@ -101,23 +101,32 @@ async function detectJiraServer() {
   const { stdout } = await execFileAsync("mcpproxy", ["upstream", "list", "--json"], { timeout: 5000 });
   const servers = JSON.parse(stdout);
   return servers.find((s) =>
-    /jira/i.test(s.name) && s.connected === true && s.health?.level === "healthy"
+    /jira/i.test(s.name) && s.health?.level === "healthy"
   );
 }
 
 async function detectCloudInfo(serverName) {
   const tool = `${serverName}:getAccessibleAtlassianResources`;
-  const { stdout } = await execFileAsync(
-    "mcpproxy",
-    ["call", "tool-read", "-t", tool, "-j", "{}", "-o", "json"],
-    { timeout: 10000 },
-  );
-  // mcpproxy double-wraps MCP responses: outer JSON → text field with Go map[] → inner JSON → text with resources.
-  // Peel each layer by JSON-parsing, then extracting the text field, repeating until we find the resources array.
-  const resources = unwrapMcpResponse(stdout);
-  if (!resources.length) throw new Error("No accessible Atlassian resources found");
-  const site = resources[0];
-  return { cloudId: site.id, jiraSite: site.url };
+  let lastErr;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    if (attempt > 0) await new Promise((r) => setTimeout(r, 5000));
+    try {
+      const { stdout } = await execFileAsync(
+        "mcpproxy",
+        ["call", "tool-read", "-t", tool, "-j", "{}", "-o", "json"],
+        { timeout: 10000 },
+      );
+      // mcpproxy double-wraps MCP responses: outer JSON → text field with Go map[] → inner JSON → text with resources.
+      // Peel each layer by JSON-parsing, then extracting the text field, repeating until we find the resources array.
+      const resources = unwrapMcpResponse(stdout);
+      if (!resources.length) throw new Error("No accessible Atlassian resources found");
+      const site = resources[0];
+      return { cloudId: site.id, jiraSite: site.url };
+    } catch (err) {
+      lastErr = err;
+    }
+  }
+  throw lastErr;
 }
 
 function unwrapMcpResponse(raw) {
@@ -141,7 +150,7 @@ function unwrapMcpResponse(raw) {
       } catch { /* not valid JSON, try extracting from Go map[] */ }
     }
     // Handle Go map[] serialization: map[text:{...} type:text]
-    const mapMatch = text.match(/map\[text:(\{.+\})\s+type:text\]/s);
+    const mapMatch = text.match(/map\[text:(\[.+\]|\{.+\})\s+type:text\]/s);
     if (mapMatch) { text = mapMatch[1]; continue; }
     break;
   }
