@@ -168,6 +168,16 @@ export class Monitor {
         }
       }
 
+      // Reap dismissed items whose workspace cmux no longer reports. Otherwise a
+      // card for a closed workspace lingers forever in the Dismissed list and
+      // can't be cleared — "close" only acts on a live cmux workspace.
+      const liveWsIds = new Set(workspaces.map((w) => w.id));
+      for (const item of this.#queue.dismissedItems()) {
+        if (!item.workspaceId || !liveWsIds.has(item.workspaceId)) {
+          this.#queue.remove(item.id);
+        }
+      }
+
       if (this.#onUpdate) this.#onUpdate();
     } catch (err) {
       console.error("Poll error:", err.message);

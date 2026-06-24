@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.27.3] - 2026-06-24
+
+### Fixed
+
+- Dismissed workspace cards whose cmux workspace has been closed are now reaped on the next poll, instead of lingering forever in the Dismissed list. Previously the cleanup pass only removed active cards, so a dismissed card for a gone workspace couldn't be cleared and reappeared after the optimistic "close" window expired.
+
 ## [1.27.2] - 2026-06-18
 
 ### Removed
