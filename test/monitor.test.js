@@ -211,6 +211,33 @@ describe("Monitor terminal detection", () => {
     assert.equal(queue.dismissedItems().length, 1);
   });
 
+  it("reaps a dismissed item when its workspace no longer exists in cmux", async () => {
+    const state = {
+      notifications: [],
+      workspaces: [{ id: "W1", title: "claude-session", directory: "/home/user/project" }],
+      agentWorkspaceIds: new Set(["W1"]),
+    };
+    const cmuxApi = {
+      listNotifications: async () => state.notifications,
+      listWorkspaces: async () => state.workspaces,
+      listTerminals: async () => [],
+      listAgentWorkspaceIds: async () => state.agentWorkspaceIds,
+      readScreen: async () => null,
+    };
+    const monitor = new Monitor(queue, { cmuxApi });
+
+    await monitor.poll();
+    queue.dismiss("synthetic-W1");
+    assert.equal(queue.dismissedItems().length, 1);
+
+    state.workspaces = [];
+    state.agentWorkspaceIds = new Set();
+    await monitor.poll();
+
+    assert.equal(queue.dismissedItems().length, 0, "dismissed item for a closed workspace should be reaped");
+    assert.equal(queue.items().length, 0);
+  });
+
   it("evicts a dismissed synthetic entry when the workspace starts producing notifications", async () => {
     const state = {
       notifications: [],
