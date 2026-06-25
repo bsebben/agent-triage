@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.28.0] - 2026-06-25
+
+### Added
+
+- Tickets tab story/epic groups are now collapsible — click a group header to expand or collapse its tickets. Click the parent key chip to open it in Jira.
+
+### Changed
+
+- Tickets and Pull Requests tabs now render each group as a soft card — a colored left accent rail plus a subtle background tint and rounded edge — making it clearer which items belong to which story/epic or repo.
+- Group headers on the Tickets and Pull Requests tabs are slightly larger with a small gap above their rows; on the Tickets tab the story summary truncates and the key chip stays pinned to the right.
+- Removed the per-group column-header rows (Ticket/Status, PR/Status/CI) from the Tickets and Pull Requests tabs for a cleaner look.
+- Group cards on the Tickets and Pull Requests tabs now brighten with a full-accent rail on hover, and the spacing between groups was increased for clearer separation.
+- Tickets tab content now starts below the Refresh button row instead of crowding it.
+
 ## [1.27.4] - 2026-06-24
 
 ### Fixed
