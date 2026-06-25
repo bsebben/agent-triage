@@ -1,5 +1,7 @@
 // public/tab-tickets.js
 
+const collapsedTicketGroups = new Set();
+
 function renderTickets() {
   const ticketStatus = state.tabStatus?.tickets || appConfig.tickets || {};
   if (!ticketStatus.available) {
@@ -19,16 +21,32 @@ function renderTickets() {
   </div>`;
 }
 
+function toggleTicketGroup(key, header) {
+  if (collapsedTicketGroups.has(key)) {
+    collapsedTicketGroups.delete(key);
+  } else {
+    collapsedTicketGroups.add(key);
+  }
+  toggleGroup(header);
+}
+
 function renderTicketGroup(group) {
-  const header = group.key
-    ? `<div class="tickets-parent" onclick="openExternal('${escapeHtml(group.url)}')">${escapeHtml(group.summary)} <span class="tickets-parent-key">${escapeHtml(group.key)}</span></div>`
-    : `<div class="tickets-parent">${escapeHtml(group.summary)}</div>`;
+  const groupKey = group.key || group.summary;
+  const isCollapsed = collapsedTicketGroups.has(groupKey);
+  const keyChip = group.key
+    ? `<span class="tickets-parent-key" onclick="event.stopPropagation(); openExternal('${escapeHtml(group.url)}')">${escapeHtml(group.key)}</span>`
+    : "";
   return `<div class="tickets-group">
-    ${header}
-    <table class="tickets-table">
-      <thead><tr><th>Ticket</th><th>Status</th><th></th></tr></thead>
-      <tbody>${group.tickets.map(renderTicketRow).join("")}</tbody>
-    </table>
+    <div class="tickets-parent" data-group-key="${escapeHtml(groupKey)}" onclick="toggleTicketGroup('${escapeHtml(groupKey)}', this)">
+      <span class="chevron${isCollapsed ? " collapsed" : ""}">▼</span>
+      <span class="tickets-parent-summary">${escapeHtml(group.summary)}</span>
+      ${keyChip}
+    </div>
+    <div class="group-items${isCollapsed ? " collapsed" : ""}">
+      <table class="tickets-table">
+        <tbody>${group.tickets.map(renderTicketRow).join("")}</tbody>
+      </table>
+    </div>
   </div>`;
 }
 

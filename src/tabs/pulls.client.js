@@ -163,7 +163,6 @@ function renderPullGroup(group, showAuthor, subTab) {
     </div>
     <div class="group-items${isCollapsed ? " collapsed" : ""}">
       <table class="pulls-table">
-        <thead><tr><th>PR</th>${showAuthor ? "<th>Author</th>" : ""}<th>Status</th><th>CI</th><th></th></tr></thead>
         <tbody>${group.prs.map((pr) => renderPullRow(pr, showAuthor, group.repo)).join("")}</tbody>
       </table>
     </div>
