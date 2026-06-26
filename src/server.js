@@ -18,7 +18,7 @@ import { refreshSession, refreshAll, refreshingIds } from "./refresh.js";
 import loops, { defaults as loopsDefaults } from "./tabs/loops.js";
 import pulls, { defaults as pullsDefaults } from "./tabs/pulls.js";
 import tickets, { defaults as ticketsDefaults } from "./tabs/tickets.js";
-import tasks, { defaults as tasksDefaults } from "./tabs/tasks.js";
+import tasks, { defaults as tasksDefaults, store as taskStore, save as saveTasks } from "./tabs/tasks.js";
 
 const tabDefaults = { loops: loopsDefaults, pulls: pullsDefaults, tickets: ticketsDefaults, tasks: tasksDefaults };
 const configSchema = buildSchema(tabDefaults);
@@ -27,7 +27,7 @@ const __dirname = fileURLToPath(new URL(".", import.meta.url));
 const PUBLIC_DIR = join(__dirname, "..", "public");
 const TABS_DIR = join(__dirname, "tabs");
 const DATA_DIR = join(__dirname, "..", "data");
-tasks._dataPath = join(DATA_DIR, "tasks.json");
+const TASKS_DATA_PATH = join(DATA_DIR, "tasks.json");
 const PORT = process.env.PORT || config.port;
 
 // --- Tab registry ---
@@ -436,8 +436,8 @@ const server = createServer(async (req, res) => {
       if (!title || typeof title !== "string" || !title.trim()) {
         return jsonResponse(res, { error: "title is required" }, 400);
       }
-      const task = tasks.store.add(title.trim());
-      tasks.store.save(tasks._dataPath).catch(() => {});
+      const task = taskStore.add(title.trim());
+      saveTasks().catch(() => {});
       broadcast();
       return jsonResponse(res, { task }, 201);
     }
@@ -448,10 +448,10 @@ const server = createServer(async (req, res) => {
       }
       const id = decodeURIComponent(req.url.slice("/api/tasks/".length));
       const body = await readBody(req);
-      const task = tasks.store.get(id);
+      const task = taskStore.get(id);
       if (!task) return jsonResponse(res, { error: "Task not found" }, 404);
       if (typeof body.done === "boolean") task.done = body.done;
-      tasks.store.save(tasks._dataPath).catch(() => {});
+      saveTasks().catch(() => {});
       broadcast();
       return jsonResponse(res, { task });
     }
@@ -461,10 +461,10 @@ const server = createServer(async (req, res) => {
         return jsonResponse(res, { error: "Tasks tab is not enabled. Enable it in Settings." }, 404);
       }
       const id = decodeURIComponent(req.url.slice("/api/tasks/".length));
-      if (!tasks.store.remove(id)) {
+      if (!taskStore.remove(id)) {
         return jsonResponse(res, { error: "Task not found" }, 404);
       }
-      tasks.store.save(tasks._dataPath).catch(() => {});
+      saveTasks().catch(() => {});
       broadcast();
       res.writeHead(204);
       return res.end();
@@ -496,7 +496,9 @@ wss.on("connection", (ws) => {
 // --- Init ---
 
 for (const [name, tab] of Object.entries(tabs)) {
-  await tab.init(config.tabs[name] || {}, broadcast);
+  const tabConfig = { ...(config.tabs[name] || {}) };
+  if (name === "tasks") tabConfig._dataPath = TASKS_DATA_PATH;
+  await tab.init(tabConfig, broadcast);
 }
 
 updateChecker.init(broadcast);

@@ -22,7 +22,20 @@ export const defaults = {
 };
 
 let cfg;
-const store = new TaskStore();
+let dataPath;
+
+export const store = new TaskStore();
+
+/**
+ * Persist tasks to disk.
+ *
+ * Returns:
+ *   Promise that resolves when the save completes.
+ */
+export function save() {
+  if (dataPath) return store.save(dataPath);
+  return Promise.resolve();
+}
 
 /**
  * Initialize the tasks tab.
@@ -36,6 +49,7 @@ const store = new TaskStore();
  */
 async function init(tabConfig, onUpdate) {
   cfg = { ...defaults, ...tabConfig };
+  dataPath = tabConfig._dataPath || null;
   tab.enabled = cfg.enabled;
   tab.available = true;
   tab.hint = null;
@@ -43,14 +57,13 @@ async function init(tabConfig, onUpdate) {
   console.log(`Config: tasks ${cfg.enabled ? "enabled" : "disabled"}`);
   if (!cfg.enabled) return;
 
-  await store.load(tab._dataPath);
+  if (dataPath) await store.load(dataPath);
 }
 
 const tab = {
   enabled: false,
   available: true,
   hint: null,
-  _dataPath: null,
   /**
    * Get the current list of tasks, filtered by expiry config.
    *
@@ -61,20 +74,6 @@ const tab = {
     if (!cfg) return [];
     return store.list(cfg.maxAgeDays, cfg.expireBehavior);
   },
-  /**
-   * Get the underlying TaskStore instance.
-   *
-   * Returns:
-   *   The TaskStore used by this tab.
-   */
-  get store() { return store; },
-  /**
-   * Get the resolved tab config.
-   *
-   * Returns:
-   *   The merged config object, or undefined before init() is called.
-   */
-  get cfg() { return cfg; },
   init,
 };
 
