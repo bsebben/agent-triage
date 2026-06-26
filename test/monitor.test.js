@@ -52,12 +52,13 @@ describe("enrichNotification", () => {
 describe("Monitor terminal detection", () => {
   let queue;
 
-  function makeCmux({ notifications = [], workspaces = [], terminals = [], agentWorkspaceIds = new Set() }) {
+  function makeCmux({ notifications = [], workspaces = [], terminals = [], agentWorkspaceIds = new Set(), bypassWorkspaceIds = new Set() }) {
     return {
       listNotifications: async () => notifications,
       listWorkspaces: async () => workspaces,
       listTerminals: async () => terminals,
       listAgentWorkspaceIds: async () => agentWorkspaceIds,
+      listBypassWorkspaceIds: async () => bypassWorkspaceIds,
       readScreen: async () => null,
     };
   }
@@ -166,6 +167,7 @@ describe("Monitor terminal detection", () => {
       listWorkspaces: async () => state.workspaces,
       listTerminals: async () => [],
       listAgentWorkspaceIds: async () => new Set(),
+      listBypassWorkspaceIds: async () => new Set(),
       readScreen: async () => null,
     };
     const monitor = new Monitor(queue, { cmuxApi });
@@ -196,6 +198,7 @@ describe("Monitor terminal detection", () => {
       listWorkspaces: async () => state.workspaces,
       listTerminals: async () => [],
       listAgentWorkspaceIds: async () => state.agentWorkspaceIds,
+      listBypassWorkspaceIds: async () => new Set(),
       readScreen: async () => null,
     };
     const monitor = new Monitor(queue, { cmuxApi });
@@ -222,6 +225,7 @@ describe("Monitor terminal detection", () => {
       listWorkspaces: async () => state.workspaces,
       listTerminals: async () => [],
       listAgentWorkspaceIds: async () => state.agentWorkspaceIds,
+      listBypassWorkspaceIds: async () => new Set(),
       readScreen: async () => null,
     };
     const monitor = new Monitor(queue, { cmuxApi });
@@ -238,6 +242,72 @@ describe("Monitor terminal detection", () => {
     assert.equal(queue.items().length, 0);
   });
 
+  it("sets bypassPermissions on synthetic running items", async () => {
+    const cmuxApi = makeCmux({
+      workspaces: [{ id: "W1", title: "claude-session", directory: "/home/user/project" }],
+      agentWorkspaceIds: new Set(["W1"]),
+      bypassWorkspaceIds: new Set(["W1"]),
+    });
+    const monitor = new Monitor(queue, { cmuxApi });
+    await monitor.poll();
+
+    const items = queue.items();
+    assert.equal(items.length, 1);
+    assert.equal(items[0].bypassPermissions, true);
+  });
+
+  it("sets bypassPermissions false when workspace is not in bypass mode", async () => {
+    const cmuxApi = makeCmux({
+      workspaces: [{ id: "W1", title: "claude-session", directory: "/home/user/project" }],
+      agentWorkspaceIds: new Set(["W1"]),
+      bypassWorkspaceIds: new Set(),
+    });
+    const monitor = new Monitor(queue, { cmuxApi });
+    await monitor.poll();
+
+    const items = queue.items();
+    assert.equal(items.length, 1);
+    assert.equal(items[0].bypassPermissions, false);
+  });
+
+  it("sets bypassPermissions on enriched notification items", async () => {
+    const cmuxApi = makeCmux({
+      notifications: [
+        { id: "notif-1", category: "permission", workspaceId: "W1", surfaceId: "S1", body: "approve?" },
+      ],
+      workspaces: [{ id: "W1", title: "claude-session", directory: "/home/user/project" }],
+      bypassWorkspaceIds: new Set(["W1"]),
+    });
+    const monitor = new Monitor(queue, { cmuxApi });
+    await monitor.poll();
+
+    const items = queue.items();
+    assert.equal(items.length, 1);
+    assert.equal(items[0].bypassPermissions, true);
+  });
+
+  it("updates bypassPermissions when session mode changes between polls", async () => {
+    const state = {
+      bypassWorkspaceIds: new Set(["W1"]),
+    };
+    const cmuxApi = {
+      listNotifications: async () => [],
+      listWorkspaces: async () => [{ id: "W1", title: "claude-session", directory: "/home/user/project" }],
+      listTerminals: async () => [],
+      listAgentWorkspaceIds: async () => new Set(["W1"]),
+      listBypassWorkspaceIds: async () => state.bypassWorkspaceIds,
+      readScreen: async () => null,
+    };
+    const monitor = new Monitor(queue, { cmuxApi });
+
+    await monitor.poll();
+    assert.equal(queue.items()[0].bypassPermissions, true);
+
+    state.bypassWorkspaceIds = new Set();
+    await monitor.poll();
+    assert.equal(queue.items()[0].bypassPermissions, false);
+  });
+
   it("evicts a dismissed synthetic entry when the workspace starts producing notifications", async () => {
     const state = {
       notifications: [],
@@ -249,6 +319,7 @@ describe("Monitor terminal detection", () => {
       listWorkspaces: async () => state.workspaces,
       listTerminals: async () => [],
       listAgentWorkspaceIds: async () => state.agentWorkspaceIds,
+      listBypassWorkspaceIds: async () => new Set(),
       readScreen: async () => null,
     };
     const monitor = new Monitor(queue, { cmuxApi });

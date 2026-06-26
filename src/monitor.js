@@ -96,11 +96,12 @@ export class Monitor {
 
   async poll() {
     try {
-      const [notifications, workspaces, terminals, agentWsIds] = await Promise.all([
+      const [notifications, workspaces, terminals, agentWsIds, bypassWsIds] = await Promise.all([
         this.#cmux.listNotifications(),
         this.#cmux.listWorkspaces(),
         this.#cmux.listTerminals(),
         this.#cmux.listAgentWorkspaceIds(),
+        this.#cmux.listBypassWorkspaceIds(),
       ]);
 
       for (const id of agentWsIds) this.#knownAgentWorkspaces.add(id);
@@ -117,6 +118,7 @@ export class Monitor {
         if (n.workspaceId === dashboardWsId) continue;
         currentIds.add(n.id);
         const enriched = await enrichNotification(n, workspaces, terminals);
+        enriched.bypassPermissions = bypassWsIds.has(n.workspaceId);
         this.#queue.upsert(enriched);
       }
 
@@ -138,6 +140,7 @@ export class Monitor {
             workspaceDir: terminal?.directory || ws.directory || null,
             workspaceSelected: ws.selected || false,
             gitBranch: terminal?.gitBranch || null,
+            bypassPermissions: bypassWsIds.has(ws.id),
           });
         }
       }
