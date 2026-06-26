@@ -97,7 +97,7 @@ function render() {
   else if (activeTab === "tickets") renderTickets();
   else if (activeTab === "tasks") renderTasks();
 
-  if (activeTab !== "workspaces") {
+  if (activeTab !== "workspaces" && activeTab !== "tasks") {
     const rs = refreshStates[activeTab] || {};
     const cls = rs.cls ? ` ${rs.cls}` : "";
     const text = rs.text || "\u21bb Refresh";
