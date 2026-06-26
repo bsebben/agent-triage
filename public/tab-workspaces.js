@@ -142,7 +142,9 @@ function renderCard(item, { isDismissed = false } = {}) {
     : "";
 
   const displayCategory = refreshing ? "refreshing" : item.category;
-  return `<div class="card${selectedClass} cat-${escapeHtml(displayCategory)}" data-workspace-id="${item.workspaceId}" onclick="cardClick(event,'${item.workspaceId}')">
+  const bypassClass = item.bypassPermissions ? " bypass" : "";
+  const bypassTip = item.bypassPermissions ? ` title="Running with --dangerously-skip-permissions"` : "";
+  return `<div class="card${selectedClass}${bypassClass} cat-${escapeHtml(displayCategory)}" data-workspace-id="${item.workspaceId}"${bypassTip} onclick="cardClick(event,'${item.workspaceId}')">
     <div class="card-title-row"><span class="card-title-group"><span class="card-title">${escapeHtml(cardTitle)}</span><a class="card-edit" onclick="event.stopPropagation();startRename(this,'${item.workspaceId}','${escapeHtml(cardTitle)}')">&#9998;</a></span><span class="card-actions-col"><span class="card-actions-right">${refreshBtn}${dismissBtn}${closeBtn}</span>${item.createdAt ? `<span class="card-time">\u{1f559} ${timeAgo(item.createdAt)}</span>` : ""}</span></div>
     <div class="card-content">
       <div class="card-header">

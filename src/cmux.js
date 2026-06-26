@@ -174,6 +174,59 @@ export async function listAgentWorkspaceIds() {
   }
 }
 
+/**
+ * Returns the set of workspace IDs whose Claude Code process was launched
+ * with --dangerously-skip-permissions.
+ *
+ * Calls system.top to resolve each agent workspace's TTY, then inspects the
+ * process args via `ps -ww`. The -ww flag is required because Claude's
+ * --settings JSON is very long and macOS ps truncates without it.
+ *
+ * @returns {Promise<Set<string>>} Workspace IDs running in bypass mode.
+ */
+export async function listBypassWorkspaceIds() {
+  try {
+    const raw = await rpc("system.top");
+    const ttyByWsId = new Map();
+    for (const win of raw.windows || []) {
+      for (const ws of win.workspaces || []) {
+        let isAgent = false;
+        for (const tag of ws.tags || []) {
+          if (tag.key === "claude_code") isAgent = true;
+        }
+        if (!isAgent && AGENT_TITLE_PREFIX.test(ws.title || "")) isAgent = true;
+        if (!isAgent) continue;
+
+        for (const pane of ws.panes || []) {
+          for (const surface of pane.surfaces || []) {
+            if (surface.type === "terminal" && surface.tty) {
+              ttyByWsId.set(ws.id, surface.tty);
+            }
+          }
+        }
+      }
+    }
+
+    const bypassIds = new Set();
+    const checks = [...ttyByWsId.entries()].map(async ([wsId, tty]) => {
+      try {
+        const { stdout } = await execFileAsync("ps", ["-ww", "-t", tty, "-o", "args="]);
+        for (const line of stdout.split("\n")) {
+          if ((line.includes("/claude") || /\bclaude\b/.test(line)) &&
+              line.includes("--dangerously-skip-permissions")) {
+            bypassIds.add(wsId);
+            break;
+          }
+        }
+      } catch {}
+    });
+    await Promise.all(checks);
+    return bypassIds;
+  } catch {
+    return new Set();
+  }
+}
+
 export async function listWorkspaces() {
   const raw = await rpc("workspace.list");
   return (raw.workspaces || []).map((w) => ({

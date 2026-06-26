@@ -386,6 +386,7 @@ main { padding: 8px; position: relative; }
 .btn-group-add .claude-icon { width: 12px; height: 12px; vertical-align: -1px; }
 
 .card {
+  --bypass-shadow: 0 0 0 0 transparent;
   background: var(--card);
   border: 1px solid var(--border);
   border-radius: 6px;
@@ -393,11 +394,13 @@ main { padding: 8px; position: relative; }
   margin: 4px 8px;
   cursor: pointer;
   transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+  box-shadow: var(--bypass-shadow);
   display: flex;
   flex-direction: column;
   gap: 4px;
   position: relative;
 }
+.card.bypass { --bypass-shadow: inset 3px 0 0 var(--clr-error); }
 
 .card-content {
   min-width: 0;
@@ -406,7 +409,7 @@ main { padding: 8px; position: relative; }
 .card:hover {
   border-color: var(--text-dim);
   transform: scale(1.02);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3), var(--bypass-shadow);
 }
 
 .card-title-row {
@@ -626,12 +629,12 @@ main { padding: 8px; position: relative; }
 
 .card.selected {
   border-color: var(--clr-running);
-  box-shadow: 0 0 0 1px var(--clr-running);
+  box-shadow: 0 0 0 1px var(--clr-running), var(--bypass-shadow);
 }
 
 .card.keyboard-focus {
   border-color: var(--text);
-  box-shadow: 0 0 0 1px var(--text);
+  box-shadow: 0 0 0 1px var(--text), var(--bypass-shadow);
 }
 
 .dismissed-group .group-header {

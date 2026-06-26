@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.29.0] - 2026-06-26
+
+### Added
+
+- Bypass permissions indicator: workspace cards now show a red left border when a Claude Code session is running with `--dangerously-skip-permissions`. Detected live via process inspection each poll cycle, so the indicator updates if a session is restarted with different flags.
+
 ## [1.28.0] - 2026-06-25
 
 ### Added
