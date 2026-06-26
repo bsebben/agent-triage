@@ -18,21 +18,23 @@ import { refreshSession, refreshAll, refreshingIds } from "./refresh.js";
 import loops, { defaults as loopsDefaults } from "./tabs/loops.js";
 import pulls, { defaults as pullsDefaults } from "./tabs/pulls.js";
 import tickets, { defaults as ticketsDefaults } from "./tabs/tickets.js";
+import tasks, { defaults as tasksDefaults } from "./tabs/tasks.js";
 
-const tabDefaults = { loops: loopsDefaults, pulls: pullsDefaults, tickets: ticketsDefaults };
+const tabDefaults = { loops: loopsDefaults, pulls: pullsDefaults, tickets: ticketsDefaults, tasks: tasksDefaults };
 const configSchema = buildSchema(tabDefaults);
 
 const __dirname = fileURLToPath(new URL(".", import.meta.url));
 const PUBLIC_DIR = join(__dirname, "..", "public");
 const TABS_DIR = join(__dirname, "tabs");
 const DATA_DIR = join(__dirname, "..", "data");
+tasks._dataPath = join(DATA_DIR, "tasks.json");
 const PORT = process.env.PORT || config.port;
 
 // --- Tab registry ---
 // Each tab module exports: { status, data, init(onUpdate) }
 // Modules manage their own polling. To add a new tab: create a module, import it, add it here.
 
-const tabs = { loops, pulls, tickets };
+const tabs = { loops, pulls, tickets, tasks };
 
 // --- Logs ---
 
@@ -106,7 +108,7 @@ function resolveCwd(repo) {
 
 const server = createServer(async (req, res) => {
   res.setHeader("Access-Control-Allow-Origin", "*");
-  res.setHeader("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS");
+  res.setHeader("Access-Control-Allow-Methods", "GET, POST, PATCH, DELETE, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
   if (req.method === "OPTIONS") { res.writeHead(204); return res.end(); }
 
@@ -415,6 +417,57 @@ const server = createServer(async (req, res) => {
       queue.restore(id);
       broadcast();
       return jsonResponse(res, { ok: true });
+    }
+
+    // --- Tasks API ---
+
+    if (req.url === "/api/tasks" && req.method === "GET") {
+      if (!tasks.enabled) {
+        return jsonResponse(res, { error: "Tasks tab is not enabled. Enable it in Settings." }, 404);
+      }
+      return jsonResponse(res, { tasks: tasks.data });
+    }
+
+    if (req.url === "/api/tasks" && req.method === "POST") {
+      if (!tasks.enabled) {
+        return jsonResponse(res, { error: "Tasks tab is not enabled. Enable it in Settings." }, 404);
+      }
+      const { title } = await readBody(req);
+      if (!title || typeof title !== "string" || !title.trim()) {
+        return jsonResponse(res, { error: "title is required" }, 400);
+      }
+      const task = tasks.store.add(title.trim());
+      tasks.store.save(tasks._dataPath).catch(() => {});
+      broadcast();
+      return jsonResponse(res, { task }, 201);
+    }
+
+    if (req.url?.startsWith("/api/tasks/") && req.method === "PATCH") {
+      if (!tasks.enabled) {
+        return jsonResponse(res, { error: "Tasks tab is not enabled. Enable it in Settings." }, 404);
+      }
+      const id = decodeURIComponent(req.url.slice("/api/tasks/".length));
+      const body = await readBody(req);
+      const task = tasks.store.get(id);
+      if (!task) return jsonResponse(res, { error: "Task not found" }, 404);
+      if (typeof body.done === "boolean") task.done = body.done;
+      tasks.store.save(tasks._dataPath).catch(() => {});
+      broadcast();
+      return jsonResponse(res, { task });
+    }
+
+    if (req.url?.startsWith("/api/tasks/") && req.method === "DELETE") {
+      if (!tasks.enabled) {
+        return jsonResponse(res, { error: "Tasks tab is not enabled. Enable it in Settings." }, 404);
+      }
+      const id = decodeURIComponent(req.url.slice("/api/tasks/".length));
+      if (!tasks.store.remove(id)) {
+        return jsonResponse(res, { error: "Task not found" }, 404);
+      }
+      tasks.store.save(tasks._dataPath).catch(() => {});
+      broadcast();
+      res.writeHead(204);
+      return res.end();
     }
   } catch (err) {
     console.error(`API error [${req.url}]:`, err.message);
