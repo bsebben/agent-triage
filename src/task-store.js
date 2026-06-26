@@ -22,8 +22,9 @@ export class TaskStore {
    *   The newly created task object.
    */
   add(title) {
-    const id = `t_${Date.now()}_${this.#counter++}`;
-    const task = { id, title, done: false, createdAt: Date.now() };
+    const now = Date.now();
+    const id = `t_${now}_${this.#counter++}`;
+    const task = { id, title, done: false, createdAt: now };
     this.#items.set(id, task);
     return task;
   }
