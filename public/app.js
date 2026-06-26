@@ -19,7 +19,7 @@ async function loadAppConfig() {
       document.querySelector(".app-version").textContent = `v${appConfig.version}`;
     }
     if (typeof renderCmuxCompatIndicator === "function") renderCmuxCompatIndicator();
-    for (const tab of ["loops", "tickets", "pulls"]) {
+    for (const tab of ["loops", "tickets", "pulls", "tasks"]) {
       const btn = document.querySelector(`.tab[data-tab="${tab}"]`);
       if (btn) btn.style.display = appConfig[tab]?.enabled === false ? "none" : "";
     }
@@ -95,6 +95,7 @@ function render() {
   else if (activeTab === "loops") renderLoops();
   else if (activeTab === "pulls") renderPulls();
   else if (activeTab === "tickets") renderTickets();
+  else if (activeTab === "tasks") renderTasks();
 
   if (activeTab !== "workspaces") {
     const rs = refreshStates[activeTab] || {};
@@ -155,6 +156,11 @@ function updateTabBadges() {
   const ticketGroups = state.tickets || [];
   const ticketCount = ticketGroups.reduce((n, g) => n + g.tickets.length, 0);
   setBadge("tickets", ticketCount || null, null);
+
+  // Tasks: count of incomplete tasks
+  const taskItems = state.tasks || [];
+  const incompleteTasks = taskItems.filter((t) => !t.done).length;
+  setBadge("tasks", incompleteTasks || null, null);
 }
 
 function setBadge(tab, count, variant) {
