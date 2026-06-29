@@ -1758,3 +1758,112 @@ main { padding: 8px; position: relative; }
 .config-tab-section .config-field {
   margin-left: 8px;
 }
+
+/* Tasks */
+.tasks-input-row {
+  display: flex;
+  gap: 8px;
+  padding: 32px 0 12px;
+}
+
+.tasks-input {
+  flex: 1;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  font-family: inherit;
+  font-size: 13px;
+  padding: 8px 12px;
+  outline: none;
+}
+
+.tasks-input:focus {
+  border-color: var(--clr-running);
+}
+
+.tasks-input::placeholder {
+  color: var(--text-dim);
+}
+
+.tasks-add-btn {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text-dim);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 8px 14px;
+  cursor: pointer;
+}
+
+.tasks-add-btn:hover {
+  color: var(--text);
+  border-color: var(--text-dim);
+}
+
+.tasks-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.task-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  transition: background 0.1s;
+}
+
+.task-row:hover {
+  background: color-mix(in srgb, var(--surface) 60%, transparent);
+}
+
+.task-checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+  cursor: pointer;
+}
+
+.task-checkbox-label input[type="checkbox"] {
+  accent-color: var(--clr-completion);
+  cursor: pointer;
+  flex: none;
+}
+
+.task-title {
+  font-size: 13px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.task-done .task-title {
+  text-decoration: line-through;
+  color: var(--text-dim);
+}
+
+.task-delete-btn {
+  background: none;
+  border: none;
+  color: var(--text-dim);
+  font-size: 16px;
+  cursor: pointer;
+  padding: 0 4px;
+  opacity: 0;
+  transition: opacity 0.1s;
+}
+
+.task-row:hover .task-delete-btn {
+  opacity: 1;
+}
+
+.task-delete-btn:hover {
+  color: var(--clr-error);
+}

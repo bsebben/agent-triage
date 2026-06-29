@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.30.0] - 2026-06-26
+
+### Added
+
+- Tasks tab: persistent task list with REST API (`GET/POST /api/tasks`, `PATCH/DELETE /api/tasks/:id`). Tasks survive server restarts via `data/tasks.json`. Configurable expiry via `maxAgeDays` and `expireBehavior` (`hide`/`delete`). Disabled by default.
+- Tasks tab frontend: checklist UI with inline add input, checkbox toggle (strikethrough for done items), hover-reveal delete button, and badge showing count of incomplete tasks.
+- `triage-tasks` Claude skill: manage the task list programmatically from any Claude Code session. Installed automatically by `bin/install.sh`.
+
 ## [1.29.0] - 2026-06-26
 
 ### Added

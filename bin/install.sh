@@ -43,5 +43,23 @@ HOOK
 # Patch in the actual path (can't use $AUTOSTART inside a quoted heredoc)
 sed -i '' "s|AUTOSTART_SCRIPT|$AUTOSTART|" "$ZSHRC"
 
+# --- Skill symlink ---
+SKILLS_DIR="$SCRIPT_DIR/../skills"
+COMMANDS_DIR="${HOME}/.claude/commands"
+
+if [[ -d "$SKILLS_DIR" ]]; then
+  mkdir -p "$COMMANDS_DIR"
+  for skill in "$SKILLS_DIR"/*.md; do
+    [[ -f "$skill" ]] || continue
+    name="$(basename "$skill")"
+    target="$COMMANDS_DIR/$name"
+    if [[ -L "$target" ]]; then
+      rm "$target"
+    fi
+    ln -s "$skill" "$target"
+    echo "Linked skill: $name -> $COMMANDS_DIR/"
+  done
+fi
+
 echo "Installed auto-start hook in $ZSHRC"
 echo "The dashboard will start automatically the next time cmux launches."
