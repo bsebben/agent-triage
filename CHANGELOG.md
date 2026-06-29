@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.32.0] - 2026-06-29
+
+### Added
+
+- Tickets tab: Runlayer MCP fallback transport. When `mcpproxy` is unavailable, the dashboard can connect directly to a Runlayer-hosted Jira MCP server via HTTP. Configure `runlayerUrl` and `runlayerApiKey` under `tabs.tickets` in `config.json`, or set the `RUNLAYER_USER_KEY` env var.
+- New `src/runlayer-mcp.js` module: lightweight MCP client for Runlayer Streamable HTTP servers, handling the initialize/initialized handshake and session management.
+- Transport auto-detection: the tickets tab now tries mcpproxy first, then Runlayer, with clear hint messages for each failure mode.
+- Friendly error messages for Runlayer auth issues (401/403) guiding users to the correct API key type.
+
 ## [1.31.1] - 2026-06-29
 
 ### Added

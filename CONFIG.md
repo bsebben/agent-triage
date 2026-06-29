@@ -62,8 +62,29 @@ All tabs live under the `tabs` key and are enabled by default. Each tab auto-det
 |-----|-----------|--------------------------|
 | Loops | claude-loops plugin | Shows install link |
 | Pulls | `gh` CLI | Shows install instructions |
-| Tickets | Jira MCP server | Shows setup hint |
+| Tickets | mcpproxy or Runlayer Jira MCP | Shows setup hint |
 
 Each tab module defines its own defaults. See the `defaults` export in each `src/tabs/*.js` file for available options.
+
+### Tickets Tab
+
+The tickets tab supports two transports for connecting to Jira, tried in order:
+
+1. **mcpproxy** (default) — Uses the `mcpproxy` CLI to proxy MCP calls to a Jira server. No extra config needed if `mcpproxy` is installed and a healthy Jira upstream is configured.
+
+2. **Runlayer** (fallback) — Connects directly to a Runlayer-hosted Jira MCP server via HTTP. Requires a **user API key** (not an org key). Configure in `config.json`:
+
+```json
+{
+  "tabs": {
+    "tickets": {
+      "runlayerUrl": "https://gusto.runlayer.com/api/v1/proxy/<jira-server-uuid>/mcp",
+      "runlayerApiKey": "rl_user_..."
+    }
+  }
+}
+```
+
+The API key can also be set via the `RUNLAYER_USER_KEY` environment variable.
 
 If auto-detection fails for cmux (required for the dashboard itself), the server exits with a clear message telling you which config field to set.
