@@ -94,12 +94,14 @@ function openActionDrawer(item, type, repo) {
   drawerEl.innerHTML = renderDrawerContent(item, type, repo);
 
   drawerEl.querySelectorAll(".drawer-action-btn").forEach((btn) => {
-    btn.addEventListener("click", () => {
+    btn.addEventListener("click", (e) => {
       const actionId = btn.dataset.actionId;
       const actions = type === "pr" ? prActions : ticketActions;
       const action = actions.find((a) => a.id === actionId);
       if (!action) return;
-      apiPost("agent-workspace", { prompt: action.prompt(item), repo });
+      const body = { prompt: action.prompt(item), repo };
+      if (e.shiftKey) body.dangerous = true;
+      apiPost("agent-workspace", body);
       closeActionDrawer();
     });
   });

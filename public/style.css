@@ -1290,6 +1290,11 @@ main { padding: 8px; position: relative; }
   background: var(--card);
 }
 
+body.shift-held .drawer-action-btn {
+  color: var(--clr-error);
+  border-color: var(--clr-error);
+}
+
 /* Changelog modal */
 .modal-panel {
   position: fixed;

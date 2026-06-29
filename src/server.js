@@ -349,14 +349,15 @@ const server = createServer(async (req, res) => {
       if (config.maxSessions !== null && getSessionCount() >= config.maxSessions) {
         return jsonResponse(res, { error: "Session limit reached", limit: config.maxSessions, current: getSessionCount() }, 429);
       }
-      const { prompt, repo } = await readBody(req);
+      const { prompt, repo, dangerous } = await readBody(req);
       if (!prompt || typeof prompt !== "string") {
         return jsonResponse(res, { error: "prompt required" }, 400);
       }
       const escaped = "'" + prompt.replace(/'/g, "'\\''") + "'";
+      const flags = dangerous ? " --dangerously-skip-permissions" : "";
       await cmux.createWorkspace({
         cwd: resolveCwd(repo),
-        command: `claude ${escaped}`,
+        command: `claude${flags} ${escaped}`,
       });
       await monitor.poll();
       return jsonResponse(res, { ok: true });
