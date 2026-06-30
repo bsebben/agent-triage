@@ -10,7 +10,10 @@
   },
   "tabs": {
     "loops": {},
-    "tickets": {},
+    "tickets": {
+      "runlayerUrl": null,
+      "runlayerApiKey": null
+    },
     "pulls": {},
     "tasks": {}
   }
