@@ -34,6 +34,17 @@ const prActions = [
       `ask before editing.`,
   },
   {
+    id: "ciFix",
+    label: "Fix CI",
+    prompt: (pr) =>
+      `Check out the branch \`${pr.branch}\` then use \`/ci fix\` to investigate ` +
+      `and fix the failing CI on this PR: ${pr.url}\n\n` +
+      `If the skill isn't installed, check CI status with ` +
+      `\`gh pr checks ${pr.number}\`, read the logs of failing jobs, ` +
+      `reproduce the failures locally, fix the code, and push. ` +
+      `Iterate until CI is green.`,
+  },
+  {
     id: "taskPr",
     label: "Update PR description",
     prompt: (pr) =>

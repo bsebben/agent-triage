@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.33.0] - 2026-06-30
+
+### Added
+
+- Pull Requests tab: "Fix CI" action button in the drawer. Checks out the PR branch and runs `/ci fix` to investigate and fix failing CI, with a manual fallback if the skill isn't installed.
+
 ## [1.32.0] - 2026-06-29
 
 ### Added
