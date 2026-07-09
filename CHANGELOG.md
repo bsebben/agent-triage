@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.34.0] - 2026-07-09
+
+### Added
+
+- Pull Requests and Tickets tabs: a "Workspace limit reached" banner now appears at the top when the cmux workspace limit is hit, and the per-row action button is disabled (with a tooltip) since every action opens a new workspace.
+
+### Changed
+
+- Renamed "session limit reached" to "workspace limit reached" everywhere (API errors, banners, toasts) — the limit counts cmux workspaces, including terminal sessions.
+
 ## [1.33.0] - 2026-06-30
 
 ### Added

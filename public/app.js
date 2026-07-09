@@ -214,20 +214,29 @@ async function newSession(cwd, dangerous) {
   if (cwd) body.cwd = cwd;
   if (dangerous) body.dangerous = true;
   const res = await apiPost("new-workspace", body);
-  if (res.error && res.limit) showSessionLimitAlert(res);
+  if (res.error && res.limit) showWorkspaceLimitAlert(res);
 }
 
 async function newWorkspace(cwd) {
   const res = await apiPost("new-workspace", cwd ? { cwd } : {});
-  if (res.error && res.limit) showSessionLimitAlert(res);
+  if (res.error && res.limit) showWorkspaceLimitAlert(res);
 }
 
-function showSessionLimitAlert(res) {
-  const existing = document.querySelector(".session-limit-toast");
+function isAtWorkspaceLimit() {
+  return state.maxSessions !== null && state.sessionCount >= state.maxSessions;
+}
+
+function workspaceLimitBanner() {
+  if (!isAtWorkspaceLimit()) return "";
+  return `<div class="workspace-limit-banner">Workspace limit reached (${state.sessionCount}/${state.maxSessions})</div>`;
+}
+
+function showWorkspaceLimitAlert(res) {
+  const existing = document.querySelector(".workspace-limit-banner");
   if (existing) return;
   const toast = document.createElement("div");
-  toast.className = "session-limit-toast";
-  toast.textContent = `Session limit reached (${res.current}/${res.limit})`;
+  toast.className = "workspace-limit-banner";
+  toast.textContent = `Workspace limit reached (${res.current}/${res.limit})`;
   queue.prepend(toast);
   setTimeout(() => toast.remove(), 3000);
 }

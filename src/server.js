@@ -328,7 +328,7 @@ const server = createServer(async (req, res) => {
 
     if (req.url === "/api/new-workspace" && req.method === "POST") {
       if (config.maxSessions !== null && getSessionCount() >= config.maxSessions) {
-        return jsonResponse(res, { error: "Session limit reached", limit: config.maxSessions, current: getSessionCount() }, 429);
+        return jsonResponse(res, { error: "Workspace limit reached", limit: config.maxSessions, current: getSessionCount() }, 429);
       }
       const body = await readBody(req).catch(() => ({}));
       const cwd = body.cwd || config.defaultDirectory;
@@ -347,7 +347,7 @@ const server = createServer(async (req, res) => {
 
     if (req.url === "/api/agent-workspace" && req.method === "POST") {
       if (config.maxSessions !== null && getSessionCount() >= config.maxSessions) {
-        return jsonResponse(res, { error: "Session limit reached", limit: config.maxSessions, current: getSessionCount() }, 429);
+        return jsonResponse(res, { error: "Workspace limit reached", limit: config.maxSessions, current: getSessionCount() }, 429);
       }
       const { prompt, repo, dangerous } = await readBody(req);
       if (!prompt || typeof prompt !== "string") {

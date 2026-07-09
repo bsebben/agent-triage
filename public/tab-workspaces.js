@@ -19,14 +19,11 @@ function saveCollapseState() {
 
 function renderWorkspaces() {
   const { groups, dismissed, recentGroups } = state;
-  const atLimit = state.maxSessions !== null && state.sessionCount >= state.maxSessions;
+  const atLimit = isAtWorkspaceLimit();
 
   saveCollapseState();
 
-  let html = "";
-  if (atLimit) {
-    html += `<div class="session-limit-toast">Session limit reached (${state.sessionCount}/${state.maxSessions})</div>`;
-  }
+  let html = workspaceLimitBanner();
 
   const disabledAttr = atLimit ? " disabled" : "";
   const refreshAllDisabled = refreshAllInFlight ? " disabled" : "";
