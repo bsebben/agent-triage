@@ -954,7 +954,7 @@ main { padding: 8px; position: relative; }
   color: var(--text-dim);
 }
 
-.session-limit-toast {
+.workspace-limit-banner {
   background: color-mix(in srgb, var(--clr-permission) 20%, var(--surface));
   border: 1px solid var(--clr-permission);
   border-radius: 6px;
@@ -1107,10 +1107,15 @@ main { padding: 8px; position: relative; }
   justify-content: center;
 }
 
-.agent-btn:hover {
+.agent-btn:hover:not(:disabled) {
   background: var(--card);
   color: var(--text);
   border-color: var(--text-dim);
+}
+
+.agent-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
 }
 
 .claude-icon {

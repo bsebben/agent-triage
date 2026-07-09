@@ -16,7 +16,7 @@ function renderTickets() {
     queue.innerHTML = `<div class="empty-state">${hint}</div>`;
     return;
   }
-  queue.innerHTML = `<div class="tickets-section">
+  queue.innerHTML = workspaceLimitBanner() + `<div class="tickets-section">
     ${groups.map(renderTicketGroup).join("")}
   </div>`;
 }
@@ -59,9 +59,13 @@ function ticketStatusClass(status) {
 }
 
 function renderTicketRow(ticket) {
+  const atLimit = isAtWorkspaceLimit();
+  const actionBtn = atLimit
+    ? `<button class="agent-btn" title="Workspace limit reached" disabled>${claudeIcon()}</button>`
+    : `<button class="agent-btn" title="Actions" data-ticket-key="${escapeHtml(ticket.key)}" onclick="event.stopPropagation(); openActionDrawerFromBtn(this)">${claudeIcon()}</button>`;
   return `<tr class="ticket-row" onclick="openExternal('${escapeHtml(ticket.url)}')">
     <td class="ticket-title"><span class="ticket-key">${escapeHtml(ticket.key)}</span> ${escapeHtml(ticket.summary)}</td>
     <td><span class="ticket-badge status-${ticketStatusClass(ticket.status)}">${escapeHtml(ticket.status)}</span></td>
-    <td class="row-action"><button class="agent-btn" title="Actions" data-ticket-key="${escapeHtml(ticket.key)}" onclick="event.stopPropagation(); openActionDrawerFromBtn(this)">${claudeIcon()}</button></td>
+    <td class="row-action">${actionBtn}</td>
   </tr>`;
 }

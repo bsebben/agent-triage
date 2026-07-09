@@ -61,7 +61,8 @@ function renderPulls() {
   const mineActive = pullsSubTab === "mine" ? " active" : "";
   const reviewsActive = pullsSubTab === "reviews" ? " active" : "";
 
-  let html = `<div class="sub-tabs">
+  let html = workspaceLimitBanner();
+  html += `<div class="sub-tabs">
     <button class="sub-tab${mineActive}" onclick="switchPullsTab('mine')">Mine (${mineCount})</button>
     <button class="sub-tab${reviewsActive}" onclick="switchPullsTab('reviews')">Reviews (${reviewCount})</button>
   </div>`;
@@ -177,12 +178,16 @@ function ciCell(ci) {
 }
 
 function renderPullRow(pr, showAuthor, repo) {
+  const atLimit = isAtWorkspaceLimit();
+  const actionBtn = atLimit
+    ? `<button class="agent-btn" title="Workspace limit reached" disabled>${claudeIcon()}</button>`
+    : `<button class="agent-btn" title="Actions" data-pr-url="${escapeHtml(pr.url)}" onclick="event.stopPropagation(); openActionDrawerFromBtn(this)">${claudeIcon()}</button>`;
   return `<tr class="pull-row" onclick="openExternal('${escapeHtml(pr.url)}')">
     <td class="pull-title"><span class="pull-number">#${pr.number}</span> ${escapeHtml(pr.title)}</td>
     ${showAuthor ? `<td class="pull-author">${escapeHtml(pr.author)}</td>` : ""}
     <td class="pull-status"><span class="pull-badge status-${pr.status}">${pr.status}</span></td>
     <td class="pull-ci">${ciCell(pr.ci)}</td>
-    <td class="row-action"><button class="agent-btn" title="Actions" data-pr-url="${escapeHtml(pr.url)}" onclick="event.stopPropagation(); openActionDrawerFromBtn(this)">${claudeIcon()}</button></td>
+    <td class="row-action">${actionBtn}</td>
   </tr>`;
 }
 
