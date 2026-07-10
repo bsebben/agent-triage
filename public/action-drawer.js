@@ -62,7 +62,7 @@ function renderDrawerContent(item, type, repo) {
     : `<span class="drawer-title-key">${escapeHtml(item.key)}</span> ${escapeHtml(item.summary)}`;
 
   const buttons = actions.map((a) =>
-    `<button class="drawer-action-btn" data-action-id="${a.id}">${escapeHtml(a.label)}</button>`
+    `<button class="drawer-action-btn" data-action-id="${a.id}"><span class="btn-label">${escapeHtml(a.label)}</span><span class="btn-label-dangerous">${escapeHtml(a.label)} (dangerously)</span></button>`
   ).join("");
 
   const detail = type === "pr" ? renderPrMeta(item, repo) : renderTicketMeta(item);
