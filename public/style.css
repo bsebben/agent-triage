@@ -1295,10 +1295,15 @@ main { padding: 8px; position: relative; }
   background: var(--card);
 }
 
+.drawer-action-btn .btn-label-dangerous { display: none; }
+
 body.shift-held .drawer-action-btn {
   color: var(--clr-error);
   border-color: var(--clr-error);
 }
+
+body.shift-held .drawer-action-btn .btn-label { display: none; }
+body.shift-held .drawer-action-btn .btn-label-dangerous { display: inline; }
 
 /* Changelog modal */
 .modal-panel {
