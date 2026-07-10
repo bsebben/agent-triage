@@ -1,17 +1,17 @@
 # Agent Triage
 
-A live dashboard for monitoring and triaging parallel Claude Code agents running in [cmux](https://cmux.dev). See all your agent workspaces at a glance, track long-running Claude Loop tasks, and monitor PR and ticket status — without switching contexts.
+A live dashboard for monitoring parallel Claude Code agents running in [cmux](https://cmux.dev). See all your workspaces at a glance, track Claude Loop tasks, and monitor PR and ticket status — without switching contexts.
 
 <img width="2448" height="1056" alt="image" src="https://github.com/user-attachments/assets/b5879792-a712-4c22-adac-e9db985aabf2" />
 
 
 ## Prerequisites
 
-- [cmux](https://cmux.dev) installed and running — download from [cmux.dev](https://cmux.dev), open the app, and it starts automatically. cmux provides a Unix socket that the dashboard connects to for real-time workspace data.
+- [cmux](https://cmux.dev) installed and running
 - Node.js 20+
 - [`gh` CLI](https://cli.github.com/) authenticated (for Pull Requests tab)
 
-## Quick Start
+## Setup
 
 ```bash
 git clone <repo-url> agent-triage
@@ -19,69 +19,63 @@ cd agent-triage
 npm install
 cp config.example.json config.json
 bin/install.sh   # auto-start when cmux launches
-npm start        # start now
+npm start        # start now (first time only)
 ```
 
-Open `http://localhost:7777` in your browser. After the install, the server will start automatically whenever cmux launches — no manual `npm start` needed.
+After install, the server starts automatically in a dedicated cmux workspace every time cmux launches — no manual `npm start` needed.
 
-### Upgrading
+## Recommended Layout
 
-Ask Claude Code:
+Install as a PWA and split-screen with cmux for the best experience.
 
-> Pull the latest agent-triage changes, read the CHANGELOG for anything new, and run any setup steps needed.
+### Install as a PWA
 
-Or manually:
+Installing as a PWA removes the browser chrome for a clean full-screen dashboard.
+
+1. Open `http://localhost:7777` in Chrome
+2. Three-dot menu → **Cast, save, and share** → **Install page as app...**
+3. Click Install
+
+To reopen: search **"Agent Triage"** in Spotlight, find it in Launchpad, or pin it to your Dock.
+
+### Split screen with cmux (macOS)
+
+1. Enter fullscreen on the Agent Triage PWA
+2. Long-press the green button → **Tile Window to Left of Screen**
+3. Pick cmux as the right-side app
+
+This gives you a clean full-display split with no desktop chrome.
+
+**Tip:** Hide the cmux sidebar — the dashboard replaces it as your primary agent view. Right-click the sidebar toggle in cmux and set it to auto-hide, or drag the divider closed.
+
+For non-fullscreen side-by-side, use [Rectangle](https://rectangleapp.com/) to snap each window to half the screen.
+
+## Upgrading
+
+The dashboard checks for updates automatically every 30 minutes. When a new version is available, an indicator appears in the header — click it to see what changed and apply the update in place.
+
+To update manually:
 
 ```bash
 git pull
 bin/install.sh   # safe to re-run, idempotent
 ```
 
-## Configuration
-
-Edit `config.json` to customize. The defaults work out of the box if cmux is installed — the server auto-detects paths.
-
-See [CONFIG.md](CONFIG.md) for the full reference of every field.
-
-### Enabling Optional Features
-
-**Claude Loops** — enabled by default if the plugin is installed. If not, the Loops tab shows an install link. Install via the [Claude Code marketplace](https://silver-adventure-o3qwg53.pages.github.io/plugin.html?name=claude-loops).
-
-**Jira Tickets** — enabled by default. Automatically detects a running Jira MCP server at startup. If Jira isn't available, the tab shows a setup hint. Set `tickets.enabled` to `false` to hide the tab. See [CONFIG.md](CONFIG.md) for details.
-
 ## Tabs
 
 | Tab | What it shows |
 |-----|---------------|
 | **Workspaces** | All cmux agent workspaces. Click to focus, dismiss, or close. |
-| **Loops** | Long-running Claude Loop tasks. Shows schedule, run count, and whether each loop is running, idle, or errored. |
-| **Pull Requests** | Your open PRs (with CI status) and incoming review requests, grouped by repo. Sub-tabs for "Mine" and "Reviews". |
-| **Tickets** | Your assigned Jira tickets grouped by parent story, with status badges. |
+| **Loops** | Long-running Claude Loop tasks with schedule, run count, and status. |
+| **Pull Requests** | Your open PRs with CI status and incoming review requests, grouped by repo. |
+| **Tickets** | Your assigned Jira tickets grouped by parent story. Auto-detected at startup. |
+| **Tasks** | Persistent todo list that survives server restarts. Disabled by default — enable in `config.json`. |
 
-## Recommended Layout
+## Configuration
 
-For the best experience, install the dashboard as a PWA and run it side-by-side with cmux:
+Edit `config.json` to customize. The defaults work out of the box if cmux is installed — the server auto-detects paths. See [CONFIG.md](CONFIG.md) for the full field reference.
 
-### Install as a PWA (recommended)
-
-Installing as a PWA removes the browser tab bar and address bar, giving you a clean full-screen dashboard.
-
-1. Open `http://localhost:7777` in Chrome
-2. Click the three-dot menu → **Cast, save, and share** → **Install page as app...**
-3. Click Install
-
-To reopen after closing: search **"Agent Triage"** in Spotlight, find it in Launchpad, or pin it to your Dock (right-click dock icon → Options → Keep in Dock).
-
-For a completely clean full-screen view with no toolbar, uncheck **View → "Always Show Toolbar in Full Screen"** in the PWA window.
-
-### Side-by-side with cmux
-
-1. Open cmux and snap it to the **right half** of your screen
-2. Open the dashboard (PWA or browser) and snap it to the **left half**
-
-On macOS, use [Rectangle](https://rectangleapp.com/) or built-in window tiling (drag to screen edge) to snap each window. This gives you the dashboard for quick triage on the left, and the full cmux terminal for deep work on the right.
-
-When you click a workspace card in the dashboard, it automatically focuses that workspace in cmux.
+The in-dashboard Settings panel also lets you edit config, view live server logs, and manage plugin configs without touching files directly.
 
 ## Development
 
@@ -89,19 +83,3 @@ When you click a workspace card in the dashboard, it automatically focuses that 
 npm start      # Start the server (auto-reloads on file changes)
 npm test       # Run tests
 ```
-
-## Running the Server
-
-The server must run from a terminal inside cmux (not as a launchd service) because it connects to cmux's Unix socket, which requires the calling process to be in cmux's session context.
-
-Start it in a dedicated cmux workspace and leave it running:
-
-```bash
-npm start
-```
-
-## Installing via Claude Code
-
-You can ask Claude Code to handle the entire setup:
-
-> Clone agent-triage, install dependencies, copy the example config, start the server, and open localhost:7777 in my browser.
