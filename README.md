@@ -14,7 +14,7 @@ A live dashboard for monitoring parallel Claude Code agents running in [cmux](ht
 ## Setup
 
 ```bash
-git clone <repo-url> agent-triage
+git clone https://github.com/bsebben/agent-triage.git agent-triage
 cd agent-triage
 npm install
 cp config.example.json config.json
@@ -26,11 +26,15 @@ After install, the server starts automatically in a dedicated cmux workspace eve
 
 ## Recommended Layout
 
-Install as a PWA and split-screen with cmux for the best experience.
+Run Agent Triage on the **left**, cmux on the **right**, with the cmux sidebar hidden. The dashboard is your control plane — cmux is where you go for deep work on a specific agent.
 
-### Install as a PWA
+**Hide the cmux sidebar:** in cmux, right-click the sidebar toggle and set it to auto-hide, or drag the divider fully closed. The dashboard replaces the sidebar as your agent overview.
 
-Installing as a PWA removes the browser chrome for a clean full-screen dashboard.
+### Go further: install as a PWA
+
+A PWA (Progressive Web App) is a website installed as a standalone app — it opens in its own window with no browser tab bar or address bar, making it feel like a native app. This gives Agent Triage a clean, minimal look with no browser chrome cluttering the view.
+
+To install:
 
 1. Open `http://localhost:7777` in Chrome
 2. Three-dot menu → **Cast, save, and share** → **Install page as app...**
@@ -38,17 +42,15 @@ Installing as a PWA removes the browser chrome for a clean full-screen dashboard
 
 To reopen: search **"Agent Triage"** in Spotlight, find it in Launchpad, or pin it to your Dock.
 
-### Split screen with cmux (macOS)
+### Go further: fullscreen split (macOS)
 
-1. Enter fullscreen on the Agent Triage PWA
-2. Long-press the green button → **Tile Window to Left of Screen**
+For a completely immersive setup with no desktop visible:
+
+1. Open both Agent Triage (PWA) and cmux
+2. On the Agent Triage window, long-press the green traffic light button → **Tile Window to Left of Screen**
 3. Pick cmux as the right-side app
 
-This gives you a clean full-display split with no desktop chrome.
-
-**Tip:** Hide the cmux sidebar — the dashboard replaces it as your primary agent view. Right-click the sidebar toggle in cmux and set it to auto-hide, or drag the divider closed.
-
-For non-fullscreen side-by-side, use [Rectangle](https://rectangleapp.com/) to snap each window to half the screen.
+Both apps fill the entire display. Switch to this Space with a three-finger swipe or Mission Control. Use [Rectangle](https://rectangleapp.com/) if you prefer non-fullscreen tiling.
 
 ## Upgrading
 
@@ -71,15 +73,24 @@ bin/install.sh   # safe to re-run, idempotent
 | **Tickets** | Your assigned Jira tickets grouped by parent story. Auto-detected at startup. |
 | **Tasks** | Persistent todo list that survives server restarts. Disabled by default — enable in `config.json`. |
 
+## Features
+
+### Session refresh
+
+Each Workspaces card for a Claude Code session has a refresh button (&#x21bb;). Click it to restart the Claude Code session in that workspace — the dashboard kills the running Claude process and respawns it in place, preserving the session. Use it when a session gets stuck or you want a clean restart without leaving the dashboard.
+
+### Shift-click danger mode
+
+Hold **Shift** when clicking an action (starting a new session, refreshing a session, or a PR/ticket action) to spawn the Claude session with `--dangerously-skip-permissions`. While Shift is held, the buttons turn red as a visual warning that the next click will run in danger mode.
+
 ## Configuration
 
-Edit `config.json` to customize. The defaults work out of the box if cmux is installed — the server auto-detects paths. See [CONFIG.md](CONFIG.md) for the full field reference.
-
-The in-dashboard Settings panel also lets you edit config, view live server logs, and manage plugin configs without touching files directly.
+Open the Settings panel in the dashboard to customize config, view live server logs, and manage plugin settings — no file editing required.
 
 ## Development
 
+If the server is already running, just make changes and refresh the browser — there's no build step. The server auto-reloads on backend file changes.
+
 ```bash
-npm start      # Start the server (auto-reloads on file changes)
 npm test       # Run tests
 ```
