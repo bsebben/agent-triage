@@ -1,10 +1,14 @@
 // src/tabs/tickets.js — Tab module: Jira ticket integration
 import { execFile } from "node:child_process";
+import { readFileSync } from "node:fs";
 import { promisify } from "node:util";
+import { join } from "node:path";
+import { homedir } from "node:os";
 import { startPolling } from "../utils.js";
 import { RunlayerMcpClient } from "../runlayer-mcp.js";
 
 const execFileAsync = promisify(execFile);
+const HOME = homedir();
 const DEFAULT_JQL = "assignee = currentUser() AND status != Done ORDER BY status ASC";
 const FIELDS = ["summary", "status", "issuetype", "parent"];
 const PAGE_LIMIT = 100;
@@ -14,7 +18,6 @@ export const defaults = {
   enabled: true,
   jql: null,
   runlayerUrl: null,
-  runlayerApiKey: null,
 };
 
 // Shared detected state — transport-specific state lives inside each transport's closure
@@ -77,7 +80,7 @@ async function detect() {
       return true;
     }
   }
-  tab.hint = "No Jira transport available. Install mcpproxy or jira-cli, or configure runlayerUrl and runlayerApiKey in config.json tabs.tickets.";
+  tab.hint = "No Jira transport available. Install mcpproxy with a Jira upstream, or add a Jira Runlayer MCP server via 'claude mcp add --transport http' and set runlayerUserApiKey in config.json.";
   return false;
 }
 
@@ -185,12 +188,12 @@ const runlayerTransport = (() => {
     pageSize: 100,
 
     async detect(cfg) {
-      const url = cfg.runlayerUrl;
-      const apiKey = cfg.runlayerApiKey || process.env.RUNLAYER_USER_KEY;
+      const url = cfg.runlayerUrl || findRunlayerJiraUrl();
+      const apiKey = cfg._runlayerUserApiKey || process.env.RUNLAYER_USER_KEY;
 
       if (!url) return null;
       if (!apiKey) {
-        tab.hint = "Runlayer URL configured but no API key found. Set runlayerApiKey in config.json tabs.tickets, or set RUNLAYER_USER_KEY env var.";
+        tab.hint = "Runlayer Jira MCP detected but no API key found. Set runlayerUserApiKey in config.json or set RUNLAYER_USER_KEY env var.";
         return null;
       }
 
@@ -232,6 +235,24 @@ async function fetchCloudInfoViaRunlayer(rl) {
   const resources = JSON.parse(textContent);
   if (!Array.isArray(resources) || !resources.length) throw new Error("No accessible Atlassian resources found");
   return { cloudId: resources[0].id, jiraSite: resources[0].url };
+}
+
+// --- Runlayer URL auto-detection ---
+// Reads ~/.claude.json and finds any HTTP MCP server added via `claude mcp add --transport http`
+// whose URL points to Runlayer and whose name suggests Jira/Atlassian/Confluence.
+
+function findRunlayerJiraUrl() {
+  try {
+    const raw = readFileSync(join(HOME, ".claude.json"), "utf-8");
+    const servers = JSON.parse(raw).mcpServers || {};
+    for (const [name, cfg] of Object.entries(servers)) {
+      const url = cfg.url || "";
+      if (url.includes("runlayer.com") && /jira|atlassian|confluence/i.test(name)) {
+        return url;
+      }
+    }
+  } catch { /* no claude config or parse error */ }
+  return null;
 }
 
 // --- Shared helpers ---

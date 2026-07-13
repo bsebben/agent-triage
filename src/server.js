@@ -499,6 +499,7 @@ wss.on("connection", (ws) => {
 for (const [name, tab] of Object.entries(tabs)) {
   const tabConfig = { ...(config.tabs[name] || {}) };
   if (name === "tasks") tabConfig._dataPath = TASKS_DATA_PATH;
+  if (name === "tickets") tabConfig._runlayerUserApiKey = config.runlayerUserApiKey;
   await tab.init(tabConfig, broadcast);
 }
 

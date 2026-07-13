@@ -68,23 +68,49 @@ Each tab module defines its own defaults. See the `defaults` export in each `src
 
 ### Tickets Tab
 
-The tickets tab supports two transports for connecting to Jira, tried in this order:
+The tickets tab is optional. Without a Jira connection it shows a setup hint and the rest of the dashboard works normally.
 
-1. **mcpproxy** (auto-detected) — Uses the `mcpproxy` CLI to proxy MCP calls to a Jira server. No extra config needed if `mcpproxy` is installed and a healthy Jira upstream is configured.
+Two transports are supported, tried in order:
 
-2. **Runlayer** (explicit config) — Connects directly to a Runlayer-hosted Jira MCP server via HTTP. Requires a **user API key** (not an org key). Configure in `config.json`:
+1. **mcpproxy** (auto-detected) — No config needed. If `mcpproxy` is installed with a healthy Jira upstream, it is used automatically.
+
+2. **Runlayer** (auto-detected URL, key required) — Connects directly to a Runlayer-hosted Jira MCP server. The server URL is auto-detected from your Claude Code MCP config (`~/.claude.json`). You only need to supply a **user API key**.
+
+#### Runlayer setup (if not using mcpproxy)
+
+**Step 1** — Add the Jira MCP server to Claude Code (if you haven't already):
+
+```bash
+claude mcp add --transport http --scope user jiraconfluencegusto \
+  https://<your-org>.runlayer.com/api/v1/proxy/<jira-server-uuid>/mcp
+```
+
+**Step 2** — Add your Runlayer user API key to `config.json`:
+
+```json
+{
+  "runlayerUserApiKey": "rl_..."
+}
+```
+
+Or set it as an environment variable instead:
+
+```bash
+export RUNLAYER_USER_KEY="rl_..."
+```
+
+> **Note:** Use a *user* API key, not an org key (`rl_org_...`). Org keys are not supported for individual user context.
+
+If you need to override the auto-detected URL (e.g. you have multiple Runlayer Jira servers), set it explicitly:
 
 ```json
 {
   "tabs": {
     "tickets": {
-      "runlayerUrl": "https://gusto.runlayer.com/api/v1/proxy/<jira-server-uuid>/mcp",
-      "runlayerApiKey": "rl_user_..."
+      "runlayerUrl": "https://<your-org>.runlayer.com/api/v1/proxy/<uuid>/mcp"
     }
   }
 }
 ```
-
-The API key can also be set via the `RUNLAYER_USER_KEY` environment variable.
 
 If auto-detection fails for cmux (required for the dashboard itself), the server exits with a clear message telling you which config field to set.

@@ -15,6 +15,7 @@ const DEFAULTS = {
   maxSessions: null,
   maxRecentGroups: 4,
   showRecentGroups: true,
+  runlayerUserApiKey: null,
   cmux: { binary: null, socket: null },
 };
 
@@ -29,8 +30,8 @@ export const FIELD_META = {
   "tabs.loops.dataDir":    { type: "string", nullable: true, description: "Path to claude-loops plugin data" },
   "tabs.loops.installUrl": { type: "string", nullable: true, description: "URL shown when the plugin isn't installed" },
   "tabs.pulls.orgFilter":  { type: "string", nullable: true, description: "GitHub org to filter PRs by" },
-  "tabs.tickets.runlayerUrl":    { type: "string", nullable: true, description: "Runlayer MCP endpoint URL for Jira (fallback when mcpproxy is unavailable)" },
-  "tabs.tickets.runlayerApiKey": { type: "string", nullable: true, description: "Runlayer user API key (or set RUNLAYER_USER_KEY env var)" },
+  "runlayerUserApiKey":          { type: "string", nullable: true, description: "Runlayer user API key for the Tickets tab (or set RUNLAYER_USER_KEY env var). Required when not using mcpproxy." },
+  "tabs.tickets.runlayerUrl":    { type: "string", nullable: true, description: "Runlayer Jira MCP endpoint URL — auto-detected from Claude Code MCP config if not set" },
   "tabs.tasks.maxAgeDays":      { type: "number", description: "Hide tasks older than this many days (0 = never expire)" },
   "tabs.tasks.expireBehavior":  { type: "string", description: 'What to do with expired tasks: "hide" (filter from display) or "delete" (remove from disk)' },
 };
@@ -151,6 +152,7 @@ function resolve(raw) {
     maxSessions,
     maxRecentGroups,
     showRecentGroups,
+    runlayerUserApiKey: raw.runlayerUserApiKey ?? null,
     cmux: { ...DEFAULTS.cmux, ...raw.cmux },
     tabs: raw.tabs || {},
   };

@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.36.0] - 2026-07-13
+
+### Changed
+
+- Tickets tab: `runlayerUserApiKey` is now a top-level config field (was `tabs.tickets.runlayerApiKey`); Runlayer server URL is auto-detected from `~/.claude.json` so only the key needs to be set explicitly; improved hint messages guide setup when a transport is partially configured
+
 ## [1.35.0] - 2026-07-13
 
 ### Changed
