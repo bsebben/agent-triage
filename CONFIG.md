@@ -68,11 +68,11 @@ Each tab module defines its own defaults. See the `defaults` export in each `src
 
 ### Tickets Tab
 
-The tickets tab supports two transports for connecting to Jira, tried in order:
+The tickets tab supports two transports for connecting to Jira, tried in this order:
 
-1. **mcpproxy** (default) — Uses the `mcpproxy` CLI to proxy MCP calls to a Jira server. No extra config needed if `mcpproxy` is installed and a healthy Jira upstream is configured.
+1. **mcpproxy** (auto-detected) — Uses the `mcpproxy` CLI to proxy MCP calls to a Jira server. No extra config needed if `mcpproxy` is installed and a healthy Jira upstream is configured.
 
-2. **Runlayer** (fallback) — Connects directly to a Runlayer-hosted Jira MCP server via HTTP. Requires a **user API key** (not an org key). Configure in `config.json`:
+2. **Runlayer** (explicit config) — Connects directly to a Runlayer-hosted Jira MCP server via HTTP. Requires a **user API key** (not an org key). Configure in `config.json`:
 
 ```json
 {

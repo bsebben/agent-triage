@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.35.0] - 2026-07-13
+
+### Changed
+
+- Tickets tab: refactored transport layer — each transport (mcpproxy, Runlayer) now implements a common `detect`/`searchIssues` interface; shared cursor-based pagination loop replaces duplicated code in each transport
+
 ## [1.34.2] - 2026-07-10
 
 ### Added
