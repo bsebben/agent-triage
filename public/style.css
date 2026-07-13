@@ -229,9 +229,10 @@ body.shift-held [data-tip-dangerous]:hover::after {
 }
 
 .tab {
-  flex: 1;
-  padding: 6px 0;
+  flex: 1 1 auto;
+  padding: 6px 10px;
   margin-bottom: -1px;
+  white-space: nowrap;
   background: transparent;
   border: 1px solid transparent;
   border-bottom: 1px solid var(--border);
