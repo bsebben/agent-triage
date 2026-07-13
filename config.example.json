@@ -4,14 +4,15 @@
   "maxSessions": null,
   "maxRecentGroups": 4,
   "showRecentGroups": true,
-  "runlayerUserApiKey": null,
   "cmux": {
     "binary": null,
     "socket": null
   },
   "tabs": {
     "loops": {},
-    "tickets": {},
+    "tickets": {
+      "runlayerUserApiKey": null
+    },
     "pulls": {},
     "tasks": {}
   }

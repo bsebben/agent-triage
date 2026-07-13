@@ -18,6 +18,7 @@ export const defaults = {
   enabled: true,
   jql: null,
   runlayerUrl: null,
+  runlayerUserApiKey: null,
 };
 
 // Shared detected state — transport-specific state lives inside each transport's closure
@@ -189,7 +190,7 @@ const runlayerTransport = (() => {
 
     async detect(cfg) {
       const url = cfg.runlayerUrl || findRunlayerJiraUrl();
-      const apiKey = cfg._runlayerUserApiKey || process.env.RUNLAYER_USER_KEY;
+      const apiKey = cfg.runlayerUserApiKey || process.env.RUNLAYER_USER_KEY;
 
       if (!url) return null;
       if (!apiKey) {

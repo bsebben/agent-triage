@@ -89,7 +89,11 @@ claude mcp add --transport http --scope user jiraconfluencegusto \
 
 ```json
 {
-  "runlayerUserApiKey": "rl_..."
+  "tabs": {
+    "tickets": {
+      "runlayerUserApiKey": "rl_..."
+    }
+  }
 }
 ```
 
