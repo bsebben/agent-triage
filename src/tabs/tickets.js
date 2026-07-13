@@ -8,7 +8,7 @@ const execFileAsync = promisify(execFile);
 const DEFAULT_JQL = "assignee = currentUser() AND status != Done ORDER BY status ASC";
 const FIELDS = ["summary", "status", "issuetype", "parent"];
 const PAGE_LIMIT = 100;
-const PAGE_SIZE = 3; // small enough to stay under mcpproxy's ~19KB truncation limit
+const MCPPROXY_PAGE_SIZE = 3; // small enough to stay under mcpproxy's ~19KB truncation limit
 
 export const defaults = {
   enabled: true,
@@ -93,12 +93,13 @@ async function paginateIssues(cloudId, jql, transport) {
   const baseJql = stripOrderBy(jql);
   const allIssues = [];
   let lastKey = null;
+  const pageSize = transport.pageSize ?? 50;
 
   for (let page = 0; page < 20 && allIssues.length < PAGE_LIMIT; page++) {
     const pagedJql = lastKey
       ? `${baseJql} AND key > "${lastKey}" ORDER BY key ASC`
       : `${baseJql} ORDER BY key ASC`;
-    const { issues, isLast } = await transport.searchIssues(cloudId, pagedJql, FIELDS, PAGE_SIZE);
+    const { issues, isLast } = await transport.searchIssues(cloudId, pagedJql, FIELDS, pageSize);
     allIssues.push(...issues);
     if (isLast || issues.length === 0) break;
     lastKey = issues[issues.length - 1].key;
@@ -115,6 +116,7 @@ const mcpproxyTransport = (() => {
 
   return {
     name: "mcpproxy",
+    pageSize: MCPPROXY_PAGE_SIZE,
 
     async detect(_cfg) {
       try {
@@ -180,6 +182,7 @@ const runlayerTransport = (() => {
 
   return {
     name: "runlayer",
+    pageSize: 100,
 
     async detect(cfg) {
       const url = cfg.runlayerUrl;
@@ -203,13 +206,18 @@ const runlayerTransport = (() => {
       }
     },
 
-    async searchIssues(cloudId, jql, fields, _maxResults) {
-      const result = await client.callTool("searchJiraIssuesUsingJql", { cloudId, jql, fields });
+    async searchIssues(cloudId, jql, fields, maxResults) {
+      const result = await client.callTool("searchJiraIssuesUsingJql", { cloudId, jql, fields, maxResults });
       const textContent = result?.content?.[0]?.text;
       if (!textContent) return { issues: [], isLast: true };
       try {
         const parsed = JSON.parse(textContent);
-        return { issues: parsed.issues || [], isLast: parsed.isLast !== false };
+        const issues = parsed.issues || [];
+        // Derive isLast from explicit field or standard Jira pagination fields (total/startAt/maxResults)
+        const isLast = parsed.isLast !== undefined
+          ? parsed.isLast !== false
+          : (parsed.startAt ?? 0) + issues.length >= (parsed.total ?? issues.length);
+        return { issues, isLast };
       } catch {
         return { issues: extractIssuesFromCleanJson(textContent), isLast: true };
       }
