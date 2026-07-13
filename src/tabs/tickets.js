@@ -1,127 +1,46 @@
 // src/tabs/tickets.js — Tab module: Jira ticket integration
 import { execFile } from "node:child_process";
+import { readFileSync } from "node:fs";
 import { promisify } from "node:util";
+import { join } from "node:path";
+import { homedir } from "node:os";
 import { startPolling } from "../utils.js";
 import { RunlayerMcpClient } from "../runlayer-mcp.js";
 
 const execFileAsync = promisify(execFile);
+const HOME = homedir();
 const DEFAULT_JQL = "assignee = currentUser() AND status != Done ORDER BY status ASC";
 const FIELDS = ["summary", "status", "issuetype", "parent"];
 const PAGE_LIMIT = 100;
-const PAGE_SIZE = 3; // small enough to stay under mcpproxy's ~19KB truncation limit
-
-const detected = {
-  cloudId: null,
-  jiraSite: null,
-  jql: DEFAULT_JQL,
-  transport: null, // "mcpproxy" | "runlayer"
-  mcpTool: null,
-  runlayerClient: null,
-};
+const MCPPROXY_PAGE_SIZE = 3; // small enough to stay under mcpproxy's ~19KB truncation limit
 
 export const defaults = {
   enabled: true,
   jql: null,
   runlayerUrl: null,
-  runlayerApiKey: null,
+  runlayerUserApiKey: null,
 };
 
+// Shared detected state — transport-specific state lives inside each transport's closure
+const detected = {
+  cloudId: null,
+  jiraSite: null,
+  jql: DEFAULT_JQL,
+  transport: null,
+};
+
+let resolvedCfg = { ...defaults };
 let data = [];
 
+// --- Init & Polling ---
+
 async function init(tabConfig, onUpdate) {
-  const cfg = { ...defaults, ...tabConfig };
-  tab.enabled = cfg.enabled;
-  if (!cfg.enabled) return;
-
-  if (cfg.jql) {
-    detected.jql = cfg.jql;
-  }
-  if (cfg.runlayerUrl) {
-    detected.runlayerUrl = cfg.runlayerUrl;
-  }
-  if (cfg.runlayerApiKey) {
-    detected.runlayerApiKey = cfg.runlayerApiKey;
-  }
-
+  resolvedCfg = { ...defaults, ...tabConfig };
+  tab.enabled = resolvedCfg.enabled;
+  if (!tab.enabled) return;
+  if (resolvedCfg.jql) detected.jql = resolvedCfg.jql;
   tab.refresh = await startPolling("Tickets", poll, onUpdate, 3 * 60 * 1000);
 }
-
-// --- Transport detection ---
-
-/**
- * Tries mcpproxy first, then Runlayer. Sets detected.transport on success.
- *
- * Returns true if a working transport was found.
- */
-async function detect() {
-  if (await detectMcpProxy()) return true;
-  if (await detectRunlayer()) return true;
-
-  tab.hint = "No Jira transport available. Install mcpproxy, or configure runlayerUrl and runlayerApiKey in config.json tabs.tickets.";
-  return false;
-}
-
-/**
- * Detects mcpproxy and discovers the Jira server through it.
- *
- * This is the original transport — uses the mcpproxy CLI to proxy MCP calls.
- */
-async function detectMcpProxy() {
-  try {
-    const server = await detectMcpProxyJiraServer();
-    if (!server) return false;
-
-    const { cloudId, jiraSite } = await detectCloudInfoViaMcpProxy(server.name);
-    detected.transport = "mcpproxy";
-    detected.cloudId = cloudId;
-    detected.jiraSite = jiraSite.replace(/\/$/, "");
-    detected.mcpTool = `${server.name}:searchJiraIssuesUsingJql`;
-    tab.available = true;
-    tab.hint = null;
-    console.log(`Config: tickets enabled via mcpproxy (${detected.jiraSite})`);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-/**
- * Detects the Runlayer Jira MCP server and initializes a client.
- *
- * Uses the runlayerUrl/runlayerApiKey from config, falling back to
- * the RUNLAYER_USER_KEY env var for the API key.
- */
-async function detectRunlayer() {
-  const url = detected.runlayerUrl;
-  const apiKey = detected.runlayerApiKey || process.env.RUNLAYER_USER_KEY;
-
-  if (!url) return false;
-  if (!apiKey) {
-    tab.hint = "Runlayer URL configured but no API key found. Set runlayerApiKey in config.json tabs.tickets, or set RUNLAYER_USER_KEY env var.";
-    return false;
-  }
-
-  try {
-    const client = new RunlayerMcpClient(url, apiKey);
-    await client.initialize();
-
-    const { cloudId, jiraSite } = await detectCloudInfoViaRunlayer(client);
-    detected.transport = "runlayer";
-    detected.runlayerClient = client;
-    detected.cloudId = cloudId;
-    detected.jiraSite = jiraSite.replace(/\/$/, "");
-    tab.available = true;
-    tab.hint = null;
-    console.log(`Config: tickets enabled via Runlayer (${detected.jiraSite})`);
-    return true;
-  } catch (err) {
-    console.log(`[tickets] Runlayer detection failed: ${err.message}`);
-    tab.hint = `Runlayer Jira connection failed: ${friendlyError(err.message)}`;
-    return false;
-  }
-}
-
-// --- Polling ---
 
 async function poll() {
   if (!detected.transport) {
@@ -130,16 +49,10 @@ async function poll() {
   }
 
   const { cloudId, jiraSite, jql } = detected;
-  console.log(`[tickets] polling via ${detected.transport}`);
+  console.log(`[tickets] polling via ${detected.transport.name}`);
 
   try {
-    let issues;
-    if (detected.transport === "mcpproxy") {
-      issues = await pollViaMcpProxy(cloudId, jql);
-    } else {
-      issues = await pollViaRunlayer(cloudId, jql);
-    }
-
+    const issues = await paginateIssues(cloudId, jql, detected.transport);
     const result = groupByParent(issues, jiraSite);
     if (result.length > 0) data = result;
     tab.hint = null;
@@ -152,46 +65,45 @@ async function poll() {
   }
 }
 
-function isTransportError(msg) {
-  return msg.includes("ENOENT") || msg.includes("ECONNREFUSED")
-    || msg.includes("HTTP 401") || msg.includes("HTTP 403");
+// --- Transport detection ---
+// Tries each transport in order; first one that detects successfully wins.
+
+async function detect() {
+  const transports = [mcpproxyTransport, runlayerTransport];
+  for (const t of transports) {
+    const result = await t.detect(resolvedCfg);
+    if (result) {
+      detected.transport = t;
+      detected.cloudId = result.cloudId;
+      detected.jiraSite = result.jiraSite.replace(/\/$/, "");
+      tab.available = true;
+      tab.hint = null;
+      return true;
+    }
+  }
+  tab.hint = "No Jira transport available. Install mcpproxy with a Jira upstream, or add a Jira Runlayer MCP server via 'claude mcp add --transport http' and set runlayerUserApiKey in config.json.";
+  return false;
 }
 
-// --- mcpproxy transport ---
+// --- Shared pagination ---
+// Each transport implements searchIssues(cloudId, jql, fields, maxResults) => { issues, isLast }.
+// This loop is transport-agnostic: cursor-based keyset pagination using ORDER BY key ASC.
 
 function stripOrderBy(jql) {
   return jql.replace(/\s+ORDER\s+BY\s+.+$/i, "").trim();
 }
 
-async function fetchMcpProxyPage(cloudId, jql) {
-  const { stdout } = await execFileAsync(
-    "mcpproxy",
-    [
-      "call", "tool-read",
-      "-t", detected.mcpTool,
-      "-j", JSON.stringify({ cloudId, jql, fields: FIELDS, maxResults: PAGE_SIZE }),
-      "-o", "json",
-    ],
-    { timeout: 30000, maxBuffer: 1024 * 1024 },
-  );
-  const jsonStart = stdout.indexOf("{");
-  if (jsonStart === -1) return { issues: [], isLast: true };
-  const raw = JSON.parse(stdout.slice(jsonStart));
-  const textContent = raw?.content?.[0]?.text;
-  if (!textContent) return { issues: [], isLast: true };
-  return extractPageFromMcpProxy(textContent);
-}
-
-async function pollViaMcpProxy(cloudId, jql) {
+async function paginateIssues(cloudId, jql, transport) {
   const baseJql = stripOrderBy(jql);
   const allIssues = [];
   let lastKey = null;
+  const pageSize = transport.pageSize ?? 50;
 
   for (let page = 0; page < 20 && allIssues.length < PAGE_LIMIT; page++) {
     const pagedJql = lastKey
       ? `${baseJql} AND key > "${lastKey}" ORDER BY key ASC`
       : `${baseJql} ORDER BY key ASC`;
-    const { issues, isLast } = await fetchMcpProxyPage(cloudId, pagedJql);
+    const { issues, isLast } = await transport.searchIssues(cloudId, pagedJql, FIELDS, pageSize);
     allIssues.push(...issues);
     if (isLast || issues.length === 0) break;
     lastKey = issues[issues.length - 1].key;
@@ -199,15 +111,53 @@ async function pollViaMcpProxy(cloudId, jql) {
   return allIssues;
 }
 
-async function detectMcpProxyJiraServer() {
+// --- mcpproxy transport ---
+// Uses the mcpproxy CLI to proxy MCP calls to a locally-running Jira MCP server.
+// Handles mcpproxy's Go map response format and ~19KB truncation limit.
+
+const mcpproxyTransport = (() => {
+  let mcpTool = null;
+
+  return {
+    name: "mcpproxy",
+    pageSize: MCPPROXY_PAGE_SIZE,
+
+    async detect(_cfg) {
+      try {
+        const server = await findMcpProxyJiraServer();
+        if (!server) return null;
+        const { cloudId, jiraSite } = await fetchCloudInfoViaMcpProxy(server.name);
+        mcpTool = `${server.name}:searchJiraIssuesUsingJql`;
+        console.log(`Config: tickets enabled via mcpproxy (${jiraSite})`);
+        return { cloudId, jiraSite };
+      } catch {
+        return null;
+      }
+    },
+
+    async searchIssues(cloudId, jql, fields, maxResults) {
+      const { stdout } = await execFileAsync(
+        "mcpproxy",
+        ["call", "tool-read", "-t", mcpTool, "-j", JSON.stringify({ cloudId, jql, fields, maxResults }), "-o", "json"],
+        { timeout: 30000, maxBuffer: 1024 * 1024 },
+      );
+      const jsonStart = stdout.indexOf("{");
+      if (jsonStart === -1) return { issues: [], isLast: true };
+      const raw = JSON.parse(stdout.slice(jsonStart));
+      const textContent = raw?.content?.[0]?.text;
+      if (!textContent) return { issues: [], isLast: true };
+      return parseGoMapPage(textContent);
+    },
+  };
+})();
+
+async function findMcpProxyJiraServer() {
   const { stdout } = await execFileAsync("mcpproxy", ["upstream", "list", "--json"], { timeout: 5000 });
   const servers = JSON.parse(stdout);
-  return servers.find((s) =>
-    /jira/i.test(s.name) && s.health?.level === "healthy"
-  );
+  return servers.find((s) => /jira/i.test(s.name) && s.health?.level === "healthy");
 }
 
-async function detectCloudInfoViaMcpProxy(serverName) {
+async function fetchCloudInfoViaMcpProxy(serverName) {
   const tool = `${serverName}:getAccessibleAtlassianResources`;
   let lastErr;
   for (let attempt = 0; attempt < 3; attempt++) {
@@ -220,8 +170,7 @@ async function detectCloudInfoViaMcpProxy(serverName) {
       );
       const resources = unwrapMcpProxyResponse(stdout);
       if (!resources.length) throw new Error("No accessible Atlassian resources found");
-      const site = resources[0];
-      return { cloudId: site.id, jiraSite: site.url };
+      return { cloudId: resources[0].id, jiraSite: resources[0].url };
     } catch (err) {
       lastErr = err;
     }
@@ -230,59 +179,98 @@ async function detectCloudInfoViaMcpProxy(serverName) {
 }
 
 // --- Runlayer transport ---
+// HTTP-based MCP client. Requires explicit runlayerUrl + runlayerApiKey config.
 
-async function pollViaRunlayer(cloudId, jql) {
-  const baseJql = stripOrderBy(jql);
-  const allIssues = [];
-  let lastKey = null;
+const runlayerTransport = (() => {
+  let client = null;
 
-  for (let page = 0; page < 20 && allIssues.length < PAGE_LIMIT; page++) {
-    const pagedJql = lastKey
-      ? `${baseJql} AND key > "${lastKey}" ORDER BY key ASC`
-      : `${baseJql} ORDER BY key ASC`;
-    const result = await detected.runlayerClient.callTool(
-      "searchJiraIssuesUsingJql",
-      { cloudId, jql: pagedJql, fields: FIELDS },
-    );
-    const textContent = result?.content?.[0]?.text;
-    if (!textContent) break;
-    let issues = [], isLast = true;
-    try {
-      const parsed = JSON.parse(textContent);
-      issues = parsed.issues || [];
-      isLast = parsed.isLast !== false;
-    } catch {
-      issues = extractIssuesFromCleanJson(textContent);
-    }
-    allIssues.push(...issues);
-    if (isLast || issues.length === 0) break;
-    lastKey = issues[issues.length - 1].key;
-  }
-  return allIssues;
-}
+  return {
+    name: "runlayer",
+    pageSize: 100,
 
-async function detectCloudInfoViaRunlayer(client) {
-  const result = await client.callTool("getAccessibleAtlassianResources", {});
+    async detect(cfg) {
+      const url = cfg.runlayerUrl || findRunlayerJiraUrl();
+      const apiKey = cfg.runlayerUserApiKey || process.env.RUNLAYER_USER_KEY;
+
+      if (!url) return null;
+      if (!apiKey) {
+        tab.hint = "Runlayer Jira MCP detected but no API key found. Set runlayerUserApiKey in config.json or set RUNLAYER_USER_KEY env var.";
+        return null;
+      }
+
+      try {
+        client = new RunlayerMcpClient(url, apiKey);
+        await client.initialize();
+        const { cloudId, jiraSite } = await fetchCloudInfoViaRunlayer(client);
+        console.log(`Config: tickets enabled via Runlayer (${jiraSite})`);
+        return { cloudId, jiraSite };
+      } catch (err) {
+        tab.hint = `Runlayer Jira connection failed: ${friendlyError(err.message)}`;
+        return null;
+      }
+    },
+
+    async searchIssues(cloudId, jql, fields, maxResults) {
+      const result = await client.callTool("searchJiraIssuesUsingJql", { cloudId, jql, fields, maxResults });
+      const textContent = result?.content?.[0]?.text;
+      if (!textContent) return { issues: [], isLast: true };
+      try {
+        const parsed = JSON.parse(textContent);
+        const issues = parsed.issues || [];
+        // Derive isLast from explicit field or standard Jira pagination fields (total/startAt/maxResults)
+        const isLast = parsed.isLast !== undefined
+          ? parsed.isLast !== false
+          : (parsed.startAt ?? 0) + issues.length >= (parsed.total ?? issues.length);
+        return { issues, isLast };
+      } catch {
+        return { issues: extractIssuesFromCleanJson(textContent), isLast: true };
+      }
+    },
+  };
+})();
+
+async function fetchCloudInfoViaRunlayer(rl) {
+  const result = await rl.callTool("getAccessibleAtlassianResources", {});
   const textContent = result?.content?.[0]?.text;
   if (!textContent) throw new Error("Empty response from getAccessibleAtlassianResources");
-
   const resources = JSON.parse(textContent);
-  if (!Array.isArray(resources) || !resources.length) {
-    throw new Error("No accessible Atlassian resources found");
-  }
+  if (!Array.isArray(resources) || !resources.length) throw new Error("No accessible Atlassian resources found");
   return { cloudId: resources[0].id, jiraSite: resources[0].url };
+}
+
+// --- Runlayer URL auto-detection ---
+// Reads ~/.claude.json and finds any HTTP MCP server added via `claude mcp add --transport http`
+// whose URL points to Runlayer and whose name suggests Jira/Atlassian/Confluence.
+
+function findRunlayerJiraUrl() {
+  try {
+    const raw = readFileSync(join(HOME, ".claude.json"), "utf-8");
+    const servers = JSON.parse(raw).mcpServers || {};
+    for (const [name, cfg] of Object.entries(servers)) {
+      const url = cfg.url || "";
+      if (url.includes("runlayer.com") && /jira|atlassian|confluence/i.test(name)) {
+        return url;
+      }
+    }
+  } catch { /* no claude config or parse error */ }
+  return null;
 }
 
 // --- Shared helpers ---
 
+function isTransportError(msg) {
+  return msg.includes("ENOENT") || msg.includes("ECONNREFUSED")
+    || msg.includes("HTTP 401") || msg.includes("HTTP 403");
+}
+
 function friendlyError(raw) {
   if (raw.includes("rate limit")) return "Rate limited — will retry on next poll.";
-  if (raw.includes("ENOENT")) return "mcpproxy not found. Make sure it's installed and in your PATH.";
-  if (raw.includes("timeout") || raw.includes("ETIMEDOUT")) return "Connection timed out. Check that your Jira MCP server is running.";
+  if (raw.includes("ENOENT")) return "Jira transport not found. Make sure mcpproxy or jira-cli is installed and in your PATH.";
+  if (raw.includes("timeout") || raw.includes("ETIMEDOUT")) return "Connection timed out. Check that your Jira transport is running.";
   if (raw.includes("not found")) return "Jira tools not available on this MCP server.";
   if (raw.includes("HTTP 401")) return "Authentication failed. Check your Runlayer API key.";
   if (raw.includes("HTTP 403")) return "Access denied. Make sure you're using a user API key, not an org key.";
-  return "Check that your Jira MCP server is authenticated and running.";
+  return "Check that your Jira transport is authenticated and running.";
 }
 
 function groupByParent(issues, jiraSite) {
@@ -317,10 +305,7 @@ function groupByParent(issues, jiraSite) {
     }
   }
 
-  const result = [];
-  for (const group of groups.values()) {
-    result.push(group);
-  }
+  const result = [...groups.values()];
   if (standalone.length > 0) {
     result.push({ key: null, summary: "Standalone", type: null, url: null, tickets: standalone });
   }
@@ -329,7 +314,6 @@ function groupByParent(issues, jiraSite) {
 
 // --- mcpproxy response parsing ---
 // mcpproxy double-wraps MCP responses with Go map[] serialization.
-// These parsers handle that format.
 
 function unwrapMcpProxyResponse(raw) {
   let text = raw;
@@ -404,8 +388,7 @@ function parseIssueArray(src, arrayStart) {
   return issues;
 }
 
-function extractPageFromMcpProxy(text) {
-  // Detect mcpproxy truncation marker and strip it before parsing
+function parseGoMapPage(text) {
   const TRUNCATION_MARKER = "... [truncated by mcpproxy]";
   const truncIdx = text.indexOf(TRUNCATION_MARKER);
   const wasTruncated = truncIdx !== -1;
@@ -419,24 +402,20 @@ function extractPageFromMcpProxy(text) {
       try {
         const parsed = JSON.parse(safeText.slice(jsonStart, lastBrace + 1));
         if (parsed.issues) {
-          // If truncated, always continue even if Jira said isLast
           const isLast = wasTruncated ? false : parsed.isLast !== false;
           return { issues: parsed.issues, isLast };
         }
       } catch { /* fall through */ }
     }
   }
-  const issues = extractIssuesFromMcpProxy(safeText);
-  // If truncated, keep paginating; otherwise assume this is the last page
+  const issues = parseGoMapIssues(safeText);
   return { issues, isLast: !wasTruncated };
 }
 
-function extractIssuesFromMcpProxy(text) {
-  // Handle Go map format: [map[text:{...json...} type:text]]
-  // Extract the inner JSON using the known wrapper boundaries.
+function parseGoMapIssues(text) {
   const goMapPos = text.indexOf("text:{");
   if (goMapPos !== -1) {
-    const jsonStart = goMapPos + 5; // position of the opening {
+    const jsonStart = goMapPos + 5;
     const lastBrace = text.lastIndexOf("}");
     if (lastBrace > jsonStart) {
       try {

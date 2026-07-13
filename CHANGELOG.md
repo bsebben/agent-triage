@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.35.0] - 2026-07-13
+
+### Changed
+
+- Tickets tab: refactored transport layer — mcpproxy and Runlayer each implement a common `detect`/`searchIssues`/`pageSize` interface; shared cursor-based pagination loop replaces duplicated code
+- Runlayer transport: per-transport page size (100 vs mcpproxy's 3), passes `maxResults`, derives `isLast` from standard Jira pagination fields when not explicit
+- Runlayer server URL auto-detected from `~/.claude.json` (servers added via `claude mcp add --transport http`); only `tabs.tickets.runlayerUserApiKey` needs to be set explicitly
+- Improved hint messages guide Runlayer setup when key is missing
+
 ## [1.34.2] - 2026-07-10
 
 ### Added
