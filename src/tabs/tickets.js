@@ -7,6 +7,8 @@ import { RunlayerMcpClient } from "../runlayer-mcp.js";
 const execFileAsync = promisify(execFile);
 const DEFAULT_JQL = "assignee = currentUser() AND status != Done ORDER BY status ASC";
 const FIELDS = ["summary", "status", "issuetype", "parent"];
+const PAGE_LIMIT = 100;
+const PAGE_SIZE = 3; // small enough to stay under mcpproxy's ~19KB truncation limit
 
 const detected = {
   cloudId: null,
@@ -19,6 +21,7 @@ const detected = {
 
 export const defaults = {
   enabled: true,
+  jql: null,
   runlayerUrl: null,
   runlayerApiKey: null,
 };
@@ -30,6 +33,9 @@ async function init(tabConfig, onUpdate) {
   tab.enabled = cfg.enabled;
   if (!cfg.enabled) return;
 
+  if (cfg.jql) {
+    detected.jql = cfg.jql;
+  }
   if (cfg.runlayerUrl) {
     detected.runlayerUrl = cfg.runlayerUrl;
   }
@@ -153,23 +159,44 @@ function isTransportError(msg) {
 
 // --- mcpproxy transport ---
 
-async function pollViaMcpProxy(cloudId, jql) {
+function stripOrderBy(jql) {
+  return jql.replace(/\s+ORDER\s+BY\s+.+$/i, "").trim();
+}
+
+async function fetchMcpProxyPage(cloudId, jql) {
   const { stdout } = await execFileAsync(
     "mcpproxy",
     [
       "call", "tool-read",
       "-t", detected.mcpTool,
-      "-j", JSON.stringify({ cloudId, jql, fields: FIELDS }),
+      "-j", JSON.stringify({ cloudId, jql, fields: FIELDS, maxResults: PAGE_SIZE }),
       "-o", "json",
     ],
     { timeout: 30000, maxBuffer: 1024 * 1024 },
   );
   const jsonStart = stdout.indexOf("{");
-  if (jsonStart === -1) return [];
+  if (jsonStart === -1) return { issues: [], isLast: true };
   const raw = JSON.parse(stdout.slice(jsonStart));
   const textContent = raw?.content?.[0]?.text;
-  if (!textContent) return [];
-  return extractIssuesFromMcpProxy(textContent);
+  if (!textContent) return { issues: [], isLast: true };
+  return extractPageFromMcpProxy(textContent);
+}
+
+async function pollViaMcpProxy(cloudId, jql) {
+  const baseJql = stripOrderBy(jql);
+  const allIssues = [];
+  let lastKey = null;
+
+  for (let page = 0; page < 20 && allIssues.length < PAGE_LIMIT; page++) {
+    const pagedJql = lastKey
+      ? `${baseJql} AND key > "${lastKey}" ORDER BY key ASC`
+      : `${baseJql} ORDER BY key ASC`;
+    const { issues, isLast } = await fetchMcpProxyPage(cloudId, pagedJql);
+    allIssues.push(...issues);
+    if (isLast || issues.length === 0) break;
+    lastKey = issues[issues.length - 1].key;
+  }
+  return allIssues;
 }
 
 async function detectMcpProxyJiraServer() {
@@ -205,20 +232,33 @@ async function detectCloudInfoViaMcpProxy(serverName) {
 // --- Runlayer transport ---
 
 async function pollViaRunlayer(cloudId, jql) {
-  const result = await detected.runlayerClient.callTool(
-    "searchJiraIssuesUsingJql",
-    { cloudId, jql, fields: FIELDS },
-  );
+  const baseJql = stripOrderBy(jql);
+  const allIssues = [];
+  let lastKey = null;
 
-  const textContent = result?.content?.[0]?.text;
-  if (!textContent) return [];
-
-  try {
-    const parsed = JSON.parse(textContent);
-    return parsed.issues || [];
-  } catch {
-    return extractIssuesFromCleanJson(textContent);
+  for (let page = 0; page < 20 && allIssues.length < PAGE_LIMIT; page++) {
+    const pagedJql = lastKey
+      ? `${baseJql} AND key > "${lastKey}" ORDER BY key ASC`
+      : `${baseJql} ORDER BY key ASC`;
+    const result = await detected.runlayerClient.callTool(
+      "searchJiraIssuesUsingJql",
+      { cloudId, jql: pagedJql, fields: FIELDS },
+    );
+    const textContent = result?.content?.[0]?.text;
+    if (!textContent) break;
+    let issues = [], isLast = true;
+    try {
+      const parsed = JSON.parse(textContent);
+      issues = parsed.issues || [];
+      isLast = parsed.isLast !== false;
+    } catch {
+      issues = extractIssuesFromCleanJson(textContent);
+    }
+    allIssues.push(...issues);
+    if (isLast || issues.length === 0) break;
+    lastKey = issues[issues.length - 1].key;
   }
+  return allIssues;
 }
 
 async function detectCloudInfoViaRunlayer(client) {
@@ -364,7 +404,48 @@ function parseIssueArray(src, arrayStart) {
   return issues;
 }
 
+function extractPageFromMcpProxy(text) {
+  // Detect mcpproxy truncation marker and strip it before parsing
+  const TRUNCATION_MARKER = "... [truncated by mcpproxy]";
+  const truncIdx = text.indexOf(TRUNCATION_MARKER);
+  const wasTruncated = truncIdx !== -1;
+  const safeText = wasTruncated ? text.slice(0, truncIdx) : text;
+
+  const goMapPos = safeText.indexOf("text:{");
+  if (goMapPos !== -1) {
+    const jsonStart = goMapPos + 5;
+    const lastBrace = safeText.lastIndexOf("}");
+    if (lastBrace > jsonStart) {
+      try {
+        const parsed = JSON.parse(safeText.slice(jsonStart, lastBrace + 1));
+        if (parsed.issues) {
+          // If truncated, always continue even if Jira said isLast
+          const isLast = wasTruncated ? false : parsed.isLast !== false;
+          return { issues: parsed.issues, isLast };
+        }
+      } catch { /* fall through */ }
+    }
+  }
+  const issues = extractIssuesFromMcpProxy(safeText);
+  // If truncated, keep paginating; otherwise assume this is the last page
+  return { issues, isLast: !wasTruncated };
+}
+
 function extractIssuesFromMcpProxy(text) {
+  // Handle Go map format: [map[text:{...json...} type:text]]
+  // Extract the inner JSON using the known wrapper boundaries.
+  const goMapPos = text.indexOf("text:{");
+  if (goMapPos !== -1) {
+    const jsonStart = goMapPos + 5; // position of the opening {
+    const lastBrace = text.lastIndexOf("}");
+    if (lastBrace > jsonStart) {
+      try {
+        const parsed = JSON.parse(text.slice(jsonStart, lastBrace + 1));
+        if (parsed.issues) return parsed.issues;
+      } catch { /* fall through to legacy parsers */ }
+    }
+  }
+
   const marker = '"text":"';
   let pos = text.indexOf(marker);
 

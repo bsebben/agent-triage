@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.34.2] - 2026-07-10
+
+### Added
+
+- Tickets tab: filter bar with a Backlog toggle; backlog items are hidden by default and the button shows the hidden count
+
+### Fixed
+
+- Tickets tab: cursor-based pagination now fetches all pages correctly by using smaller page sizes to avoid mcpproxy truncation
+
 ## [1.34.1] - 2026-07-10
 
 ### Changed

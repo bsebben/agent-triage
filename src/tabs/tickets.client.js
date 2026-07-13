@@ -1,6 +1,19 @@
 // public/tab-tickets.js
 
 const collapsedTicketGroups = new Set();
+let ticketsShowBacklog = false;
+
+function toggleTicketsBacklog() {
+  ticketsShowBacklog = !ticketsShowBacklog;
+  renderTickets();
+}
+
+function filterTicketGroups(groups) {
+  if (ticketsShowBacklog) return groups;
+  return groups
+    .map((g) => ({ ...g, tickets: g.tickets.filter((t) => t.status.toLowerCase() !== "backlog") }))
+    .filter((g) => g.tickets.length > 0);
+}
 
 function renderTickets() {
   const ticketStatus = state.tabStatus?.tickets || appConfig.tickets || {};
@@ -9,14 +22,27 @@ function renderTickets() {
     queue.innerHTML = `<div class="empty-state">${hint}</div>`;
     return;
   }
-  const groups = state.tickets || [];
-  const totalTickets = groups.reduce((n, g) => n + g.tickets.length, 0);
-  if (totalTickets === 0) {
+  const allGroups = state.tickets || [];
+  const groups = filterTicketGroups(allGroups);
+  const totalAll = allGroups.reduce((n, g) => n + g.tickets.length, 0);
+  const totalVisible = groups.reduce((n, g) => n + g.tickets.length, 0);
+  const backlogCount = totalAll - totalVisible + (ticketsShowBacklog ? 0 : 0);
+  const hiddenBacklog = allGroups.reduce((n, g) => n + g.tickets.filter((t) => t.status.toLowerCase() === "backlog").length, 0);
+  if (totalAll === 0) {
     const hint = ticketStatus.hint ? escapeHtml(ticketStatus.hint) : "No assigned tickets";
     queue.innerHTML = `<div class="empty-state">${hint}</div>`;
     return;
   }
-  queue.innerHTML = workspaceLimitBanner() + `<div class="tickets-section">
+  const filterBar = `<div class="tickets-filter-bar">
+    <button class="tickets-filter-btn${ticketsShowBacklog ? " active" : ""}" onclick="toggleTicketsBacklog()">
+      Backlog${hiddenBacklog > 0 && !ticketsShowBacklog ? ` (${hiddenBacklog})` : ""}
+    </button>
+  </div>`;
+  if (totalVisible === 0) {
+    queue.innerHTML = workspaceLimitBanner() + filterBar + `<div class="empty-state">No active tickets</div>`;
+    return;
+  }
+  queue.innerHTML = workspaceLimitBanner() + filterBar + `<div class="tickets-section">
     ${groups.map(renderTicketGroup).join("")}
   </div>`;
 }
