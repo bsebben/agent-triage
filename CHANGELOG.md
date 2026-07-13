@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.35.1] - 2026-07-13
+
+### Fixed
+
+- Tab header: tab labels with count badges no longer wrap to a second line; tabs now size to their content and share leftover space instead of splitting the row evenly
+
 ## [1.35.0] - 2026-07-13
 
 ### Changed
