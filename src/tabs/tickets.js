@@ -9,7 +9,7 @@ import { RunlayerMcpClient } from "../runlayer-mcp.js";
 
 const execFileAsync = promisify(execFile);
 const HOME = homedir();
-const DEFAULT_JQL = "assignee = currentUser() AND status != Done ORDER BY status ASC";
+const DEFAULT_JQL = "assignee = currentUser() AND statusCategory != Done ORDER BY status ASC";
 const FIELDS = ["summary", "status", "issuetype", "parent"];
 const PAGE_LIMIT = 100;
 const MCPPROXY_PAGE_SIZE = 3; // small enough to stay under mcpproxy's ~19KB truncation limit
@@ -17,6 +17,7 @@ const MCPPROXY_PAGE_SIZE = 3; // small enough to stay under mcpproxy's ~19KB tru
 export const defaults = {
   enabled: true,
   jql: null,
+  excludeProjects: null,
   runlayerUrl: null,
   runlayerUserApiKey: null,
 };
@@ -38,7 +39,8 @@ async function init(tabConfig, onUpdate) {
   resolvedCfg = { ...defaults, ...tabConfig };
   tab.enabled = resolvedCfg.enabled;
   if (!tab.enabled) return;
-  if (resolvedCfg.jql) detected.jql = resolvedCfg.jql;
+  const baseJql = resolvedCfg.jql || DEFAULT_JQL;
+  detected.jql = applyExcludeProjects(baseJql, resolvedCfg.excludeProjects);
   tab.refresh = await startPolling("Tickets", poll, onUpdate, 3 * 60 * 1000);
 }
 
@@ -91,6 +93,23 @@ async function detect() {
 
 function stripOrderBy(jql) {
   return jql.replace(/\s+ORDER\s+BY\s+.+$/i, "").trim();
+}
+
+// Injects an `AND project NOT IN (...)` clause from a comma-separated list of
+// project keys. The clause is placed *before* any ORDER BY so it survives
+// stripOrderBy() during keyset pagination — appending it after ORDER BY would
+// let stripOrderBy() eat the filter and silently show excluded tickets again.
+// Assumes the base JQL is AND-joined at the top level; not safe to combine with
+// a custom OR-joined jql.
+export function applyExcludeProjects(jql, excludeProjects) {
+  if (!excludeProjects) return jql;
+  const keys = excludeProjects.split(",").map((k) => k.trim()).filter(Boolean);
+  if (keys.length === 0) return jql;
+  const notIn = keys.map((k) => `"${k}"`).join(", ");
+  const orderMatch = jql.match(/\s+ORDER\s+BY\s+.+$/i);
+  const where = orderMatch ? jql.slice(0, orderMatch.index) : jql;
+  const order = orderMatch ? orderMatch[0] : "";
+  return `${where} AND project NOT IN (${notIn})${order}`;
 }
 
 async function paginateIssues(cloudId, jql, transport) {

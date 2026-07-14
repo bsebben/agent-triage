@@ -117,4 +117,24 @@ If you need to override the auto-detected URL (e.g. you have multiple Runlayer J
 }
 ```
 
+#### Filtering
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `excludeProjects` | string | `null` | Comma-separated project keys to hide (e.g. `"USPUDU, BBO"`) |
+
+`excludeProjects` adds an `AND project NOT IN (...)` clause to the ticket query, so tickets from those projects never appear. Example — hide two noisy projects:
+
+```json
+{
+  "tabs": {
+    "tickets": {
+      "excludeProjects": "USPUDU, BBO"
+    }
+  }
+}
+```
+
+Editable in the settings UI. The clause is AND-joined onto the base query; if you also set a custom `jql` that uses a top-level `OR`, wrap it in parentheses yourself so the exclusion binds correctly.
+
 If auto-detection fails for cmux (required for the dashboard itself), the server exits with a clear message telling you which config field to set.

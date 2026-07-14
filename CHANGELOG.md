@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.36.0] - 2026-07-14
+
+### Added
+
+- Tickets tab: `excludeProjects` config field to hide tickets from specific Jira projects. Accepts a comma-separated list of project keys (e.g. `"USPUDU, BBO"`) and is editable in the settings UI.
+
+### Fixed
+
+- Tickets tab: use `statusCategory != Done` instead of `status != Done` in the default JQL. Tickets in terminal statuses like "Won't Fix" or "Closed" were incorrectly appearing because only the literal "Done" status was excluded.
+
 ## [1.35.1] - 2026-07-13
 
 ### Fixed

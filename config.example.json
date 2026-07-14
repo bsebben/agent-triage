@@ -11,6 +11,7 @@
   "tabs": {
     "loops": {},
     "tickets": {
+      "excludeProjects": null,
       "runlayerUserApiKey": null
     },
     "pulls": {},
