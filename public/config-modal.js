@@ -115,7 +115,7 @@ async function openConfigModal() {
   try {
     const res = await fetch("/api/config/schema");
     if (!res.ok) throw new Error(`status ${res.status}`);
-    const { schema, raw, resolved } = await res.json();
+    const { schema, raw, resolved, configWarnings } = await res.json();
     loadedSchema = schema;
 
     const groups = new Map();
@@ -132,6 +132,17 @@ async function openConfigModal() {
     }
 
     let html = "";
+    if (Array.isArray(configWarnings) && configWarnings.length > 0) {
+      const items = configWarnings
+        .map((w) => `<li>${escapeHtml(w.message)}</li>`)
+        .join("");
+      html += `
+        <div class="config-warning-banner" id="config-warning-banner">
+          <button class="config-warning-dismiss" type="button" aria-label="Dismiss">&times;</button>
+          <div class="config-warning-title">Configuration warnings</div>
+          <ul class="config-warning-list">${items}</ul>
+        </div>`;
+    }
     for (const { group, fields } of topGroups) {
       html += `<div class="config-group">`;
       html += `<h3 class="config-group-title">${escapeHtml(groupLabel(group))}</h3>`;
@@ -165,6 +176,10 @@ async function openConfigModal() {
     body.textContent = "Could not load config schema";
     return;
   }
+
+  panel.querySelector(".config-warning-dismiss")?.addEventListener("click", () => {
+    panel.querySelector("#config-warning-banner")?.remove();
+  });
 
   panel.querySelector("#config-cancel").addEventListener("click", () => closeConfigModal?.());
   panel.querySelector("#config-save").addEventListener("click", async () => {

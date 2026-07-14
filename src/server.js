@@ -10,18 +10,26 @@ import * as cmux from "./cmux.js";
 import { execFile } from "node:child_process";
 import { readBody, serveStatic, jsonResponse } from "./utils.js";
 import { initLogs, getLines } from "./logs.js";
-import config, { HOME, buildSchema, loadRawConfig, writeConfigFile } from "./config.js";
+import config, { HOME, validateConfig, mergeConfigForSave, loadRawConfig, writeConfigFile, migratedRaw, migrationNotice } from "./config.js";
+import { buildConfigSchema } from "./config-schema.js";
 import { UpdateChecker } from "./update-checker.js";
 import { detectCmuxVersion } from "./cmux-version.js";
 import * as plugins from "./plugins.js";
 import { refreshSession, refreshAll, refreshingIds } from "./refresh.js";
-import loops, { defaults as loopsDefaults } from "./tabs/loops.js";
-import pulls, { defaults as pullsDefaults } from "./tabs/pulls.js";
-import tickets, { defaults as ticketsDefaults } from "./tabs/tickets.js";
-import tasks, { defaults as tasksDefaults, store as taskStore, save as saveTasks } from "./tabs/tasks.js";
+import loops from "./tabs/loops.js";
+import pulls from "./tabs/pulls.js";
+import tickets from "./tabs/tickets.js";
+import tasks, { store as taskStore, save as saveTasks } from "./tabs/tasks.js";
 
-const tabDefaults = { loops: loopsDefaults, pulls: pullsDefaults, tickets: ticketsDefaults, tasks: tasksDefaults };
-const configSchema = buildSchema(tabDefaults);
+const configSchema = buildConfigSchema();
+
+const configWarnings = [
+  ...(migrationNotice ? [migrationNotice] : []),
+  ...validateConfig(migratedRaw, configSchema),
+];
+for (const warning of configWarnings) {
+  console.warn(`Config warning [${warning.key}]: ${warning.message}`);
+}
 
 const __dirname = fileURLToPath(new URL(".", import.meta.url));
 const PUBLIC_DIR = join(__dirname, "..", "public");
@@ -128,6 +136,7 @@ const server = createServer(async (req, res) => {
         resolved: config,
         projectDir: join(__dirname, ".."),
         cmuxVersion,
+        configWarnings,
         ...tabConfigs,
       });
     }
@@ -137,6 +146,7 @@ const server = createServer(async (req, res) => {
         schema: configSchema,
         raw: loadRawConfig(),
         resolved: config,
+        configWarnings,
       });
     }
 
@@ -145,7 +155,7 @@ const server = createServer(async (req, res) => {
       if (!body || typeof body !== "object") {
         return jsonResponse(res, { error: "Invalid config object" }, 400);
       }
-      writeConfigFile(body);
+      writeConfigFile(mergeConfigForSave(body, loadRawConfig()));
       jsonResponse(res, { ok: true });
       setTimeout(() => {
         const now = new Date();
