@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.37.0] - 2026-07-14
+
+### Added
+
+- Config compatibility & migration system: `config.json` now carries an integer `configVersion`. On startup the server backs up and migrates any config behind the current version (`src/migrations.js`), so field renames/moves/removals in future releases no longer silently orphan a user's settings. Ships inert with zero migrations.
+- Config validation surfaces warnings for unknown keys and invalid enum/type values in a dismissible banner in the Settings modal (also exposed via `/api/config` as `configWarnings`). In steady state this never fires — a warning means a migration was missed.
+- `config.shape.json` snapshot plus `npm run config-snapshot` and an extended `npm run version-check` gate: a PR that changes the config shape now fails the check unless it adds a migration, bumps `configVersion`, refreshes the snapshot, and updates `config.example.json`.
+- `/config-migration` repo skill to author a migration and pass the gate.
+
+### Fixed
+
+- Settings save (`POST /api/config`) now preserves `configVersion` verbatim instead of dropping it, which previously would have re-run every migration on the next load.
+
 ## [1.36.0] - 2026-07-14
 
 ### Added

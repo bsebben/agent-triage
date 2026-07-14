@@ -70,6 +70,12 @@ npm version major --no-git-tag-version   # breaking change
 
 Do **not** edit the version in `package.json` by hand — that leaves `package-lock.json` out of sync. The version-check script will catch this before you push.
 
+### Config migrations
+
+`config.json` is user-owned and never touched by `git pull`, so additive config changes are safe but **renames, moves, type/enum changes, and removals** orphan the user's value unless a migration carries it forward. Config carries an integer `configVersion` (absent ⇒ `0`); `src/migrations.js` holds an ordered `migrations` array and `CURRENT_CONFIG_VERSION = migrations.length`. On load, `src/config.js` backs up and migrates any stale config.
+
+`config.shape.json` is a checked-in fingerprint of the config shape (sorted schema keys + version). `npm run version-check` regenerates the live shape and **fails** if the shape changed without a `configVersion` bump, if the committed snapshot is stale, or if `config.example.json`'s `configVersion` doesn't match `CURRENT_CONFIG_VERSION`. Any PR that changes the config shape must add a migration — run the `/config-migration` skill (`skills/config-migration.md`), then `npm run config-snapshot` and commit `config.shape.json`.
+
 Add a corresponding entry in `CHANGELOG.md`. The server reads the version at startup and exposes it via `/api/config`.
 
 ## Changelog
@@ -119,4 +125,4 @@ Each tab module in `src/tabs/` exports:
 
 Modules define their own defaults, merge them with the config passed to `init()`, detect dependencies, and manage their own polling. Config.js has no tab-specific knowledge.
 
-To add a new tab: create a module in `src/tabs/`, import it in `server.js`, add it to the `tabs` object, and add its config under `tabs` in `config.schema.json`.
+To add a new tab: create a module in `src/tabs/`, import it in `server.js`, add it to the `tabs` object, and add its config defaults to the tab module's `defaults` export. The config schema is derived at runtime by `buildSchema` (`src/config.js`) from `DEFAULTS`, `FIELD_META`, and the tab defaults — there is no static schema file. A checked-in `config.shape.json` snapshot fingerprints the resulting shape for the PR-time gate.
