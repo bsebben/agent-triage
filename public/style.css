@@ -1667,6 +1667,44 @@ body.shift-held .drawer-action-btn .btn-label-dangerous { display: inline; }
   border-top: 1px solid var(--border);
 }
 
+.config-warning-banner {
+  position: relative;
+  background: color-mix(in srgb, var(--clr-permission) 15%, var(--surface));
+  border: 1px solid var(--clr-permission);
+  border-radius: 6px;
+  padding: 10px 32px 10px 12px;
+  margin-bottom: 16px;
+}
+
+.config-warning-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--clr-permission);
+  margin-bottom: 4px;
+}
+
+.config-warning-list {
+  margin: 0;
+  padding-left: 16px;
+  font-size: 12px;
+  color: var(--text);
+}
+
+.config-warning-list li { margin-bottom: 2px; }
+
+.config-warning-dismiss {
+  position: absolute;
+  top: 6px;
+  right: 8px;
+  background: none;
+  border: none;
+  color: var(--clr-permission);
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0;
+}
+
 .config-group { margin-bottom: 16px; }
 
 .config-group-title {
