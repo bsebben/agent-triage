@@ -35,6 +35,50 @@ if [[ "$LOCAL_VERSION" != "$LOCK_VERSION" ]]; then
   exit 1
 fi
 
+# --- Config shape gate -----------------------------------------------------
+# A checked-in fingerprint of the config shape (config.shape.json) makes
+# config-shape drift diffable and enforceable, mirroring Rails' schema.rb.
+# Regenerate the live shape and compare it against the committed snapshot.
+
+LIVE_SHAPE=$(AGENT_TRIAGE_NO_BOOT=1 node scripts/config-snapshot.mjs --print)
+COMMITTED_SHAPE=$(cat config.shape.json 2>/dev/null || echo "")
+LIVE_VERSION=$(echo "$LIVE_SHAPE" | node -e "let d='';process.stdin.on('data',c=>d+=c);process.stdin.on('end',()=>console.log(JSON.parse(d).configVersion))")
+REMOTE_SHAPE=$(git show "$REMOTE_BRANCH:config.shape.json" 2>/dev/null || echo "")
+REMOTE_SHAPE_VERSION=$(echo "$REMOTE_SHAPE" | node -e "let d='';process.stdin.on('data',c=>d+=c);process.stdin.on('end',()=>{try{console.log(JSON.parse(d).configVersion)}catch{console.log('')}})" 2>/dev/null || echo "")
+EXAMPLE_VERSION=$(node -e "console.log(require('./config.example.json').configVersion)")
+
+# Live schema must match the committed snapshot (run config-snapshot to refresh).
+if [[ "$LIVE_SHAPE" != "$COMMITTED_SHAPE" ]]; then
+  echo ""
+  echo "ERROR: config.shape.json is out of date with the live schema."
+  echo ""
+  echo "Run 'npm run config-snapshot' and commit config.shape.json."
+  exit 1
+fi
+
+# config.example.json must be stamped at the current version so fresh installs
+# start correct and never re-migrate.
+if [[ "$EXAMPLE_VERSION" != "$LIVE_VERSION" ]]; then
+  echo ""
+  echo "ERROR: config.example.json configVersion ($EXAMPLE_VERSION) != CURRENT_CONFIG_VERSION ($LIVE_VERSION)"
+  echo ""
+  echo "Update config.example.json's configVersion to match the current shape."
+  exit 1
+fi
+
+# If the shape changed relative to remote, a migration (version bump) is required.
+if [[ -n "$REMOTE_SHAPE" && "$LIVE_SHAPE" != "$REMOTE_SHAPE" ]]; then
+  if [[ "$LIVE_VERSION" == "$REMOTE_SHAPE_VERSION" ]]; then
+    echo ""
+    echo "ERROR: config shape changed but configVersion was not increased."
+    echo ""
+    echo "Add a migration step in src/migrations.js and bump CURRENT_CONFIG_VERSION,"
+    echo "then run 'npm run config-snapshot'. See skills/config-migration.md."
+    exit 1
+  fi
+  echo "Config shape changed: v$REMOTE_SHAPE_VERSION → v$LIVE_VERSION (migration present)"
+fi
+
 # Check if there are code changes compared to remote
 CHANGED_FILES=$(git diff --name-only "$REMOTE_BRANCH"...HEAD -- \
   'src/' 'public/' 'package.json' 'test/' 2>/dev/null || true)

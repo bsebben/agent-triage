@@ -1,0 +1,80 @@
+{
+  "configVersion": 0,
+  "keys": {
+    "cmux.binary": {
+      "type": "string",
+      "nullable": true
+    },
+    "cmux.socket": {
+      "type": "string",
+      "nullable": true
+    },
+    "defaultDirectory": {
+      "type": "string",
+      "nullable": true
+    },
+    "maxRecentGroups": {
+      "type": "number"
+    },
+    "maxSessions": {
+      "type": "number",
+      "nullable": true
+    },
+    "port": {
+      "type": "number"
+    },
+    "showRecentGroups": {
+      "type": "boolean"
+    },
+    "tabs.loops.dataDir": {
+      "type": "string",
+      "nullable": true
+    },
+    "tabs.loops.enabled": {
+      "type": "boolean"
+    },
+    "tabs.loops.installUrl": {
+      "type": "string",
+      "nullable": true
+    },
+    "tabs.pulls.enabled": {
+      "type": "boolean"
+    },
+    "tabs.pulls.orgFilter": {
+      "type": "string",
+      "nullable": true
+    },
+    "tabs.tasks.enabled": {
+      "type": "boolean"
+    },
+    "tabs.tasks.expireBehavior": {
+      "type": "string",
+      "enum": [
+        "hide",
+        "delete"
+      ]
+    },
+    "tabs.tasks.maxAgeDays": {
+      "type": "number"
+    },
+    "tabs.tickets.enabled": {
+      "type": "boolean"
+    },
+    "tabs.tickets.excludeProjects": {
+      "type": "string",
+      "nullable": true
+    },
+    "tabs.tickets.jql": {
+      "type": "string",
+      "nullable": true
+    },
+    "tabs.tickets.runlayerUrl": {
+      "type": "string",
+      "nullable": true
+    },
+    "tabs.tickets.runlayerUserApiKey": {
+      "type": "string",
+      "nullable": true
+    }
+  }
+}

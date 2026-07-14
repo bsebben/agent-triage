@@ -3,6 +3,7 @@ config.json
 data/queue.json
 data/tasks.json
 data/audit.log
+data/config-backups/
 .idea/
 .superpowers/
 docs/superpowers/

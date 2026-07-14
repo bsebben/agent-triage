@@ -1,10 +1,11 @@
 {
   "name": "agent-triage",
-  "version": "1.36.0",
+  "version": "1.37.0",
   "type": "module",
   "scripts": {
     "start": "node --watch src/server.js",
     "test": "node --test test/*.test.js",
+    "config-snapshot": "node scripts/config-snapshot.mjs",
     "version-check": "scripts/version-check.sh"
   },
   "dependencies": {
