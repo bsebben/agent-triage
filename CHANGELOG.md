@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.39.0] - 2026-07-16
+
+### Changed
+
+- Ticket and pull request titles now show in full, wrapping to multiple lines instead of truncating with an ellipsis. Wrapped lines stay aligned under the title text (the PR number / ticket key sits in a fixed left column), so long descriptions are readable at a glance without hovering.
+
 ## [1.38.0] - 2026-07-16
 
 ### Added
