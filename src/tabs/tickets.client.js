@@ -90,7 +90,7 @@ function renderTicketRow(ticket) {
     ? `<button class="agent-btn" title="Workspace limit reached" disabled>${claudeIcon()}</button>`
     : `<button class="agent-btn" title="Actions" data-ticket-key="${escapeHtml(ticket.key)}" onclick="event.stopPropagation(); openActionDrawerFromBtn(this)">${claudeIcon()}</button>`;
   return `<tr class="ticket-row" onclick="openExternal('${escapeHtml(ticket.url)}')">
-    <td class="ticket-title"><span class="ticket-key">${escapeHtml(ticket.key)}</span> ${escapeHtml(ticket.summary)}</td>
+    <td class="ticket-title"><span class="ticket-key">${escapeHtml(ticket.key)}</span> <span class="ticket-title-text">${escapeHtml(ticket.summary)}</span></td>
     <td><span class="ticket-badge status-${ticketStatusClass(ticket.status)}">${escapeHtml(ticket.status)}</span></td>
     <td class="row-action">${actionBtn}</td>
   </tr>`;

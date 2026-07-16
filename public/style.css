@@ -844,13 +844,19 @@ main { padding: 8px; position: relative; }
 .pull-title {
   color: var(--text);
   font-weight: 500;
-  max-width: 220px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  display: flex;
+  gap: 6px;
+  align-items: baseline;
+}
+
+.pull-title-text {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .pull-number {
+  flex: none;
   color: var(--text-dim);
   font-weight: 400;
 }
@@ -1107,12 +1113,19 @@ main { padding: 8px; position: relative; }
 .ticket-title {
   color: var(--text);
   font-weight: 500;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  display: flex;
+  gap: 6px;
+  align-items: baseline;
+}
+
+.ticket-title-text {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .ticket-key {
+  flex: none;
   color: var(--text-dim);
   font-weight: 400;
 }
