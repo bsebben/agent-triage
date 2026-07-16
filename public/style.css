@@ -30,6 +30,15 @@ body {
   overflow-y: auto;
 }
 
+/* Dim the page while unfocused: keyboard focus is elsewhere (e.g. the cmux
+   workspace), so dictation/keystrokes land there, not here. */
+body {
+  transition: opacity 0.15s ease;
+}
+body:not(.window-focused) {
+  opacity: 0.55;
+}
+
 header {
   position: sticky;
   top: 0;

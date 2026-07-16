@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.38.0] - 2026-07-16
+
+### Added
+
+- Focus indicator: when the dashboard window loses keyboard focus, the page dims to signal that dictation/keystrokes are landing elsewhere (e.g. the cmux workspace) rather than the dashboard.
+
 ## [1.37.0] - 2026-07-14
 
 ### Added

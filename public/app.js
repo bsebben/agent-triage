@@ -279,6 +279,15 @@ window.addEventListener("blur", () => {
   document.body.classList.remove("shift-held");
 });
 
+// --- Focus warning: dictation lands here, not cmux, while this window has focus ---
+
+function syncWindowFocus() {
+  document.body.classList.toggle("window-focused", document.hasFocus());
+}
+window.addEventListener("focus", syncWindowFocus);
+window.addEventListener("blur", syncWindowFocus);
+syncWindowFocus();
+
 document.addEventListener("keydown", (e) => {
   if (e.target.tagName === "INPUT") return;
 
