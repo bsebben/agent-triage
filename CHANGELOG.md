@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.39.1] - 2026-07-17
+
+### Fixed
+
+- Workspace rename (edit) button no longer silently fails when a title contains an apostrophe or other single quote. The edit control now passes the title via `data-*` attributes instead of an inline JavaScript string literal, eliminating the quote-injection that broke the click handler.
+
 ## [1.39.0] - 2026-07-16
 
 ### Changed
