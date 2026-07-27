@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.40.0] - 2026-07-27
+
+### Added
+
+- Pull request tab now shows a distinct `queued` status for PRs in GitHub's native merge queue, instead of `approved`. Queued PRs sort ahead of approved ones. (Trunk.io merge queues are not detected — GitHub's `isInMergeQueue` field only reflects the native queue.)
+
 ## [1.39.1] - 2026-07-17
 
 ### Fixed

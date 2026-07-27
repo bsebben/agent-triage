@@ -24,6 +24,7 @@ query($q: String!) {
         title
         url
         isDraft
+        isInMergeQueue
         createdAt
         headRefName
         reviewDecision
@@ -143,17 +144,18 @@ function summarize(node) {
   };
 }
 
-const PRIORITY = { approved: 0, comments: 1, open: 3, draft: 4 };
+const PRIORITY = { queued: 0, approved: 1, comments: 2, open: 4, draft: 5 };
 function prPriority(pr) {
-  if (pr.ci === "failing" && pr.status !== "approved" && pr.status !== "comments") return 2;
+  if (pr.ci === "failing" && pr.status !== "approved" && pr.status !== "comments") return 3;
   return PRIORITY[pr.status] ?? 5;
 }
 
 const CI_ORDER = { passing: 0, running: 1, none: 2, failing: 3 };
 function reviewPriority(pr) { return CI_ORDER[pr.ci] ?? 2; }
 
-function prStatus(node) {
+export function prStatus(node) {
   if (node.isDraft) return "draft";
+  if (node.isInMergeQueue) return "queued";
   if (node.reviewDecision === "APPROVED") return "approved";
   if ((node.latestReviews?.nodes || []).length > 0) return "comments";
   return "open";

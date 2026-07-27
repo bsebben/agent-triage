@@ -23,7 +23,7 @@ function collectStatuses(groups) {
       if (pr.status) statuses.add(pr.status);
     }
   }
-  const order = ["open", "draft", "comments", "approved"];
+  const order = ["open", "draft", "comments", "approved", "queued"];
   return order.filter((s) => statuses.has(s));
 }
 
