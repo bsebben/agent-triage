@@ -1,5 +1,5 @@
 {
-  "configVersion": 0,
+  "configVersion": 1,
   "keys": {
     "cmux.binary": {
       "type": "string",
@@ -34,6 +34,13 @@
       "type": "boolean"
     },
     "tabs.loops.installUrl": {
+      "type": "string",
+      "nullable": true
+    },
+    "tabs.pulls.deployStatus": {
+      "type": "boolean"
+    },
+    "tabs.pulls.deployStatusUrl": {
       "type": "string",
       "nullable": true
     },

@@ -13,7 +13,39 @@ const ghAvailable = (() => {
 export const defaults = {
   enabled: true,
   orgFilter: null,
+  // Enrich merged PRs with deploy-status dots from an external deploy-status API.
+  // Off unless a base URL is configured (deployStatusUrl or DEPLOY_STATUS_API_URL).
+  deployStatus: true,
+  deployStatusUrl: null,
 };
+
+// Base URL of the deploy-status API, resolved at init() from config or the
+// DEPLOY_STATUS_API_URL env var. Left null when unset, which disables enrichment.
+// Do not hardcode a host here — this repository is public (see CLAUDE.md).
+let deployStatusBase = null;
+
+// Fairness caps for the merged view (design: 5 most recent per repo, last 30 days).
+const MERGED_PER_REPO_CAP = 5;
+const MERGED_WINDOW_DAYS = 30;
+
+// The deploy-status API's deployment state enum:
+// deploying | succeeded | failed | canceled | blocked. Only `deploying` is non-terminal.
+function deployStateToIndicator(state) {
+  if (state === "succeeded") return "deployed";
+  if (state === "deploying") return "in_progress";
+  if (state === "failed" || state === "canceled" || state === "blocked") return "errored";
+  return "unknown";
+}
+
+const DEPLOY_ENV_KEYS = { production: "prod", staging: "stage", demo: "demo" };
+
+// Concurrency-limited enrichment pool so we don't fire N deploy-status requests at once.
+const DEPLOY_STATUS_CONCURRENCY = 6;
+
+// Per-SHA cache: SHAs whose tracked environments have all settled (no in_progress or
+// unknown) are terminal and never re-fetched. Everything still deploying or unknown
+// re-fetches each poll.
+const deployCache = new Map(); // sha -> { deploy, fetchedAt }
 
 const PR_QUERY = `
 query($q: String!) {
@@ -26,8 +58,10 @@ query($q: String!) {
         isDraft
         isInMergeQueue
         createdAt
+        mergedAt
         headRefName
         reviewDecision
+        mergeCommit { oid }
         author { login }
         repository { nameWithOwner }
         commits(last: 1) {
@@ -62,10 +96,12 @@ query($q: String!) {
 
 let cfg;
 let currentUser = "";
-let data = { mine: [], reviews: [] };
+let onUpdateCb = () => {};
+let data = { mine: [], reviews: [], merged: [] };
 
 async function init(tabConfig, onUpdate) {
   cfg = { ...defaults, ...tabConfig };
+  deployStatusBase = cfg.deployStatusUrl || process.env.DEPLOY_STATUS_API_URL || null;
 
   tab.enabled = cfg.enabled;
   tab.available = ghAvailable;
@@ -79,20 +115,136 @@ async function init(tabConfig, onUpdate) {
     currentUser = stdout.trim();
   } catch { /* non-fatal; directReview will always be false */ }
 
+  onUpdateCb = onUpdate;
   tab.refresh = await startPolling("Pulls", poll, onUpdate, 2 * 60 * 1000);
 }
 
 async function poll() {
   try {
-    const [mine, reviews] = await Promise.all([
+    const mergedSince = new Date(Date.now() - MERGED_WINDOW_DAYS * 24 * 60 * 60 * 1000)
+      .toISOString().slice(0, 10);
+    const [mine, reviews, merged] = await Promise.all([
       searchPrs("is:pr is:open archived:false author:@me", () => true, prPriority),
       searchPrs("is:pr is:open archived:false review-requested:@me draft:false", (pr) => !pr.isDraft, reviewPriority),
+      // GitHub search has no merged-date sort, so `sort:updated-desc` is the closest
+      // proxy to skew the first-100 window toward the most recent merges (see PR_QUERY's
+      // first:100 ceiling — a hard cap, documented as a known limitation).
+      searchMerged(`is:pr archived:false author:@me is:merged merged:>=${mergedSince} sort:updated-desc`),
     ]);
-    data = { mine, reviews };
+    // Publish Mine/Reviews/merged immediately; deploy dots fill in via a follow-up
+    // onUpdate so the deploy-status fetch never blocks the tab render (each fetch can
+    // run its full 10s abort timeout when the API is unreachable).
+    data = { mine, reviews, merged };
+    if (cfg.deployStatus && deployStatusBase) enrichInBackground(merged);
   } catch (err) {
     console.error("PR fetch error:", err.message);
     throw err;
   }
+}
+
+async function searchMerged(query) {
+  const groups = await searchPrs(query, () => true, mergedPriority);
+  capMergedGroups(groups);
+  return groups;
+}
+
+// Enrich merged groups with deploy status out of band, then push a follow-up update.
+// Never throws into poll(): per-PR failures already resolve to "unknown".
+// Guards against calling onUpdateCb() when a newer poll has already replaced data.merged,
+// which would otherwise trigger a render showing the new merged list without deploy dots.
+async function enrichInBackground(groups) {
+  try {
+    await enrichDeployStatus(groups);
+    if (data.merged === groups) onUpdateCb();
+  } catch (err) {
+    console.error("[pulls] deploy enrichment error:", err.message);
+  }
+}
+
+// Fairness cap: keep the N most recent merges per repo (by mergedAt desc).
+export function capMergedGroups(groups, cap = MERGED_PER_REPO_CAP) {
+  for (const group of groups) {
+    group.prs.sort((a, b) => new Date(b.mergedAt || 0) - new Date(a.mergedAt || 0));
+    group.prs = group.prs.slice(0, cap);
+  }
+  return groups;
+}
+
+// Fetch deploy status for every capped PR, bounded by a small pool.
+// A per-PR failure resolves that PR's dots to "unknown"; it never throws out of poll().
+async function enrichDeployStatus(groups) {
+  const tasks = [];
+  for (const group of groups) {
+    for (const pr of group.prs) tasks.push({ pr, repo: group.repo });
+  }
+
+  let cursor = 0;
+  const worker = async () => {
+    while (cursor < tasks.length) {
+      const { pr, repo } = tasks[cursor++];
+      pr.deploy = await deployForSha(pr.repoWithOwner, pr.mergeCommitOid);
+    }
+  };
+  const pool = Array.from({ length: Math.min(DEPLOY_STATUS_CONCURRENCY, tasks.length) }, worker);
+  await Promise.all(pool);
+}
+
+async function deployForSha(repoWithOwner, sha) {
+  if (!sha) return { prod: "unknown", stage: "unknown", demo: "unknown" };
+  return resolveDeploy(sha, () => fetchDeployStatus(repoWithOwner, sha), deployCache);
+}
+
+// Cache-aware resolution: a terminal (fully settled) SHA is served from cache and never
+// re-fetched; in-progress/unknown results self-heal by re-fetching on the next poll.
+export async function resolveDeploy(sha, fetcher, cache = deployCache) {
+  const cached = cache.get(sha);
+  if (cached && isTerminalDeploy(cached.deploy)) return cached.deploy;
+
+  const deploy = await fetcher();
+  if (isTerminalDeploy(deploy)) cache.set(sha, { deploy, fetchedAt: Date.now() });
+  return deploy;
+}
+
+// Terminal when no environment is still settling: "deploying" (in_progress) and
+// "unknown" are the only non-terminal states. A repo that only deploys to prod
+// ({prod:"deployed", stage:"none", demo:"none"}) is terminal so the cache engages.
+const NON_TERMINAL_DEPLOY_STATES = new Set(["in_progress", "unknown"]);
+export function isTerminalDeploy(deploy) {
+  return !NON_TERMINAL_DEPLOY_STATES.has(deploy.prod)
+    && !NON_TERMINAL_DEPLOY_STATES.has(deploy.stage)
+    && !NON_TERMINAL_DEPLOY_STATES.has(deploy.demo);
+}
+
+async function fetchDeployStatus(repoWithOwner, sha) {
+  const url = `${deployStatusBase}/v2/commits/repo/${repoWithOwner}/sha/${sha}`;
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 10000);
+    let json;
+    try {
+      const res = await fetch(url, { signal: controller.signal });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      json = await res.json();
+    } finally {
+      clearTimeout(timer);
+    }
+    return parseDeployments(json?.data?.deployments);
+  } catch {
+    // Unreachable / network error / bad response → gray "unknown", not cached as terminal.
+    return { prod: "unknown", stage: "unknown", demo: "unknown" };
+  }
+}
+
+// Parse the deploy-status API's deployments[] into { prod, stage, demo }. Missing env → "none".
+export function parseDeployments(deployments) {
+  const deploy = { prod: "none", stage: "none", demo: "none" };
+  if (!Array.isArray(deployments)) return deploy;
+  for (const d of deployments) {
+    const key = DEPLOY_ENV_KEYS[d?.environment];
+    if (!key) continue;
+    deploy[key] = deployStateToIndicator(d.state);
+  }
+  return deploy;
 }
 
 async function searchPrs(query, filter, sortFn) {
@@ -134,6 +286,9 @@ function summarize(node) {
     branch: node.headRefName,
     url: node.url,
     createdAt: node.createdAt,
+    mergedAt: node.mergedAt,
+    mergeCommitOid: node.mergeCommit?.oid || null,
+    repoWithOwner: node.repository?.nameWithOwner || "",
     isDraft: node.isDraft,
     author: node.author?.login || "",
     status: prStatus(node),
@@ -153,7 +308,11 @@ function prPriority(pr) {
 const CI_ORDER = { passing: 0, running: 1, none: 2, failing: 3 };
 function reviewPriority(pr) { return CI_ORDER[pr.ci] ?? 2; }
 
+// Merged PRs are sorted newest-first (most recent merge on top).
+function mergedPriority(pr) { return -new Date(pr.mergedAt || 0).getTime(); }
+
 export function prStatus(node) {
+  if (node.merged || node.mergedAt) return "merged";
   if (node.isDraft) return "draft";
   if (node.isInMergeQueue) return "queued";
   if (node.reviewDecision === "APPROVED") return "approved";

@@ -54,17 +54,20 @@ function renderPulls() {
     queue.innerHTML = `<div class="empty-state">${hint}</div>`;
     return;
   }
-  const pulls = state.pulls || { mine: [], reviews: [] };
+  const pulls = state.pulls || { mine: [], reviews: [], merged: [] };
   const mineCount = pulls.mine.reduce((n, g) => n + g.prs.length, 0);
   const reviewCount = pulls.reviews.reduce((n, g) => n + g.prs.length, 0);
+  const mergedCount = (pulls.merged || []).reduce((n, g) => n + g.prs.length, 0);
 
   const mineActive = pullsSubTab === "mine" ? " active" : "";
   const reviewsActive = pullsSubTab === "reviews" ? " active" : "";
+  const mergedActive = pullsSubTab === "merged" ? " active" : "";
 
   let html = workspaceLimitBanner();
   html += `<div class="sub-tabs">
     <button class="sub-tab${mineActive}" onclick="switchPullsTab('mine')">Mine (${mineCount})</button>
     <button class="sub-tab${reviewsActive}" onclick="switchPullsTab('reviews')">Reviews (${reviewCount})</button>
+    <button class="sub-tab${mergedActive}" onclick="switchPullsTab('merged')">Merged (${mergedCount})</button>
   </div>`;
 
   if (pullsSubTab === "mine") {
@@ -78,6 +81,14 @@ function renderPulls() {
       html += `<div class="empty-state">No open pull requests</div>`;
     } else {
       html += filtered.map((g) => renderPullGroup(g, false, "mine")).join("");
+    }
+  } else if (pullsSubTab === "merged") {
+    const merged = pulls.merged || [];
+    const filteredCount = merged.reduce((n, g) => n + g.prs.length, 0);
+    if (filteredCount === 0) {
+      html += `<div class="empty-state">No recently merged pull requests</div>`;
+    } else {
+      html += merged.map((g) => renderPullGroup(g, false, "merged")).join("");
     }
   } else {
     const authors = collectAuthors(pulls.reviews);
@@ -153,6 +164,15 @@ function togglePullRepo(key, header) {
   toggleGroup(header);
 }
 
+// "more" link (merged tab only) → this repo's merged PRs for the author on GitHub.
+function repoMergedLink(group) {
+  const pr = group.prs[0];
+  if (!pr || !pr.repoWithOwner || !pr.author) return "";
+  const q = encodeURIComponent(`is:pr is:merged author:${pr.author}`);
+  const url = `https://github.com/${pr.repoWithOwner}/pulls?q=${q}`;
+  return `<a class="pulls-repo-more" href="${escapeHtml(url)}" title="View all merged PRs for this repo on GitHub" onclick="event.stopPropagation(); openExternal('${escapeHtml(url)}'); return false;">more →</a>`;
+}
+
 function renderPullGroup(group, showAuthor, subTab) {
   const key = `${subTab}:${group.repo}`;
   const isCollapsed = collapsedPullRepos.has(key);
@@ -161,10 +181,11 @@ function renderPullGroup(group, showAuthor, subTab) {
       <span class="chevron${isCollapsed ? " collapsed" : ""}">▼</span>
       ${escapeHtml(group.repo)}
       <span class="pulls-repo-count">(${group.prs.length})</span>
+      ${subTab === "merged" ? repoMergedLink(group) : ""}
     </div>
     <div class="group-items${isCollapsed ? " collapsed" : ""}">
       <table class="pulls-table">
-        <tbody>${group.prs.map((pr) => renderPullRow(pr, showAuthor, group.repo)).join("")}</tbody>
+        <tbody>${group.prs.map((pr) => renderPullRow(pr, showAuthor, group.repo, subTab)).join("")}</tbody>
       </table>
     </div>
   </div>`;
@@ -177,16 +198,43 @@ function ciCell(ci) {
   return '<span class="ci-badge ci-none">\u2014</span>';
 }
 
-function renderPullRow(pr, showAuthor, repo) {
+const DEPLOY_LABELS = {
+  deployed: "deployed",
+  errored: "errored",
+  in_progress: "in progress",
+  none: "not deployed",
+  unknown: "unknown (deploy-status API unreachable?)",
+};
+
+function deployDot(letter, envLabel, state) {
+  const s = state || "unknown";
+  const label = DEPLOY_LABELS[s];
+  return `<span class="deploy-dot deploy-${s}" title="${envLabel}: ${label}">${letter}</span>`;
+}
+
+function deployDots(deploy) {
+  // No dots when the deploy-status feature is unconfigured (server leaves deploy unset)
+  // or before background enrichment has populated it.
+  if (!deploy) return "";
+  const d = deploy;
+  return `<span class="deploy-dots">${
+    deployDot("P", "Production", d.prod)
+  }${deployDot("S", "Staging", d.stage)}${deployDot("D", "Demo", d.demo)}</span>`;
+}
+
+function renderPullRow(pr, showAuthor, repo, subTab) {
   const atLimit = isAtWorkspaceLimit();
   const actionBtn = atLimit
     ? `<button class="agent-btn" title="Workspace limit reached" disabled>${claudeIcon()}</button>`
     : `<button class="agent-btn" title="Actions" data-pr-url="${escapeHtml(pr.url)}" onclick="event.stopPropagation(); openActionDrawerFromBtn(this)">${claudeIcon()}</button>`;
+  const statusCells = subTab === "merged"
+    ? `<td class="pull-deploy">${deployDots(pr.deploy)}</td>`
+    : `<td class="pull-status"><span class="pull-badge status-${pr.status}">${pr.status}</span></td>
+    <td class="pull-ci">${ciCell(pr.ci)}</td>`;
   return `<tr class="pull-row" onclick="openExternal('${escapeHtml(pr.url)}')">
     <td class="pull-title"><span class="pull-number">#${pr.number}</span> <span class="pull-title-text">${escapeHtml(pr.title)}</span></td>
     ${showAuthor ? `<td class="pull-author">${escapeHtml(pr.author)}</td>` : ""}
-    <td class="pull-status"><span class="pull-badge status-${pr.status}">${pr.status}</span></td>
-    <td class="pull-ci">${ciCell(pr.ci)}</td>
+    ${statusCells}
     <td class="row-action">${actionBtn}</td>
   </tr>`;
 }
