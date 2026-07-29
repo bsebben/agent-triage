@@ -21,7 +21,7 @@ describe("parseNotifications", () => {
           surface_id: "SF-2",
           is_read: true,
           title: "Claude Code",
-          subtitle: "Completed in zenpayroll",
+          subtitle: "Completed in my-project",
           body: "Task finished successfully",
         },
       ],
@@ -43,7 +43,7 @@ describe("categorizeNotification", () => {
     assert.equal(categorizeNotification(n), "permission");
   });
   it("categorizes Completed subtitle", () => {
-    const n = { subtitle: "Completed in zenpayroll", body: "Done" };
+    const n = { subtitle: "Completed in my-project", body: "Done" };
     assert.equal(categorizeNotification(n), "completion");
   });
   it("categorizes Waiting as waiting", () => {
@@ -80,16 +80,16 @@ describe("categorizeNotification", () => {
 
 describe("AGENT_TITLE_PREFIX", () => {
   it("matches active/thinking prefix (✳)", () => {
-    assert.ok(AGENT_TITLE_PREFIX.test("✳ zenpayroll"));
+    assert.ok(AGENT_TITLE_PREFIX.test("✳ my-project"));
   });
   it("matches idle braille dot prefix (⠂)", () => {
-    assert.ok(AGENT_TITLE_PREFIX.test("⠂ zenpayroll"));
+    assert.ok(AGENT_TITLE_PREFIX.test("⠂ my-project"));
   });
   it("matches idle braille dot variant prefix (⠐)", () => {
     assert.ok(AGENT_TITLE_PREFIX.test("⠐ my-project"));
   });
   it("does not match plain workspace titles", () => {
-    assert.equal(AGENT_TITLE_PREFIX.test("zenpayroll"), false);
+    assert.equal(AGENT_TITLE_PREFIX.test("my-project"), false);
   });
   it("does not match titles with prefix mid-string", () => {
     assert.equal(AGENT_TITLE_PREFIX.test("my ✳ session"), false);

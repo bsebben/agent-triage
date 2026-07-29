@@ -37,13 +37,13 @@ describe("enrichNotification", () => {
       workspaceId: "W1",
       surfaceId: "S1",
     };
-    const workspaces = [{ id: "W1", title: "zenpayroll", directory: "/home/testuser/workspace/zenpayroll" }];
-    const terminals = [{ workspaceId: "W1", paneId: "P1", directory: "/home/testuser/workspace/zenpayroll", gitBranch: "main" }];
+    const workspaces = [{ id: "W1", title: "my-project", directory: "/home/testuser/workspace/my-project" }];
+    const terminals = [{ workspaceId: "W1", paneId: "P1", directory: "/home/testuser/workspace/my-project", gitBranch: "main" }];
     const mockReadScreen = async () => 'Some output\n  "Pick one?"\n  ❯ Option A\n    Option B';
 
     const result = await enrichNotification(notification, workspaces, terminals, mockReadScreen);
-    assert.equal(result.workspaceTitle, "zenpayroll");
-    assert.equal(result.workspaceDir, "/home/testuser/workspace/zenpayroll");
+    assert.equal(result.workspaceTitle, "my-project");
+    assert.equal(result.workspaceDir, "/home/testuser/workspace/my-project");
     assert.equal(result.gitBranch, "main");
     assert.ok(result.screenContent);
   });
@@ -95,7 +95,7 @@ describe("Monitor terminal detection", () => {
 
   it("marks workspace with agent title prefix as running", async () => {
     const cmuxApi = makeCmux({
-      workspaces: [{ id: "W1", title: "✳ zenpayroll", directory: "/home/user/project" }],
+      workspaces: [{ id: "W1", title: "✳ my-project", directory: "/home/user/project" }],
       terminals: [{ workspaceId: "W1", paneId: "P1", directory: "/home/user/project", gitBranch: "main" }],
       agentWorkspaceIds: new Set(["W1"]),
     });
@@ -109,7 +109,7 @@ describe("Monitor terminal detection", () => {
 
   it("marks workspace with idle braille prefix as running", async () => {
     const cmuxApi = makeCmux({
-      workspaces: [{ id: "W1", title: "⠂ zenpayroll", directory: "/home/user/project" }],
+      workspaces: [{ id: "W1", title: "⠂ my-project", directory: "/home/user/project" }],
       terminals: [{ workspaceId: "W1", paneId: "P1", directory: "/home/user/project", gitBranch: "main" }],
       agentWorkspaceIds: new Set(["W1"]),
     });

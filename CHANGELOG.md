@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.40.1] - 2026-07-29
+
+### Changed
+
+- Replaced an internal project codename with a generic placeholder in test fixtures.
+
+### Added
+
+- `CLAUDE.md` guardrail: this is a public repo — no internal hostnames, codenames, secrets, or company data; internal endpoints must come from env vars or user config.
+
 ## [1.40.0] - 2026-07-27
 
 ### Added
