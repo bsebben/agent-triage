@@ -59,12 +59,12 @@ describe("Queue", () => {
   });
 
   it("groups items by directory path", () => {
-    queue.upsert({ id: "A", category: "waiting", workspaceId: "W1", workspaceDir: `${HOME}/workspace/zenpayroll`, body: "q1" });
+    queue.upsert({ id: "A", category: "waiting", workspaceId: "W1", workspaceDir: `${HOME}/workspace/my-project`, body: "q1" });
     queue.upsert({ id: "B", category: "waiting", workspaceId: "W2", workspaceDir: `${HOME}/workspace/web`, body: "q2" });
-    queue.upsert({ id: "C", category: "waiting", workspaceId: "W3", workspaceDir: `${HOME}/workspace/zenpayroll`, body: "q3" });
+    queue.upsert({ id: "C", category: "waiting", workspaceId: "W3", workspaceDir: `${HOME}/workspace/my-project`, body: "q3" });
     const { groups: grouped } = queue.grouped();
     assert.equal(grouped.length, 2);
-    const zp = grouped.find((g) => g.title === "~/workspace/zenpayroll");
+    const zp = grouped.find((g) => g.title === "~/workspace/my-project");
     assert.equal(zp.items.length, 2);
   });
 
@@ -86,38 +86,38 @@ describe("Queue", () => {
   });
 
   it("sorts groups alphabetically regardless of item priority", () => {
-    queue.upsert({ id: "Z1", category: "running", workspaceId: "W1", workspaceDir: `${HOME}/workspace/zenpayroll`, body: "" });
+    queue.upsert({ id: "Z1", category: "running", workspaceId: "W1", workspaceDir: `${HOME}/workspace/my-project`, body: "" });
     queue.upsert({ id: "A1", category: "terminal", workspaceId: "W2", workspaceDir: `${HOME}/workspace/agent-triage`, body: "" });
     queue.upsert({ id: "M1", category: "error", workspaceId: "W3", workspaceDir: `${HOME}/workspace/middle`, body: "boom" });
     const { groups: initial } = queue.grouped();
-    assert.deepEqual(initial.map((g) => g.title), ["~/workspace/agent-triage", "~/workspace/middle", "~/workspace/zenpayroll"]);
+    assert.deepEqual(initial.map((g) => g.title), ["~/workspace/agent-triage", "~/workspace/middle", "~/workspace/my-project"]);
 
     queue.upsert({ id: "M1", category: "completion", workspaceId: "W3", workspaceDir: `${HOME}/workspace/middle`, body: "done" });
     queue.upsert({ id: "A1", category: "permission", workspaceId: "W2", workspaceDir: `${HOME}/workspace/agent-triage`, body: "approve?" });
     const { groups: after } = queue.grouped();
-    assert.deepEqual(after.map((g) => g.title), ["~/workspace/agent-triage", "~/workspace/middle", "~/workspace/zenpayroll"]);
+    assert.deepEqual(after.map((g) => g.title), ["~/workspace/agent-triage", "~/workspace/middle", "~/workspace/my-project"]);
   });
 
   it("tracks directories seen via grouped()", () => {
-    queue.upsert({ id: "A", category: "running", workspaceId: "W1", workspaceDir: `${HOME}/workspace/zenpayroll`, body: "" });
+    queue.upsert({ id: "A", category: "running", workspaceId: "W1", workspaceDir: `${HOME}/workspace/my-project`, body: "" });
     queue.grouped();
     assert.equal(queue.recentDirCount, 1);
   });
 
   it("returns recentGroups for directories with no active items", () => {
-    queue.upsert({ id: "A", category: "running", workspaceId: "W1", workspaceDir: `${HOME}/workspace/zenpayroll`, body: "" });
+    queue.upsert({ id: "A", category: "running", workspaceId: "W1", workspaceDir: `${HOME}/workspace/my-project`, body: "" });
     queue.grouped();
     queue.remove("A");
     const { groups, recentGroups } = queue.grouped();
     assert.equal(groups.length, 0);
     assert.equal(recentGroups.length, 1);
-    assert.equal(recentGroups[0].title, "~/workspace/zenpayroll");
+    assert.equal(recentGroups[0].title, "~/workspace/my-project");
     assert.equal(recentGroups[0].items.length, 0);
     assert.equal(recentGroups[0].recent, true);
   });
 
   it("does not duplicate a directory in both groups and recentGroups", () => {
-    queue.upsert({ id: "A", category: "running", workspaceId: "W1", workspaceDir: `${HOME}/workspace/zenpayroll`, body: "" });
+    queue.upsert({ id: "A", category: "running", workspaceId: "W1", workspaceDir: `${HOME}/workspace/my-project`, body: "" });
     queue.grouped();
     const { groups, recentGroups } = queue.grouped();
     assert.equal(groups.length, 1);
@@ -190,7 +190,7 @@ describe("Queue", () => {
   it("persists recentDirs across save/load", async () => {
     const tmpFile = join(tmpdir(), `queue-test-${Date.now()}.json`);
     try {
-      queue.upsert({ id: "A", category: "running", workspaceId: "W1", workspaceDir: `${HOME}/workspace/zenpayroll`, body: "" });
+      queue.upsert({ id: "A", category: "running", workspaceId: "W1", workspaceDir: `${HOME}/workspace/my-project`, body: "" });
       queue.grouped();
       queue.remove("A");
       await queue.save(tmpFile);
@@ -199,8 +199,8 @@ describe("Queue", () => {
       await loaded.load(tmpFile);
       const { recentGroups } = loaded.grouped();
       assert.equal(recentGroups.length, 1);
-      assert.equal(recentGroups[0].title, "~/workspace/zenpayroll");
-      assert.equal(recentGroups[0].directory, `${HOME}/workspace/zenpayroll`);
+      assert.equal(recentGroups[0].title, "~/workspace/my-project");
+      assert.equal(recentGroups[0].directory, `${HOME}/workspace/my-project`);
     } finally {
       await unlink(tmpFile).catch(() => {});
     }

@@ -2,6 +2,17 @@
 
 Dashboard for monitoring parallel Claude Code agents in cmux.
 
+## ⚠️ This is a PUBLIC repository — no internal or company data
+
+This repo is public. Never commit company-internal or confidential information — in code, comments, tests, config, changelog, or PR descriptions. Specifically:
+
+- **No internal hostnames or URLs** (e.g. anything on an internal/VPN-only domain). Read them from an environment variable or the user-owned `config.json` (which is gitignored) — never hardcode them. `config.example.json` ships such fields as `null`.
+- **No internal service names, project codenames, or team names.** Use generic placeholders in examples and tests (e.g. `my-project`, `my-service`, `https://deploy-status.example.com`).
+- **No secrets** — API keys, tokens, passwords, connection strings. Reference env vars or the user config, never commit the value.
+- **No PII or business-confidential data** (employee names/emails, customer data, revenue, roadmap).
+
+When a feature needs an internal endpoint, the pattern is: resolve it from `process.env.<NAME>` first, then `config.json`, and disable the feature gracefully when neither is set. If unsure whether something is safe to publish, treat it as confidential and leave it out.
+
 ## Setup
 
 ```bash
