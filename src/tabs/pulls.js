@@ -70,7 +70,7 @@ query($q: String!) {
               statusCheckRollup {
                 contexts(first: 50) {
                   nodes {
-                    ... on CheckRun { conclusion status }
+                    ... on CheckRun { name conclusion status checkSuite { app { slug } } }
                     ... on StatusContext { state }
                   }
                 }
@@ -280,6 +280,7 @@ async function searchPrs(query, filter, sortFn) {
 
 function summarize(node) {
   const checks = node.commits?.nodes?.[0]?.commit?.statusCheckRollup?.contexts?.nodes || [];
+  const trunk = trunkQueueState(checks);
   return {
     number: node.number,
     title: node.title,
@@ -291,18 +292,18 @@ function summarize(node) {
     repoWithOwner: node.repository?.nameWithOwner || "",
     isDraft: node.isDraft,
     author: node.author?.login || "",
-    status: prStatus(node),
-    ci: ciStatus(checks),
+    status: prStatus(node, trunk),
+    ci: ciStatus(checks.filter((c) => !isTrunkQueueCheck(c))),
     directReview: (node.reviewRequests?.nodes || []).some(
       (r) => r.requestedReviewer?.__typename === "User" && r.requestedReviewer?.login === currentUser
     ),
   };
 }
 
-const PRIORITY = { queued: 0, approved: 1, comments: 2, open: 4, draft: 5 };
+const PRIORITY = { queue_failed: 0, queued: 1, approved: 2, comments: 3, open: 5, draft: 6 };
 function prPriority(pr) {
-  if (pr.ci === "failing" && pr.status !== "approved" && pr.status !== "comments") return 3;
-  return PRIORITY[pr.status] ?? 5;
+  if (pr.ci === "failing" && pr.status !== "approved" && pr.status !== "comments" && pr.status !== "queue_failed") return 4;
+  return PRIORITY[pr.status] ?? 6;
 }
 
 const CI_ORDER = { passing: 0, running: 1, none: 2, failing: 3 };
@@ -311,10 +312,31 @@ function reviewPriority(pr) { return CI_ORDER[pr.ci] ?? 2; }
 // Merged PRs are sorted newest-first (most recent merge on top).
 function mergedPriority(pr) { return -new Date(pr.mergedAt || 0).getTime(); }
 
-export function prStatus(node) {
+// Some repos drive their merge queue via the Trunk.io GitHub App (app slug
+// trunk-io) with a check named "Trunk Merge Queue (…)" instead of GitHub's native
+// merge queue, so node.isInMergeQueue never fires for them.
+// The check is absent until a PR is submitted, then non-terminal while queued,
+// then COMPLETED/SUCCESS on merge or COMPLETED/FAILURE (etc.) if it fails in queue.
+export function isTrunkQueueCheck(check) {
+  return check?.checkSuite?.app?.slug === "trunk-io"
+    && typeof check?.name === "string"
+    && check.name.startsWith("Trunk Merge Queue");
+}
+
+// Reads the Trunk merge-queue check state: null (not submitted), "queued"
+// (present, non-terminal), or "failed" (COMPLETED with a non-success conclusion).
+export function trunkQueueState(checks) {
+  const check = (checks || []).find(isTrunkQueueCheck);
+  if (!check) return null;
+  if (check.status !== "COMPLETED") return "queued";
+  return check.conclusion === "SUCCESS" ? null : "failed";
+}
+
+export function prStatus(node, trunk = null) {
   if (node.merged || node.mergedAt) return "merged";
   if (node.isDraft) return "draft";
-  if (node.isInMergeQueue) return "queued";
+  if (node.isInMergeQueue || trunk === "queued") return "queued";
+  if (trunk === "failed") return "queue_failed";
   if (node.reviewDecision === "APPROVED") return "approved";
   if ((node.latestReviews?.nodes || []).length > 0) return "comments";
   return "open";
