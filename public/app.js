@@ -149,7 +149,7 @@ function updateTabBadges() {
   // PRs: count actionable across both sections
   const allGroups = [...pulls.mine, ...pulls.reviews];
   const actionable = allGroups.reduce((n, g) =>
-    n + g.prs.filter((p) => p.status === "approved" || p.status === "comments" || p.ci === "failing").length, 0);
+    n + g.prs.filter((p) => p.status === "approved" || p.status === "comments" || p.status === "queue_failed" || p.ci === "failing").length, 0);
   setBadge("pulls", actionable || null, actionable > 0 ? "attention" : null);
 
   // Tickets: show total count

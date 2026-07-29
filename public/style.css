@@ -877,6 +877,7 @@ main { padding: 8px; position: relative; }
 .pull-badge.status-comments { background: color-mix(in srgb, var(--clr-question) 20%, var(--card)); color: var(--clr-question); }
 .pull-badge.status-approved { background: color-mix(in srgb, var(--clr-completion) 20%, var(--card)); color: var(--clr-completion); }
 .pull-badge.status-queued { background: color-mix(in srgb, var(--clr-permission) 20%, var(--card)); color: var(--clr-permission); }
+.pull-badge.status-queue_failed { background: color-mix(in srgb, var(--clr-error) 20%, var(--card)); color: var(--clr-error); }
 
 .ci-badge { font-weight: bold; }
 .ci-badge.ci-passing { color: var(--clr-completion); }

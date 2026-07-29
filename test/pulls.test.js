@@ -8,7 +8,16 @@ import {
   capMergedGroups,
   resolveDeploy,
   isTerminalDeploy,
+  isTrunkQueueCheck,
+  trunkQueueState,
 } from "../src/tabs/pulls.js";
+
+const trunkCheck = (status, conclusion) => ({
+  name: "Trunk Merge Queue (main)",
+  status,
+  conclusion,
+  checkSuite: { app: { slug: "trunk-io" } },
+});
 
 describe("prStatus", () => {
   it("returns 'draft' for a draft PR regardless of other state", () => {
@@ -41,6 +50,53 @@ describe("prStatus", () => {
 
   it("returns 'merged' when the node is flagged merged", () => {
     assert.equal(prStatus({ merged: true }), "merged");
+  });
+
+  it("returns 'queued' when the Trunk merge-queue check is queued", () => {
+    assert.equal(prStatus({ reviewDecision: "APPROVED" }, "queued"), "queued");
+  });
+
+  it("returns 'queue_failed' when the Trunk merge-queue check failed", () => {
+    assert.equal(prStatus({ reviewDecision: "APPROVED" }, "failed"), "queue_failed");
+  });
+
+  it("prefers 'queued' over 'queue_failed' ordering (queued wins when native queue is set)", () => {
+    assert.equal(prStatus({ isInMergeQueue: true }, "failed"), "queued");
+  });
+});
+
+describe("isTrunkQueueCheck", () => {
+  it("matches a Trunk Merge Queue CheckRun by app slug and name", () => {
+    assert.equal(isTrunkQueueCheck(trunkCheck("QUEUED", null)), true);
+  });
+
+  it("ignores non-trunk checks", () => {
+    assert.equal(isTrunkQueueCheck({ name: "Trunk Merge Queue (main)", checkSuite: { app: { slug: "other" } } }), false);
+    assert.equal(isTrunkQueueCheck({ name: "CI", checkSuite: { app: { slug: "trunk-io" } } }), false);
+    assert.equal(isTrunkQueueCheck({ state: "SUCCESS" }), false);
+    assert.equal(isTrunkQueueCheck(undefined), false);
+  });
+});
+
+describe("trunkQueueState", () => {
+  it("returns null when no Trunk check is present (not submitted)", () => {
+    assert.equal(trunkQueueState([{ name: "CI", status: "COMPLETED", conclusion: "SUCCESS" }]), null);
+    assert.equal(trunkQueueState([]), null);
+  });
+
+  it("returns 'queued' while the check is non-terminal", () => {
+    assert.equal(trunkQueueState([trunkCheck("QUEUED", null)]), "queued");
+    assert.equal(trunkQueueState([trunkCheck("IN_PROGRESS", null)]), "queued");
+  });
+
+  it("returns null on a successful (merged) Trunk check", () => {
+    assert.equal(trunkQueueState([trunkCheck("COMPLETED", "SUCCESS")]), null);
+  });
+
+  it("returns 'failed' when the Trunk check completed with a non-success conclusion", () => {
+    assert.equal(trunkQueueState([trunkCheck("COMPLETED", "FAILURE")]), "failed");
+    assert.equal(trunkQueueState([trunkCheck("COMPLETED", "TIMED_OUT")]), "failed");
+    assert.equal(trunkQueueState([trunkCheck("COMPLETED", "CANCELLED")]), "failed");
   });
 });
 

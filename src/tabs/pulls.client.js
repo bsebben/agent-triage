@@ -23,7 +23,7 @@ function collectStatuses(groups) {
       if (pr.status) statuses.add(pr.status);
     }
   }
-  const order = ["open", "draft", "comments", "approved", "queued"];
+  const order = ["open", "draft", "comments", "approved", "queued", "queue_failed"];
   return order.filter((s) => statuses.has(s));
 }
 
@@ -112,6 +112,10 @@ function renderPulls() {
   queue.innerHTML = html;
 }
 
+const STATUS_LABELS = {
+  queue_failed: "queue failed",
+};
+
 function renderAuthorFilter(authors) {
   const options = authors
     .map((a) => `<option value="${escapeHtml(a)}"${a === pullsAuthorFilter ? " selected" : ""}>${escapeHtml(a)}</option>`)
@@ -124,7 +128,7 @@ function renderAuthorFilter(authors) {
 
 function renderStatusFilter(statuses) {
   const options = statuses
-    .map((s) => `<option value="${escapeHtml(s)}"${s === pullsStatusFilter ? " selected" : ""}>${escapeHtml(s)}</option>`)
+    .map((s) => `<option value="${escapeHtml(s)}"${s === pullsStatusFilter ? " selected" : ""}>${escapeHtml(STATUS_LABELS[s] || s)}</option>`)
     .join("");
   return `<select class="pulls-filter-select" onchange="setPullsStatusFilter(this.value)">
     <option value="">All statuses</option>
@@ -229,7 +233,7 @@ function renderPullRow(pr, showAuthor, repo, subTab) {
     : `<button class="agent-btn" title="Actions" data-pr-url="${escapeHtml(pr.url)}" onclick="event.stopPropagation(); openActionDrawerFromBtn(this)">${claudeIcon()}</button>`;
   const statusCells = subTab === "merged"
     ? `<td class="pull-deploy">${deployDots(pr.deploy)}</td>`
-    : `<td class="pull-status"><span class="pull-badge status-${pr.status}">${pr.status}</span></td>
+    : `<td class="pull-status"><span class="pull-badge status-${pr.status}">${STATUS_LABELS[pr.status] || pr.status}</span></td>
     <td class="pull-ci">${ciCell(pr.ci)}</td>`;
   return `<tr class="pull-row" onclick="openExternal('${escapeHtml(pr.url)}')">
     <td class="pull-title"><span class="pull-number">#${pr.number}</span> <span class="pull-title-text">${escapeHtml(pr.title)}</span></td>

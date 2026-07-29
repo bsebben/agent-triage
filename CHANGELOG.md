@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.42.0] - 2026-07-29
+
+### Added
+
+- Pull requests tab now detects Trunk.io merge-queue state for repos that use Trunk's merge queue (a GitHub App) instead of GitHub's native merge queue. A queued PR shows the `queued` badge, and a PR that failed while in the queue shows a new red `queue failed` badge and counts toward the tab's actionable badge.
+
+### Changed
+
+- CI status ignores the Trunk merge-queue check so a queued PR no longer reads as perpetually pending CI.
+
 ## [1.41.0] - 2026-07-29
 
 ### Added
