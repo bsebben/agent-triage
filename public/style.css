@@ -1002,6 +1002,17 @@ main { padding: 8px; position: relative; }
   letter-spacing: 0;
 }
 
+.pulls-repo-more {
+  margin-left: auto;
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--text-dim);
+  text-decoration: none;
+}
+
+.pulls-repo-more:hover { color: var(--text); text-decoration: underline; }
+
 .empty-state {
   text-align: center;
   padding: 40px 16px;

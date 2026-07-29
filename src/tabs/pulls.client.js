@@ -164,6 +164,15 @@ function togglePullRepo(key, header) {
   toggleGroup(header);
 }
 
+// "more" link (merged tab only) → this repo's merged PRs for the author on GitHub.
+function repoMergedLink(group) {
+  const pr = group.prs[0];
+  if (!pr || !pr.repoWithOwner || !pr.author) return "";
+  const q = encodeURIComponent(`is:pr is:merged author:${pr.author}`);
+  const url = `https://github.com/${pr.repoWithOwner}/pulls?q=${q}`;
+  return `<a class="pulls-repo-more" href="${escapeHtml(url)}" title="View all merged PRs for this repo on GitHub" onclick="event.stopPropagation(); openExternal('${escapeHtml(url)}'); return false;">more →</a>`;
+}
+
 function renderPullGroup(group, showAuthor, subTab) {
   const key = `${subTab}:${group.repo}`;
   const isCollapsed = collapsedPullRepos.has(key);
@@ -172,6 +181,7 @@ function renderPullGroup(group, showAuthor, subTab) {
       <span class="chevron${isCollapsed ? " collapsed" : ""}">▼</span>
       ${escapeHtml(group.repo)}
       <span class="pulls-repo-count">(${group.prs.length})</span>
+      ${subTab === "merged" ? repoMergedLink(group) : ""}
     </div>
     <div class="group-items${isCollapsed ? " collapsed" : ""}">
       <table class="pulls-table">

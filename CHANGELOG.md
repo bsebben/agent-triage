@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 - Pull requests tab now has a **Merged** sub-tab showing your recently merged PRs (5 most recent per repo, merged within the last 30 days), grouped by repo. When a deploy-status API is configured, each row shows per-environment deploy indicators — P (production), S (staging), D (demo): green = deployed, red = errored, amber (pulsing) = in progress, gray = not deployed. Merged PRs render immediately and the dots fill in via background enrichment.
 - New `tabs.pulls.deployStatus` and `tabs.pulls.deployStatusUrl` config fields (config migration v1). Deploy dots are populated from the deploy-status API at `deployStatusUrl` (or the `DEPLOY_STATUS_API_URL` env var); when neither is set the sub-tab shows merged PRs without dots.
+- Each repo group in the Merged sub-tab has a "more →" link to that repo's merged PRs for you on GitHub.
 
 ### Changed
 
