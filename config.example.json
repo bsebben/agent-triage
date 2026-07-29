@@ -1,5 +1,5 @@
 {
-  "configVersion": 0,
+  "configVersion": 1,
   "port": 7777,
   "defaultDirectory": "~/workspace",
   "maxSessions": null,
@@ -15,7 +15,10 @@
       "excludeProjects": null,
       "runlayerUserApiKey": null
     },
-    "pulls": {},
+    "pulls": {
+      "deployStatus": true,
+      "deployStatusUrl": null
+    },
     "tasks": {}
   }
 }

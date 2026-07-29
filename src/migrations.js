@@ -16,7 +16,21 @@
  * Ships empty: the machinery is inert until the first config-shape change
  * adds step 1.
  */
-export const migrations = [];
+export const migrations = [
+  {
+    version: 1,
+    describe: "add tabs.pulls deploy-status fields (deployStatus default on, deployStatusUrl default null)",
+    migrate(cfg) {
+      return {
+        ...cfg,
+        tabs: {
+          ...cfg.tabs,
+          pulls: { deployStatus: true, deployStatusUrl: null, ...cfg.tabs?.pulls },
+        },
+      };
+    },
+  },
+];
 
 export const CURRENT_CONFIG_VERSION = migrations.length;
 
