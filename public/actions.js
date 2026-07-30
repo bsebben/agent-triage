@@ -2,6 +2,19 @@
 
 const prActions = [
   {
+    id: "discuss",
+    label: "Discuss It",
+    prompt: (pr) =>
+      `I want to discuss this PR — I have questions or want to talk it through, ` +
+      `not necessarily take action yet: ${pr.url}\n\n` +
+      `Load context first: read it with \`gh pr view ${pr.number}\` and the diff with ` +
+      `\`gh pr diff ${pr.number}\`. The branch is \`${pr.branch}\` — you can inspect its ` +
+      `code without checking it out (\`gh\`, \`git show origin/${pr.branch}:<file>\`), ` +
+      `and only check it out if we decide the discussion calls for it (I may have other ` +
+      `work on the current branch). Then ask what I'd like to discuss. ` +
+      `Don't make changes or run review/fix skills unless I ask.`,
+  },
+  {
     id: "status",
     label: "Status update",
     prompt: (pr) =>
@@ -56,6 +69,15 @@ const prActions = [
 ];
 
 const ticketActions = [
+  {
+    id: "discuss",
+    label: "Discuss It",
+    prompt: (ticket) =>
+      `I want to discuss this ticket — I have questions or want to talk it through, ` +
+      `not necessarily start work: ${ticket.key} - ${ticket.summary}\n\n${ticket.url}\n\n` +
+      `Read the description and comments for context, then ask what I'd like to discuss. ` +
+      `Don't start coding or run task skills unless I ask.`,
+  },
   {
     id: "investigate",
     label: "Investigate and plan",

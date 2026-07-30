@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.43.0] - 2026-07-30
+
+### Added
+
+- Pulls and Tickets action drawers gain a "Discuss It" action (listed first) that opens a Claude session with the PR or ticket in context for questions or discussion, without taking action.
+
 ## [1.42.0] - 2026-07-29
 
 ### Added
