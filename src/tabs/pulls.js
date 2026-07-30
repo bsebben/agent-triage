@@ -120,26 +120,42 @@ async function init(tabConfig, onUpdate) {
 }
 
 async function poll() {
-  try {
-    const mergedSince = new Date(Date.now() - MERGED_WINDOW_DAYS * 24 * 60 * 60 * 1000)
-      .toISOString().slice(0, 10);
-    const [mine, reviews, merged] = await Promise.all([
-      searchPrs("is:pr is:open archived:false author:@me", () => true, prPriority),
-      searchPrs("is:pr is:open archived:false review-requested:@me draft:false", (pr) => !pr.isDraft, reviewPriority),
-      // GitHub search has no merged-date sort, so `sort:updated-desc` is the closest
-      // proxy to skew the first-100 window toward the most recent merges (see PR_QUERY's
-      // first:100 ceiling — a hard cap, documented as a known limitation).
-      searchMerged(`is:pr archived:false author:@me is:merged merged:>=${mergedSince} sort:updated-desc`),
-    ]);
-    // Publish Mine/Reviews/merged immediately; deploy dots fill in via a follow-up
-    // onUpdate so the deploy-status fetch never blocks the tab render (each fetch can
-    // run its full 10s abort timeout when the API is unreachable).
-    data = { mine, reviews, merged };
-    if (cfg.deployStatus && deployStatusBase) enrichInBackground(merged);
-  } catch (err) {
-    console.error("PR fetch error:", err.message);
-    throw err;
+  const mergedSince = new Date(Date.now() - MERGED_WINDOW_DAYS * 24 * 60 * 60 * 1000)
+    .toISOString().slice(0, 10);
+  // allSettled keeps the three queries independent: a single failing query (e.g. a
+  // GitHub 502) retains its last-known data while the others still update, instead of
+  // failing the whole poll and letting the display go stale.
+  const [mine, reviews, merged] = await Promise.allSettled([
+    searchPrs("is:pr is:open archived:false author:@me", () => true, prPriority),
+    searchPrs("is:pr is:open archived:false review-requested:@me draft:false", (pr) => !pr.isDraft, reviewPriority),
+    // GitHub search has no merged-date sort, so `sort:updated-desc` is the closest
+    // proxy to skew the first-100 window toward the most recent merges (see PR_QUERY's
+    // first:100 ceiling — a hard cap, documented as a known limitation).
+    searchMerged(`is:pr archived:false author:@me is:merged merged:>=${mergedSince} sort:updated-desc`),
+  ]);
+
+  data = settlePollResults({ mine, reviews, merged }, data);
+  // Only re-enrich when the merged query actually refreshed; on failure the retained
+  // groups were already enriched by an earlier poll. Deploy dots fill in via a follow-up
+  // onUpdate from enrichInBackground so the deploy-status fetch never blocks the initial
+  // render (each fetch can run its full 10s abort timeout when the API is unreachable).
+  if (merged.status === "fulfilled" && cfg.deployStatus && deployStatusBase) enrichInBackground(data.merged);
+}
+
+// Merge a batch of Promise.allSettled results into the next data snapshot. Each
+// fulfilled query publishes its fresh value; each rejected query retains its last-known
+// value from `prev` so a single failing query (e.g. a GitHub 502) never blanks the tab.
+export function settlePollResults(results, prev) {
+  const next = {};
+  for (const [key, result] of Object.entries(results)) {
+    if (result.status === "fulfilled") {
+      next[key] = result.value;
+    } else {
+      console.error(`PR fetch error (${key}):`, result.reason?.message || result.reason);
+      next[key] = prev[key];
+    }
   }
+  return next;
 }
 
 async function searchMerged(query) {

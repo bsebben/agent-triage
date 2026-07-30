@@ -10,7 +10,11 @@ import {
   isTerminalDeploy,
   isTrunkQueueCheck,
   trunkQueueState,
+  settlePollResults,
 } from "../src/tabs/pulls.js";
+
+const fulfilled = (value) => ({ status: "fulfilled", value });
+const rejected = (reason) => ({ status: "rejected", reason });
 
 const trunkCheck = (status, conclusion) => ({
   name: "Trunk Merge Queue (main)",
@@ -157,6 +161,34 @@ describe("capMergedGroups", () => {
     const groups = [{ repo: "a", prs: [{ number: 1, mergedAt: "2026-07-01T00:00:00Z" }] }];
     capMergedGroups(groups);
     assert.equal(groups[0].prs.length, 1);
+  });
+});
+
+describe("settlePollResults", () => {
+  const prev = { mine: ["m0"], reviews: ["r0"], merged: ["g0"] };
+
+  it("publishes fresh values when every query fulfills", () => {
+    const next = settlePollResults(
+      { mine: fulfilled(["m1"]), reviews: fulfilled(["r1"]), merged: fulfilled(["g1"]) },
+      prev,
+    );
+    assert.deepEqual(next, { mine: ["m1"], reviews: ["r1"], merged: ["g1"] });
+  });
+
+  it("retains the last-known value for a single failing query", () => {
+    const next = settlePollResults(
+      { mine: fulfilled(["m1"]), reviews: rejected(new Error("HTTP 502")), merged: fulfilled(["g1"]) },
+      prev,
+    );
+    assert.deepEqual(next, { mine: ["m1"], reviews: ["r0"], merged: ["g1"] });
+  });
+
+  it("retains all last-known values when every query fails", () => {
+    const next = settlePollResults(
+      { mine: rejected(new Error("a")), reviews: rejected(new Error("b")), merged: rejected(new Error("c")) },
+      prev,
+    );
+    assert.deepEqual(next, prev);
   });
 });
 
