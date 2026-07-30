@@ -136,10 +136,9 @@ async function poll() {
 
   data = settlePollResults({ mine, reviews, merged }, data);
   // Only re-enrich when the merged query actually refreshed; on failure the retained
-  // groups were already enriched by an earlier poll.
-  // Publish Mine/Reviews/merged immediately; deploy dots fill in via a follow-up
-  // onUpdate so the deploy-status fetch never blocks the tab render (each fetch can
-  // run its full 10s abort timeout when the API is unreachable).
+  // groups were already enriched by an earlier poll. Deploy dots fill in via a follow-up
+  // onUpdate from enrichInBackground so the deploy-status fetch never blocks the initial
+  // render (each fetch can run its full 10s abort timeout when the API is unreachable).
   if (merged.status === "fulfilled" && cfg.deployStatus && deployStatusBase) enrichInBackground(data.merged);
 }
 
