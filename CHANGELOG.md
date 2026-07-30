@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.43.1] - 2026-07-30
+
+### Fixed
+
+- Pull requests tab now polls each query (mine, reviews, merged) independently, so a single failing query (e.g. a GitHub 502) no longer fails the whole poll — failed queries retain their last-known data while the others update.
+
 ## [1.43.0] - 2026-07-30
 
 ### Added
