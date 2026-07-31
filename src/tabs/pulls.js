@@ -195,13 +195,13 @@ export function capMergedGroups(groups, cap = MERGED_PER_REPO_CAP) {
 async function enrichDeployStatus(groups) {
   const tasks = [];
   for (const group of groups) {
-    for (const pr of group.prs) tasks.push({ pr });
+    for (const pr of group.prs) tasks.push(pr);
   }
 
   let cursor = 0;
   const worker = async () => {
     while (cursor < tasks.length) {
-      const { pr } = tasks[cursor++];
+      const pr = tasks[cursor++];
       pr.deploy = await deployForSha(pr.repoWithOwner, pr.mergeCommitOid);
       if (deployStateIsTracked(pr.deploy)) deployTrackedRepos.add(pr.repoWithOwner);
     }
