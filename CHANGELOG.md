@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.43.2] - 2026-07-31
+
+### Fixed
+
+- Merged PRs tab no longer shows deploy dots for repos with no deployment tracking. A 404 from the deploy-status API is cached per-commit (so an untracked repo or a not-yet-ingested commit is skipped) without suppressing dots for the rest of the repo. A repo is marked "tracked" only after a real deployment state is observed — the all-`unknown` sentinel from a brief off-VPN/unreachable poll no longer flips it. Once tracked, all-`none` PRs show dots correctly (waiting to deploy).
+
 ## [1.43.1] - 2026-07-30
 
 ### Fixed

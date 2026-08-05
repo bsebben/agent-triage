@@ -47,6 +47,10 @@ const DEPLOY_STATUS_CONCURRENCY = 6;
 // re-fetches each poll.
 const deployCache = new Map(); // sha -> { deploy, fetchedAt }
 
+// Repos that have ever returned a real (observed) deploy state. Persists across polls so
+// all-"none" PRs from a tracked repo still show dots (they're just waiting to deploy).
+const deployTrackedRepos = new Set();
+
 const PR_QUERY = `
 query($q: String!) {
   search(query: $q, type: ISSUE, first: 100) {
@@ -165,7 +169,7 @@ async function searchMerged(query) {
 }
 
 // Enrich merged groups with deploy status out of band, then push a follow-up update.
-// Never throws into poll(): per-PR failures already resolve to "unknown".
+// Never throws into poll(): per-PR network/HTTP failures resolve to "unknown"; 404s resolve to null.
 // Guards against calling onUpdateCb() when a newer poll has already replaced data.merged,
 // which would otherwise trigger a render showing the new merged list without deploy dots.
 async function enrichInBackground(groups) {
@@ -187,27 +191,54 @@ export function capMergedGroups(groups, cap = MERGED_PER_REPO_CAP) {
 }
 
 // Fetch deploy status for every capped PR, bounded by a small pool.
-// A per-PR failure resolves that PR's dots to "unknown"; it never throws out of poll().
+// Network/HTTP failures resolve to "unknown"; 404s resolve to null. Never throws out of poll().
 async function enrichDeployStatus(groups) {
   const tasks = [];
   for (const group of groups) {
-    for (const pr of group.prs) tasks.push({ pr, repo: group.repo });
+    for (const pr of group.prs) tasks.push(pr);
   }
 
   let cursor = 0;
   const worker = async () => {
     while (cursor < tasks.length) {
-      const { pr, repo } = tasks[cursor++];
+      const pr = tasks[cursor++];
       pr.deploy = await deployForSha(pr.repoWithOwner, pr.mergeCommitOid);
+      if (deployStateIsTracked(pr.deploy)) deployTrackedRepos.add(pr.repoWithOwner);
     }
   };
   const pool = Array.from({ length: Math.min(DEPLOY_STATUS_CONCURRENCY, tasks.length) }, worker);
   await Promise.all(pool);
+
+  for (const group of groups) {
+    for (const pr of group.prs) {
+      pr.repoTracked = deployTrackedRepos.has(pr.repoWithOwner);
+    }
+  }
 }
 
 async function deployForSha(repoWithOwner, sha) {
-  if (!sha) return { prod: "unknown", stage: "unknown", demo: "unknown" };
+  if (!sha) return null;
   return resolveDeploy(sha, () => fetchDeployStatus(repoWithOwner, sha), deployCache);
+}
+
+// A repo counts as "tracked" only once a real, observed deployment state comes back.
+// null (per-sha 404: repo untracked OR that commit not yet ingested) and the all-"unknown"
+// sentinel (API unreachable / off-VPN) are NOT evidence of tracking — treating them as such
+// would flip a repo to tracked on a single transient failure and never unflip.
+export function deployStateIsTracked(deploy) {
+  if (!deploy) return false;
+  return Object.values(deploy).some((v) => v !== "none" && v !== "unknown");
+}
+
+// Client + server share this gate: hide dots when there's nothing to show. No deploy
+// object (null 404 / not enriched yet) hides. An all-"none" or all-"unknown" result hides
+// for untracked repos — both mean no real deployment state has been observed. For tracked
+// repos, all-"none" still shows (PR is waiting to start deploying) and all-"unknown" shows
+// (API temporarily unreachable, but we know the repo deploys).
+export function shouldShowDeployDots(deploy, repoTracked) {
+  if (!deploy) return false;
+  if (!repoTracked && !deployStateIsTracked(deploy)) return false;
+  return true;
 }
 
 // Cache-aware resolution: a terminal (fully settled) SHA is served from cache and never
@@ -224,8 +255,12 @@ export async function resolveDeploy(sha, fetcher, cache = deployCache) {
 // Terminal when no environment is still settling: "deploying" (in_progress) and
 // "unknown" are the only non-terminal states. A repo that only deploys to prod
 // ({prod:"deployed", stage:"none", demo:"none"}) is terminal so the cache engages.
+// null (per-sha 404) is also terminal — cached per-sha so it never re-fetches that commit,
+// but it does NOT poison other SHAs of the same repo (a commit merely not-yet-ingested 404s
+// too, so the negative cache must stay sha-scoped, not repo-scoped).
 const NON_TERMINAL_DEPLOY_STATES = new Set(["in_progress", "unknown"]);
 export function isTerminalDeploy(deploy) {
+  if (deploy === null) return true;
   return !NON_TERMINAL_DEPLOY_STATES.has(deploy.prod)
     && !NON_TERMINAL_DEPLOY_STATES.has(deploy.stage)
     && !NON_TERMINAL_DEPLOY_STATES.has(deploy.demo);
@@ -239,6 +274,7 @@ async function fetchDeployStatus(repoWithOwner, sha) {
     let json;
     try {
       const res = await fetch(url, { signal: controller.signal });
+      if (res.status === 404) return null; // this sha isn't in the deploy-status API (untracked repo or not-yet-ingested commit)
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       json = await res.json();
     } finally {

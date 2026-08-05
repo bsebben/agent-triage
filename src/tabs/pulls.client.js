@@ -216,14 +216,25 @@ function deployDot(letter, envLabel, state) {
   return `<span class="deploy-dot deploy-${s}" title="${envLabel}: ${label}">${letter}</span>`;
 }
 
-function deployDots(deploy) {
-  // No dots when the deploy-status feature is unconfigured (server leaves deploy unset)
-  // or before background enrichment has populated it.
-  if (!deploy) return "";
-  const d = deploy;
+// Mirror of shouldShowDeployDots in src/tabs/pulls.js (kept in lockstep — that copy is the
+// unit-tested source of truth; this browser script has no build step to import it).
+// No dots when the feature is unconfigured / enrichment hasn't run yet / the sha 404'd
+// (deploy is null). An all-"none" or all-"unknown" result hides for untracked repos —
+// both mean no real deployment state has been observed. Tracked repos show in both cases
+// (waiting to deploy, or API temporarily unreachable).
+function shouldShowDeployDots(deploy, repoTracked) {
+  if (!deploy) return false;
+  if (!repoTracked && !Object.values(deploy).some((v) => v !== "none" && v !== "unknown")) {
+    return false;
+  }
+  return true;
+}
+
+function deployDots(deploy, repoTracked) {
+  if (!shouldShowDeployDots(deploy, repoTracked)) return "";
   return `<span class="deploy-dots">${
-    deployDot("P", "Production", d.prod)
-  }${deployDot("S", "Staging", d.stage)}${deployDot("D", "Demo", d.demo)}</span>`;
+    deployDot("P", "Production", deploy.prod)
+  }${deployDot("S", "Staging", deploy.stage)}${deployDot("D", "Demo", deploy.demo)}</span>`;
 }
 
 function renderPullRow(pr, showAuthor, repo, subTab) {
@@ -232,7 +243,7 @@ function renderPullRow(pr, showAuthor, repo, subTab) {
     ? `<button class="agent-btn" title="Workspace limit reached" disabled>${claudeIcon()}</button>`
     : `<button class="agent-btn" title="Actions" data-pr-url="${escapeHtml(pr.url)}" onclick="event.stopPropagation(); openActionDrawerFromBtn(this)">${claudeIcon()}</button>`;
   const statusCells = subTab === "merged"
-    ? `<td class="pull-deploy">${deployDots(pr.deploy)}</td>`
+    ? `<td class="pull-deploy">${deployDots(pr.deploy, pr.repoTracked)}</td>`
     : `<td class="pull-status"><span class="pull-badge status-${pr.status}">${STATUS_LABELS[pr.status] || pr.status}</span></td>
     <td class="pull-ci">${ciCell(pr.ci)}</td>`;
   return `<tr class="pull-row" onclick="openExternal('${escapeHtml(pr.url)}')">

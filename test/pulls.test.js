@@ -11,6 +11,8 @@ import {
   isTrunkQueueCheck,
   trunkQueueState,
   settlePollResults,
+  deployStateIsTracked,
+  shouldShowDeployDots,
 } from "../src/tabs/pulls.js";
 
 const fulfilled = (value) => ({ status: "fulfilled", value });
@@ -201,6 +203,10 @@ describe("isTerminalDeploy", () => {
     assert.equal(isTerminalDeploy({ prod: "errored", stage: "none", demo: "deployed" }), true);
   });
 
+  it("treats null (404 = repo not tracked) as terminal", () => {
+    assert.equal(isTerminalDeploy(null), true);
+  });
+
   it("is not terminal when any environment is still in_progress or unknown", () => {
     assert.equal(isTerminalDeploy({ prod: "deployed", stage: "in_progress", demo: "none" }), false);
     assert.equal(isTerminalDeploy({ prod: "deployed", stage: "unknown", demo: "deployed" }), false);
@@ -250,5 +256,75 @@ describe("resolveDeploy cache", () => {
     await resolveDeploy("sha3", fetcher, cache);
     assert.equal(calls, 2);
     assert.equal(cache.has("sha3"), false);
+  });
+
+  it("caches a null result (per-sha 404) so it is never re-fetched", async () => {
+    const cache = new Map();
+    let calls = 0;
+    const fetcher = async () => { calls++; return null; };
+    const first = await resolveDeploy("sha5", fetcher, cache);
+    const second = await resolveDeploy("sha5", fetcher, cache);
+    assert.equal(calls, 1);
+    assert.equal(first, null);
+    assert.equal(second, null);
+  });
+
+  it("scopes the null (404) cache to the sha, not the repo — a sibling sha still fetches", async () => {
+    const cache = new Map();
+    let calls = 0;
+    // A 404'd sha (e.g. not-yet-ingested commit) must not suppress another sha's lookup.
+    const fetcher = async (sha) => { calls++; return sha === "sha404" ? null : { prod: "deployed", stage: "none", demo: "none" }; };
+    await resolveDeploy("sha404", () => fetcher("sha404"), cache);
+    const other = await resolveDeploy("shaLive", () => fetcher("shaLive"), cache);
+    assert.equal(calls, 2);
+    assert.deepEqual(other, { prod: "deployed", stage: "none", demo: "none" });
+  });
+});
+
+describe("deployStateIsTracked", () => {
+  it("counts a repo as tracked once a real deployment state is observed", () => {
+    assert.equal(deployStateIsTracked({ prod: "deployed", stage: "none", demo: "none" }), true);
+    assert.equal(deployStateIsTracked({ prod: "none", stage: "in_progress", demo: "none" }), true);
+    assert.equal(deployStateIsTracked({ prod: "none", stage: "none", demo: "errored" }), true);
+  });
+
+  it("does NOT treat the all-unknown sentinel (API unreachable / off-VPN) as tracked", () => {
+    assert.equal(deployStateIsTracked({ prod: "unknown", stage: "unknown", demo: "unknown" }), false);
+  });
+
+  it("does NOT treat a null (per-sha 404) result as tracked", () => {
+    assert.equal(deployStateIsTracked(null), false);
+  });
+
+  it("does NOT treat an all-none result as tracked", () => {
+    assert.equal(deployStateIsTracked({ prod: "none", stage: "none", demo: "none" }), false);
+  });
+});
+
+describe("shouldShowDeployDots", () => {
+  it("hides dots when there is no deploy object (null 404 / not enriched yet)", () => {
+    assert.equal(shouldShowDeployDots(null, false), false);
+    assert.equal(shouldShowDeployDots(null, true), false);
+  });
+
+  it("hides all-none dots for an untracked repo", () => {
+    assert.equal(shouldShowDeployDots({ prod: "none", stage: "none", demo: "none" }, false), false);
+  });
+
+  it("shows all-none dots for a tracked repo (PR waiting to start deploying)", () => {
+    assert.equal(shouldShowDeployDots({ prod: "none", stage: "none", demo: "none" }, true), true);
+  });
+
+  it("shows dots whenever any environment has a real state, tracked or not", () => {
+    assert.equal(shouldShowDeployDots({ prod: "deployed", stage: "none", demo: "none" }, false), true);
+    assert.equal(shouldShowDeployDots({ prod: "none", stage: "in_progress", demo: "none" }, false), true);
+  });
+
+  it("hides all-unknown dots for an untracked repo (transient API failure, not evidence of tracking)", () => {
+    assert.equal(shouldShowDeployDots({ prod: "unknown", stage: "unknown", demo: "unknown" }, false), false);
+  });
+
+  it("shows all-unknown dots for a tracked repo (API temporarily unreachable, but repo is known to deploy)", () => {
+    assert.equal(shouldShowDeployDots({ prod: "unknown", stage: "unknown", demo: "unknown" }, true), true);
   });
 });
