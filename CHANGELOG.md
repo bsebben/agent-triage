@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.43.4] - 2026-08-11
+
+### Fixed
+
+- Action drawer's PR lookup (`findPrByUrl`) now checks the Merged sub-tab's PR list, not just Mine and Reviews — opening the drawer for a merged PR (e.g. via "Discuss It") no longer fails to find it.
+
 ## [1.43.3] - 2026-08-11
 
 ### Fixed
