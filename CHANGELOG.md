@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.43.3] - 2026-08-11
+
+### Fixed
+
+- cmux socket auto-detection now follows the `last-socket-path` pointer file and checks the XDG state dir (`~/.local/state/cmux/cmux.sock`), fixing "Could not find cmux socket" on cmux 0.64.22+, which moved the socket out of `~/Library/Application Support/cmux`.
+
+### Changed
+
+- Raised supported cmux version range max to 0.64.22 — verified the RPC wire protocol is unchanged, only the socket location moved.
+
 ## [1.43.2] - 2026-07-31
 
 ### Fixed
