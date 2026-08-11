@@ -4,8 +4,8 @@ let drawerEl = null;
 let closeDrawer = null;
 
 function findPrByUrl(url) {
-  const pulls = state.pulls || { mine: [], reviews: [] };
-  for (const list of [pulls.mine, pulls.reviews]) {
+  const pulls = state.pulls || { mine: [], reviews: [], merged: [] };
+  for (const list of [pulls.mine, pulls.reviews, pulls.merged]) {
     for (const group of list) {
       for (const pr of group.prs) {
         if (pr.url === url) return { item: pr, repo: group.repo };
