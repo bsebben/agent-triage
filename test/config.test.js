@@ -4,9 +4,16 @@ import assert from "node:assert/strict";
 
 // The config module has side effects (reads config.json, detects cmux), so
 // we test the resolve logic indirectly by validating the exported config.
-import { readFileSync } from "node:fs";
+import { readFileSync, mkdtempSync } from "node:fs";
 import { join } from "node:path";
+import { tmpdir } from "node:os";
 import config, { buildSchema, FIELD_META, loadRawConfig, writeConfigFile } from "../src/config.js";
+
+// writeConfigFile/loadRawConfig round-trip against a scratch file rather than
+// the real config.json — other test files read config.json synchronously at
+// import time, and node --test runs files concurrently, so writing to the
+// shared file here raced with those reads.
+const scratchConfigPath = join(mkdtempSync(join(tmpdir(), "agent-triage-config-test-")), "config.json");
 
 describe("config.maxSessions", () => {
   it("defaults to null when not set in config.json", () => {
@@ -78,16 +85,15 @@ describe("writeConfigFile", () => {
   it("round-trips config through write and read", () => {
     const before = loadRawConfig();
     const testValue = before.maxSessions === 99 ? 100 : 99;
-    writeConfigFile({ ...before, maxSessions: testValue });
-    const after = loadRawConfig();
+    writeConfigFile({ ...before, maxSessions: testValue }, scratchConfigPath);
+    const after = loadRawConfig(scratchConfigPath);
     assert.equal(after.maxSessions, testValue);
-    writeConfigFile(before);
   });
 
   it("preserves JSON formatting with 2-space indent", () => {
     const raw = loadRawConfig();
-    writeConfigFile(raw);
-    const content = readFileSync(join(process.cwd(), "config.json"), "utf-8");
+    writeConfigFile(raw, scratchConfigPath);
+    const content = readFileSync(scratchConfigPath, "utf-8");
     assert.ok(content.includes("\n  "), "should have 2-space indentation");
     assert.ok(content.endsWith("\n"), "should end with newline");
   });

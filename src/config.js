@@ -164,13 +164,11 @@ function resolveDirectory(raw) {
   return HOME;
 }
 
-export function loadRawConfig() {
-  const configPath = join(PROJECT_ROOT, "config.json");
+export function loadRawConfig(configPath = join(PROJECT_ROOT, "config.json")) {
   return JSON.parse(readFileSync(configPath, "utf-8"));
 }
 
-export function writeConfigFile(configObj) {
-  const configPath = join(PROJECT_ROOT, "config.json");
+export function writeConfigFile(configObj, configPath = join(PROJECT_ROOT, "config.json")) {
   writeFileSync(configPath, JSON.stringify(configObj, null, 2) + "\n");
 }
 

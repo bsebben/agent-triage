@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.43.5] - 2026-08-11
+
+### Fixed
+
+- `writeConfigFile`/`loadRawConfig` tests now round-trip against a scratch temp file instead of the real `config.json`. `test/config.test.js` was writing to the shared config file mid-run, which raced with other test files that read `config.json` synchronously at import time (`node --test` runs test files concurrently) — an occasional CI flake ("Unexpected end of JSON input" in `monitor.test.js`/`refresh.test.js`).
+
 ## [1.43.4] - 2026-08-11
 
 ### Fixed
