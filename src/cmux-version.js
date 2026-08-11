@@ -3,7 +3,7 @@ import { promisify } from "node:util";
 
 const execFileAsync = promisify(execFile);
 
-export const CMUX_VERSION_RANGE = { min: "0.64.0", max: "0.64.7" };
+export const CMUX_VERSION_RANGE = { min: "0.64.0", max: "0.64.22" };
 
 const GITHUB_REPO = "manaflow-ai/cmux";
 

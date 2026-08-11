@@ -250,8 +250,20 @@ function detectCmuxBinary() {
 }
 
 function detectCmuxSocket() {
-  const sock = join(HOME, "Library", "Application Support", "cmux", "cmux.sock");
-  return existsSync(sock) ? sock : null;
+  // cmux 0.64.22 moved the socket from Application Support to the XDG state
+  // dir, leaving a pointer file at the old location during the transition.
+  const legacyDir = join(HOME, "Library", "Application Support", "cmux");
+  const pointerFile = join(legacyDir, "last-socket-path");
+  if (existsSync(pointerFile)) {
+    const pointed = readFileSync(pointerFile, "utf-8").trim();
+    if (pointed && existsSync(pointed)) return pointed;
+  }
+
+  const candidates = [
+    join(HOME, ".local", "state", "cmux", "cmux.sock"),
+    join(legacyDir, "cmux.sock"),
+  ];
+  return candidates.find(existsSync) ?? null;
 }
 
 function resolve(raw) {
