@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.43.7] - 2026-08-12
+
+### Fixed
+
+- Tickets tab pagination now resumes via the Jira search API's own `nextPageToken` instead of a hand-rolled `key > lastKey` cursor. That cursor compared alphabetically-sorted keys against Jira's internal numeric issue ID, which don't correlate across projects — any JQL spanning more than one project (e.g. the default, unscoped JQL) silently stopped after the first page, permanently dropping every project whose keys sorted alphabetically later but had lower internal IDs.
+
 ## [1.43.6] - 2026-08-12
 
 ### Fixed
