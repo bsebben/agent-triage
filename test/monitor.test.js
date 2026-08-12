@@ -27,6 +27,66 @@ describe("parseScreenForQuestion", () => {
     const result = parseScreenForQuestion(screen);
     assert.equal(result, null);
   });
+
+  it("ignores soft-wrapped agent prose that follows the option block", () => {
+    const screen = [
+      '  "Should I retry the failed deploy?"',
+      "",
+      "  ❯ Yes, retry it",
+      "    No, leave it",
+      "",
+      "  I checked the Buildkite logs and the failure looks like a transient",
+      "    network timeout rather than anything wrong with the commit itself.",
+      "  Let me know how you would like to proceed.",
+    ].join("\n");
+
+    const result = parseScreenForQuestion(screen);
+    assert.deepEqual(result.options, ["Yes, retry it", "No, leave it"]);
+  });
+
+  it("ignores the 'Update available!' banner line", () => {
+    const screen = [
+      '  "Which branch should I target?"',
+      "",
+      "  ❯ master",
+      "    develop",
+      "",
+      "  Update available! Restart to apply.",
+    ].join("\n");
+
+    const result = parseScreenForQuestion(screen);
+    assert.deepEqual(result.options, ["master", "develop"]);
+  });
+
+  it("ignores indented prose that appears before any option block", () => {
+    const screen = [
+      "  Reading the config file now.",
+      "  Update available! Restart to apply.",
+      "",
+      '  "Continue?"',
+      "",
+      "  ❯ Yes",
+      "    No",
+    ].join("\n");
+
+    const result = parseScreenForQuestion(screen);
+    assert.deepEqual(result.options, ["Yes", "No"]);
+  });
+
+  it("keeps numbered options that are all individually marked", () => {
+    const screen = [
+      '  "Pick a plan?"',
+      "",
+      "  ❯ 1. Ship it",
+      "    2. Revise it",
+      "    3. Discard it",
+      "",
+      "  Each option rebuilds the preview environment before applying.",
+    ].join("\n");
+
+    const result = parseScreenForQuestion(screen);
+    assert.deepEqual(result.options, ["Ship it", "Revise it", "Discard it"]);
+  });
 });
 
 describe("enrichNotification", () => {
