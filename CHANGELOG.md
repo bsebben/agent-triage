@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.43.6] - 2026-08-12
+
+### Fixed
+
+- Merged PR deploy dots now show the most recent deployment per environment instead of whichever entry happens to land last in the deploy-status API's array. The API doesn't guarantee chronological order, so a retried deploy could show as `errored` even after a later success — `parseDeployments` now picks by `started_at`/`finished_at` per environment.
+
 ## [1.43.5] - 2026-08-11
 
 ### Fixed
