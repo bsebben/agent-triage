@@ -907,6 +907,13 @@ main { padding: 8px; position: relative; }
   cursor: default;
 }
 
+/* Deploy dots with a known Buildkite build render as real links (see deployDot() in
+   pulls.client.js) — reset the browser's default underline/cursor to match the plain-span dots. */
+a.deploy-dot {
+  text-decoration: none;
+  cursor: pointer;
+}
+
 .deploy-dot.deploy-deployed { color: var(--clr-completion); background: color-mix(in srgb, var(--clr-completion) 22%, var(--card)); }
 .deploy-dot.deploy-errored { color: var(--clr-error); background: color-mix(in srgb, var(--clr-error) 22%, var(--card)); }
 .deploy-dot.deploy-in_progress {

@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.44.0] - 2026-08-12
+
+### Added
+
+- Merged-PR deploy dots are now clickable when the deploy-status API reports a Buildkite build (`execution_ref`) — opens the build in a new tab. Dots without a known build link render as before (non-clickable).
+
 ## [1.43.7] - 2026-08-12
 
 ### Fixed

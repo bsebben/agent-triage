@@ -203,6 +203,7 @@ async function enrichDeployStatus(groups) {
     while (cursor < tasks.length) {
       const pr = tasks[cursor++];
       pr.deploy = await deployForSha(pr.repoWithOwner, pr.mergeCommitOid);
+      pr.deployLinks = deployLinksForSha(pr.mergeCommitOid);
       if (deployStateIsTracked(pr.deploy)) deployTrackedRepos.add(pr.repoWithOwner);
     }
   };
@@ -216,9 +217,22 @@ async function enrichDeployStatus(groups) {
   }
 }
 
+// sha -> links object. Populated in lockstep with deployCache: the wrapped fetcher below
+// only runs when resolveDeploy actually does a network fetch (i.e. not on a cache hit), so
+// this stays in sync with whatever deploy state resolveDeploy is currently serving for a sha.
+const deployLinksCache = new Map();
+
 async function deployForSha(repoWithOwner, sha) {
   if (!sha) return null;
-  return resolveDeploy(sha, () => fetchDeployStatus(repoWithOwner, sha), deployCache);
+  return resolveDeploy(sha, async () => {
+    const { deploy, links } = await fetchDeployStatus(repoWithOwner, sha);
+    deployLinksCache.set(sha, links);
+    return deploy;
+  }, deployCache);
+}
+
+function deployLinksForSha(sha) {
+  return deployLinksCache.get(sha) ?? NO_LINKS;
 }
 
 // A repo counts as "tracked" only once a real, observed deployment state comes back.
@@ -266,6 +280,12 @@ export function isTerminalDeploy(deploy) {
     && !NON_TERMINAL_DEPLOY_STATES.has(deploy.demo);
 }
 
+const NO_LINKS = { prod: null, stage: null, demo: null };
+
+// Returns { deploy, links } — links carries a Buildkite build URL per environment (or null),
+// derived from the same deployments[] payload as deploy. Kept as a sibling field, never
+// merged into `deploy` itself: deployStateIsTracked() does Object.values(deploy).some(...)
+// over exactly {prod,stage,demo}, so any extra key there would always count as "tracked".
 async function fetchDeployStatus(repoWithOwner, sha) {
   const url = `${deployStatusBase}/v2/commits/repo/${repoWithOwner}/sha/${sha}`;
   try {
@@ -274,38 +294,69 @@ async function fetchDeployStatus(repoWithOwner, sha) {
     let json;
     try {
       const res = await fetch(url, { signal: controller.signal });
-      if (res.status === 404) return null; // this sha isn't in the deploy-status API (untracked repo or not-yet-ingested commit)
+      // this sha isn't in the deploy-status API (untracked repo or not-yet-ingested commit)
+      if (res.status === 404) return { deploy: null, links: NO_LINKS };
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       json = await res.json();
     } finally {
       clearTimeout(timer);
     }
-    return parseDeployments(json?.data?.deployments);
+    const deployments = json?.data?.deployments;
+    return { deploy: parseDeployments(deployments), links: parseDeployLinks(deployments) };
   } catch {
     // Unreachable / network error / bad response → gray "unknown", not cached as terminal.
-    return { prod: "unknown", stage: "unknown", demo: "unknown" };
+    return { deploy: { prod: "unknown", stage: "unknown", demo: "unknown" }, links: NO_LINKS };
   }
 }
 
-// Parse the deploy-status API's deployments[] into { prod, stage, demo }. Missing env → "none".
+// Groups deployments[] by environment, keeping only the most recent entry per environment.
 // The API can return multiple entries for the same environment (e.g. a failed deploy
-// followed by a retry) with no guaranteed chronological array order, so pick the most
-// recent entry per environment by started_at (falling back to finished_at) rather than
-// trusting array order — otherwise a stale/failed entry landing later in the array can
-// overwrite a genuinely newer success.
-export function parseDeployments(deployments) {
-  const deploy = { prod: "none", stage: "none", demo: "none" };
-  if (!Array.isArray(deployments)) return deploy;
-  const latest = new Map(); // key -> { ts, state }
+// followed by a retry) with no guaranteed chronological array order, so entries are picked
+// by started_at (falling back to finished_at) rather than trusting array order — otherwise
+// a stale/failed entry landing later in the array can overwrite a genuinely newer one.
+// Shared by parseDeployments (deploy state) and parseDeployLinks (Buildkite build links).
+function latestDeploymentsByEnv(deployments) {
+  const latest = new Map(); // key -> { ts, entry }
+  if (!Array.isArray(deployments)) return latest;
   for (const d of deployments) {
     const key = DEPLOY_ENV_KEYS[d?.environment];
     if (!key) continue;
     const ts = new Date(d?.started_at || d?.finished_at || 0).getTime();
     const prev = latest.get(key);
-    if (!prev || ts >= prev.ts) latest.set(key, { ts, state: d.state });
+    if (!prev || ts >= prev.ts) latest.set(key, { ts, entry: d });
   }
-  for (const [key, { state }] of latest) deploy[key] = deployStateToIndicator(state);
+  return latest;
+}
+
+// Parse the deploy-status API's deployments[] into { prod, stage, demo }. Missing env → "none".
+export function parseDeployments(deployments) {
+  const deploy = { prod: "none", stage: "none", demo: "none" };
+  for (const [key, { entry }] of latestDeploymentsByEnv(deployments)) {
+    deploy[key] = deployStateToIndicator(entry.state);
+  }
   return deploy;
+}
+
+// Parses a Buildkite execution_ref URN (urn:buildkite:build:<org>:<pipeline>:<number>) into
+// a clickable build URL. Returns null for a missing ref, a non-Buildkite ref (some other CI
+// system), or anything that doesn't match the expected shape.
+export function buildkiteUrlFromExecutionRef(ref) {
+  if (typeof ref !== "string") return null;
+  const m = ref.match(/^urn:buildkite:build:([^:]+):([^:]+):(\d+)$/);
+  if (!m) return null;
+  const [, org, pipeline, number] = m;
+  return `https://buildkite.com/${org}/${pipeline}/builds/${number}`;
+}
+
+// Parse the deploy-status API's deployments[] into { prod, stage, demo } Buildkite build
+// links (or null per environment when there's no deploy yet, or the deploy didn't run on
+// Buildkite). Mirrors parseDeployments' "most recent per environment" selection.
+export function parseDeployLinks(deployments) {
+  const links = { prod: null, stage: null, demo: null };
+  for (const [key, { entry }] of latestDeploymentsByEnv(deployments)) {
+    links[key] = buildkiteUrlFromExecutionRef(entry.execution_ref);
+  }
+  return links;
 }
 
 async function searchPrs(query, filter, sortFn) {
