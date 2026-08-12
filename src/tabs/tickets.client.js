@@ -60,7 +60,7 @@ function renderTicketGroup(group) {
   const groupKey = group.key || group.summary;
   const isCollapsed = collapsedTicketGroups.has(groupKey);
   const keyChip = group.key
-    ? `<span class="tickets-parent-key" onclick="event.stopPropagation(); openExternal('${escapeHtml(group.url)}')">${escapeHtml(group.key)}</span>`
+    ? `<a class="tickets-parent-key" href="${escapeHtml(group.url)}" target="_blank" rel="noopener" onclick="event.preventDefault(); event.stopPropagation(); openExternal('${escapeHtml(group.url)}')">${escapeHtml(group.key)}</a>`
     : "";
   return `<div class="tickets-group">
     <div class="tickets-parent" data-group-key="${escapeHtml(groupKey)}" onclick="toggleTicketGroup('${escapeHtml(groupKey)}', this)">
@@ -90,7 +90,7 @@ function renderTicketRow(ticket) {
     ? `<button class="agent-btn" title="Workspace limit reached" disabled>${claudeIcon()}</button>`
     : `<button class="agent-btn" title="Actions" data-ticket-key="${escapeHtml(ticket.key)}" onclick="event.stopPropagation(); openActionDrawerFromBtn(this)">${claudeIcon()}</button>`;
   return `<tr class="ticket-row" onclick="openExternal('${escapeHtml(ticket.url)}')">
-    <td class="ticket-title"><span class="ticket-key">${escapeHtml(ticket.key)}</span> <span class="ticket-title-text">${escapeHtml(ticket.summary)}</span></td>
+    <td class="ticket-title"><a class="ticket-title-link" href="${escapeHtml(ticket.url)}" target="_blank" rel="noopener" onclick="event.preventDefault(); event.stopPropagation(); openExternal('${escapeHtml(ticket.url)}')"><span class="ticket-key">${escapeHtml(ticket.key)}</span> <span class="ticket-title-text">${escapeHtml(ticket.summary)}</span></a></td>
     <td><span class="ticket-badge status-${ticketStatusClass(ticket.status)}">${escapeHtml(ticket.status)}</span></td>
     <td class="row-action">${actionBtn}</td>
   </tr>`;

@@ -254,7 +254,7 @@ function renderPullRow(pr, showAuthor, repo, subTab) {
     : `<td class="pull-status"><span class="pull-badge status-${pr.status}">${STATUS_LABELS[pr.status] || pr.status}</span></td>
     <td class="pull-ci">${ciCell(pr.ci)}</td>`;
   return `<tr class="pull-row" onclick="openExternal('${escapeHtml(pr.url)}')">
-    <td class="pull-title"><span class="pull-number">#${pr.number}</span> <span class="pull-title-text">${escapeHtml(pr.title)}</span></td>
+    <td class="pull-title"><a class="pull-title-link" href="${escapeHtml(pr.url)}" target="_blank" rel="noopener" onclick="event.preventDefault(); event.stopPropagation(); openExternal('${escapeHtml(pr.url)}')"><span class="pull-number">#${pr.number}</span> <span class="pull-title-text">${escapeHtml(pr.title)}</span></a></td>
     ${showAuthor ? `<td class="pull-author">${escapeHtml(pr.author)}</td>` : ""}
     ${statusCells}
     <td class="row-action">${actionBtn}</td>

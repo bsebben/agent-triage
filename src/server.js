@@ -324,7 +324,17 @@ const server = createServer(async (req, res) => {
             end if
             tell targetWindow to make new tab with properties {URL:"${url}"}
           end tell`;
-        execFile("osascript", ["-e", script]);
+        // Without a callback, a failed osascript invocation (wrong default browser,
+        // Chrome not running, Automation permission not granted) vanished silently —
+        // the client always got {ok: true} regardless. Log it so a "click did nothing"
+        // report is diagnosable from the server logs instead of a dead end.
+        execFile("osascript", ["-e", script], (err) => {
+          if (err) console.error(`[open-external] osascript failed for ${url}: ${err.message}`);
+        });
+      } else {
+        // Same silent-success problem as above, one level up: a missing/malformed url
+        // (e.g. pr.url was never populated) hit this branch and still returned {ok: true}.
+        console.warn(`[open-external] rejected invalid or missing url: ${JSON.stringify(url)}`);
       }
       return jsonResponse(res, { ok: true });
     }
