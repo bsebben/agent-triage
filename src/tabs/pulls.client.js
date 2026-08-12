@@ -210,10 +210,17 @@ const DEPLOY_LABELS = {
   unknown: "unknown (deploy-status API unreachable?)",
 };
 
-function deployDot(letter, envLabel, state) {
+// Real <a href> + target="_blank" when a Buildkite build link is known (so middle-click,
+// right-click "copy link", and hover-preview all work natively), plain <span> otherwise.
+// stopPropagation keeps the click from also firing the row's own PR-open handler.
+function deployDot(letter, envLabel, state, url) {
   const s = state || "unknown";
   const label = DEPLOY_LABELS[s];
-  return `<span class="deploy-dot deploy-${s}" title="${envLabel}: ${label}">${letter}</span>`;
+  const title = `${envLabel}: ${label}`;
+  if (url) {
+    return `<a class="deploy-dot deploy-${s}" href="${escapeHtml(url)}" target="_blank" rel="noopener" title="${title} — view Buildkite build" onclick="event.stopPropagation()">${letter}</a>`;
+  }
+  return `<span class="deploy-dot deploy-${s}" title="${title}">${letter}</span>`;
 }
 
 // Mirror of shouldShowDeployDots in src/tabs/pulls.js (kept in lockstep — that copy is the
@@ -230,11 +237,11 @@ function shouldShowDeployDots(deploy, repoTracked) {
   return true;
 }
 
-function deployDots(deploy, repoTracked) {
+function deployDots(deploy, repoTracked, links) {
   if (!shouldShowDeployDots(deploy, repoTracked)) return "";
   return `<span class="deploy-dots">${
-    deployDot("P", "Production", deploy.prod)
-  }${deployDot("S", "Staging", deploy.stage)}${deployDot("D", "Demo", deploy.demo)}</span>`;
+    deployDot("P", "Production", deploy.prod, links?.prod)
+  }${deployDot("S", "Staging", deploy.stage, links?.stage)}${deployDot("D", "Demo", deploy.demo, links?.demo)}</span>`;
 }
 
 function renderPullRow(pr, showAuthor, repo, subTab) {
@@ -243,7 +250,7 @@ function renderPullRow(pr, showAuthor, repo, subTab) {
     ? `<button class="agent-btn" title="Workspace limit reached" disabled>${claudeIcon()}</button>`
     : `<button class="agent-btn" title="Actions" data-pr-url="${escapeHtml(pr.url)}" onclick="event.stopPropagation(); openActionDrawerFromBtn(this)">${claudeIcon()}</button>`;
   const statusCells = subTab === "merged"
-    ? `<td class="pull-deploy">${deployDots(pr.deploy, pr.repoTracked)}</td>`
+    ? `<td class="pull-deploy">${deployDots(pr.deploy, pr.repoTracked, pr.deployLinks)}</td>`
     : `<td class="pull-status"><span class="pull-badge status-${pr.status}">${STATUS_LABELS[pr.status] || pr.status}</span></td>
     <td class="pull-ci">${ciCell(pr.ci)}</td>`;
   return `<tr class="pull-row" onclick="openExternal('${escapeHtml(pr.url)}')">
