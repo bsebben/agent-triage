@@ -143,6 +143,40 @@ describe("parseDeployments", () => {
     assert.deepEqual(parseDeployments(null), { prod: "none", stage: "none", demo: "none" });
     assert.deepEqual(parseDeployments([]), { prod: "none", stage: "none", demo: "none" });
   });
+
+  it("picks the most recent entry per environment when a retry follows a failure", () => {
+    const deploy = parseDeployments([
+      { environment: "production", state: "failed", started_at: "2026-08-12T10:00:00Z" },
+      { environment: "production", state: "succeeded", started_at: "2026-08-12T10:05:00Z" },
+    ]);
+    assert.equal(deploy.prod, "deployed");
+  });
+
+  it("is not fooled by array order — an earlier-failed entry listed after a later success", () => {
+    const deploy = parseDeployments([
+      { environment: "production", state: "succeeded", started_at: "2026-08-12T10:05:00Z" },
+      { environment: "production", state: "failed", started_at: "2026-08-12T10:00:00Z" },
+    ]);
+    assert.equal(deploy.prod, "deployed");
+  });
+
+  it("falls back to finished_at when started_at is absent", () => {
+    const deploy = parseDeployments([
+      { environment: "staging", state: "failed", finished_at: "2026-08-12T10:00:00Z" },
+      { environment: "staging", state: "succeeded", finished_at: "2026-08-12T10:05:00Z" },
+    ]);
+    assert.equal(deploy.stage, "deployed");
+  });
+
+  it("tracks the most recent entry independently per environment", () => {
+    const deploy = parseDeployments([
+      { environment: "production", state: "failed", started_at: "2026-08-12T10:00:00Z" },
+      { environment: "production", state: "succeeded", started_at: "2026-08-12T10:05:00Z" },
+      { environment: "staging", state: "succeeded", started_at: "2026-08-12T09:00:00Z" },
+      { environment: "staging", state: "deploying", started_at: "2026-08-12T09:30:00Z" },
+    ]);
+    assert.deepEqual(deploy, { prod: "deployed", stage: "in_progress", demo: "none" });
+  });
 });
 
 describe("capMergedGroups", () => {

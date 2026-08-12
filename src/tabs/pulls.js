@@ -288,14 +288,23 @@ async function fetchDeployStatus(repoWithOwner, sha) {
 }
 
 // Parse the deploy-status API's deployments[] into { prod, stage, demo }. Missing env → "none".
+// The API can return multiple entries for the same environment (e.g. a failed deploy
+// followed by a retry) with no guaranteed chronological array order, so pick the most
+// recent entry per environment by started_at (falling back to finished_at) rather than
+// trusting array order — otherwise a stale/failed entry landing later in the array can
+// overwrite a genuinely newer success.
 export function parseDeployments(deployments) {
   const deploy = { prod: "none", stage: "none", demo: "none" };
   if (!Array.isArray(deployments)) return deploy;
+  const latest = new Map(); // key -> { ts, state }
   for (const d of deployments) {
     const key = DEPLOY_ENV_KEYS[d?.environment];
     if (!key) continue;
-    deploy[key] = deployStateToIndicator(d.state);
+    const ts = new Date(d?.started_at || d?.finished_at || 0).getTime();
+    const prev = latest.get(key);
+    if (!prev || ts >= prev.ts) latest.set(key, { ts, state: d.state });
   }
+  for (const [key, { state }] of latest) deploy[key] = deployStateToIndicator(state);
   return deploy;
 }
 
