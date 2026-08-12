@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.44.2] - 2026-08-12
+
+### Fixed
+
+- Workspace-tab cards no longer render bogus answer pills. Once a real option was found, the screen parser treated *every* later line indented two or more spaces as another option, with no marker requirement and nothing to end the run — soft-wrapped agent prose and the "Update available!" banner both turned into blue pill buttons. Unmarked options must now sit in the same uninterrupted block as the marker line (`❯`, `●`, `1.`, …) and start at the same column.
+- `/api/open-external` no longer interpolates the caller-supplied URL into the AppleScript source. Only `/^https?:\/\//` was checked, so an embedded double quote could close the string literal and append arbitrary AppleScript (including `do shell script`) — reachable from any page in the browser, since CORS is wildcard and the server binds all interfaces. The URL is now parsed with `new URL()` and passed to `osascript` as an argv item.
+- Every mutating endpoint (`/api/new-workspace`, `/api/restart`, `/api/update`, `/api/close`, `/api/config` POST, and others), not just `/api/open-external`, now rejects cross-origin requests — the same wildcard-CORS exposure applied to all of them, not only the one endpoint that happened to touch AppleScript.
+- External links now raise the Chrome window they were opened into. The `activate` call only fronted whichever Chrome window was last frontmost — usually the dashboard window the click came from — so opening into an existing window looked like nothing had happened.
+- PR/ticket title links, the tickets tab's parent-key chip, and the action drawer's "Open in GitHub"/"Open in Jira" link now respect cmd/ctrl/shift/opt-click for native background-tab/new-window behaviour instead of unconditionally preventing default, matching the Buildkite deploy dots' click handling below.
+
+### Changed
+
+- Buildkite deploy dots route a plain left-click through `/api/open-external` so the build lands in a separate window rather than the dashboard's own. Cmd/ctrl/shift-click keep native browser behaviour, and `openExternal()` now falls back to `window.open` when the server reports that `osascript` failed (Chrome missing, or Automation permission not granted) instead of silently doing nothing.
+
 ## [1.44.1] - 2026-08-12
 
 ### Fixed
