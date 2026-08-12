@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.44.1] - 2026-08-12
+
+### Fixed
+
+- PR/ticket "Open in GitHub"/"Open in Jira" links (action drawer, row titles, and the tickets tab's parent-key chip) now carry a real `href` instead of relying solely on an `onclick` handler (the action drawer's link was hardcoded to `href="#"`). Middle-click, right-click "copy link"/"open in new tab", and hover-preview now work; a normal left-click still goes through the existing window-reuse flow unchanged.
+
+### Changed
+
+- `/api/open-external` now logs when it rejects a missing/malformed URL, and logs if the underlying `osascript` call fails, instead of silently returning `{ok: true}` either way. A "clicking a PR did nothing" report was previously a dead end with no signal on either the client or server side.
+
 ## [1.44.0] - 2026-08-12
 
 ### Added

@@ -28,8 +28,11 @@ function externalLinkIcon() {
   return `<svg class="external-link-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 3h3v3"/><path d="M13 3l-6 6"/><path d="M11 9v3.5A1.5 1.5 0 0 1 9.5 14h-6A1.5 1.5 0 0 1 2 12.5v-6A1.5 1.5 0 0 1 3.5 5H7"/></svg>`;
 }
 
+// Real href (not "#") so middle-click, right-click "copy link"/"open in new tab", and
+// hover-preview all work even when the onclick's window-reuse flow can't run for some
+// reason. Left-click still goes through openExternal() via preventDefault.
 function renderExternalLink(url, label) {
-  return `<a class="external-link" href="#" title="Opens in new tab" onclick="event.preventDefault(); openExternal('${escapeHtml(url)}'); return false;">${escapeHtml(label)}${externalLinkIcon()}</a>`;
+  return `<a class="external-link" href="${escapeHtml(url)}" target="_blank" rel="noopener" title="Opens in new tab" onclick="event.preventDefault(); openExternal('${escapeHtml(url)}'); return false;">${escapeHtml(label)}${externalLinkIcon()}</a>`;
 }
 
 function renderPrMeta(pr, repo) {
