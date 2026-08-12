@@ -88,8 +88,9 @@ async function detect() {
 }
 
 // --- Shared pagination ---
-// Each transport implements searchIssues(cloudId, jql, fields, maxResults) => { issues, isLast }.
-// This loop is transport-agnostic: cursor-based keyset pagination using ORDER BY key ASC.
+// Each transport implements searchIssues(cloudId, jql, fields, maxResults, pageToken)
+// => { issues, isLast, nextPageToken }. This loop is transport-agnostic and resumes via
+// the API's own nextPageToken rather than a hand-rolled cursor (see paginateIssues).
 
 function stripOrderBy(jql) {
   return jql.replace(/\s+ORDER\s+BY\s+.+$/i, "").trim();
@@ -112,20 +113,24 @@ export function applyExcludeProjects(jql, excludeProjects) {
   return `${where} AND project NOT IN (${notIn})${order}`;
 }
 
-async function paginateIssues(cloudId, jql, transport) {
-  const baseJql = stripOrderBy(jql);
+// Resumes pagination via the search API's own nextPageToken rather than a hand-rolled
+// `key > lastKey` cursor. That cursor looked safe (ORDER BY key ASC sorts alphabetically
+// by project prefix) but Jira's `key >` comparison evaluates against the issue's internal
+// numeric ID, not the alphabetical key string — so crossing from one project's keys to the
+// next (e.g. "PO-1773" -> "USPGIA-1169", alphabetically later but a lower internal ID)
+// silently matched zero issues and pagination reported isLast, permanently truncating any
+// JQL that spans more than one project. The API-issued token has no such assumption.
+export async function paginateIssues(cloudId, jql, transport) {
+  const pagedJql = `${stripOrderBy(jql)} ORDER BY key ASC`;
   const allIssues = [];
-  let lastKey = null;
+  let pageToken = null;
   const pageSize = transport.pageSize ?? 50;
 
   for (let page = 0; page < 20 && allIssues.length < PAGE_LIMIT; page++) {
-    const pagedJql = lastKey
-      ? `${baseJql} AND key > "${lastKey}" ORDER BY key ASC`
-      : `${baseJql} ORDER BY key ASC`;
-    const { issues, isLast } = await transport.searchIssues(cloudId, pagedJql, FIELDS, pageSize);
+    const { issues, isLast, nextPageToken } = await transport.searchIssues(cloudId, pagedJql, FIELDS, pageSize, pageToken);
     allIssues.push(...issues);
-    if (isLast || issues.length === 0) break;
-    lastKey = issues[issues.length - 1].key;
+    if (isLast || issues.length === 0 || !nextPageToken) break;
+    pageToken = nextPageToken;
   }
   return allIssues;
 }
@@ -154,10 +159,12 @@ const mcpproxyTransport = (() => {
       }
     },
 
-    async searchIssues(cloudId, jql, fields, maxResults) {
+    async searchIssues(cloudId, jql, fields, maxResults, pageToken) {
+      const args = { cloudId, jql, fields, maxResults };
+      if (pageToken) args.nextPageToken = pageToken;
       const { stdout } = await execFileAsync(
         "mcpproxy",
-        ["call", "tool-read", "-t", mcpTool, "-j", JSON.stringify({ cloudId, jql, fields, maxResults }), "-o", "json"],
+        ["call", "tool-read", "-t", mcpTool, "-j", JSON.stringify(args), "-o", "json"],
         { timeout: 30000, maxBuffer: 1024 * 1024 },
       );
       const jsonStart = stdout.indexOf("{");
@@ -229,8 +236,10 @@ const runlayerTransport = (() => {
       }
     },
 
-    async searchIssues(cloudId, jql, fields, maxResults) {
-      const result = await client.callTool("searchJiraIssuesUsingJql", { cloudId, jql, fields, maxResults });
+    async searchIssues(cloudId, jql, fields, maxResults, pageToken) {
+      const args = { cloudId, jql, fields, maxResults };
+      if (pageToken) args.nextPageToken = pageToken;
+      const result = await client.callTool("searchJiraIssuesUsingJql", args);
       const textContent = result?.content?.[0]?.text;
       if (!textContent) return { issues: [], isLast: true };
       try {
@@ -240,7 +249,7 @@ const runlayerTransport = (() => {
         const isLast = parsed.isLast !== undefined
           ? parsed.isLast !== false
           : (parsed.startAt ?? 0) + issues.length >= (parsed.total ?? issues.length);
-        return { issues, isLast };
+        return { issues, isLast, nextPageToken: parsed.nextPageToken };
       } catch {
         return { issues: extractIssuesFromCleanJson(textContent), isLast: true };
       }
@@ -407,6 +416,11 @@ function parseIssueArray(src, arrayStart) {
   return issues;
 }
 
+// nextPageToken is only returned when we got the complete, non-truncated JSON blob — a
+// truncated response cuts off before the trailing isLast/nextPageToken keys, so pagination
+// has no safe cursor to resume from and simply stops early for this poll (rare in practice:
+// MCPPROXY_PAGE_SIZE is deliberately tiny to stay under the truncation limit in the first
+// place; the next poll starts over from page 1 regardless).
 function parseGoMapPage(text) {
   const TRUNCATION_MARKER = "... [truncated by mcpproxy]";
   const truncIdx = text.indexOf(TRUNCATION_MARKER);
@@ -422,7 +436,7 @@ function parseGoMapPage(text) {
         const parsed = JSON.parse(safeText.slice(jsonStart, lastBrace + 1));
         if (parsed.issues) {
           const isLast = wasTruncated ? false : parsed.isLast !== false;
-          return { issues: parsed.issues, isLast };
+          return { issues: parsed.issues, isLast, nextPageToken: wasTruncated ? undefined : parsed.nextPageToken };
         }
       } catch { /* fall through */ }
     }
