@@ -5,6 +5,8 @@ import assert from "node:assert/strict";
 import {
   prStatus,
   parseDeployments,
+  parseDeployLinks,
+  buildkiteUrlFromExecutionRef,
   capMergedGroups,
   resolveDeploy,
   isTerminalDeploy,
@@ -176,6 +178,62 @@ describe("parseDeployments", () => {
       { environment: "staging", state: "deploying", started_at: "2026-08-12T09:30:00Z" },
     ]);
     assert.deepEqual(deploy, { prod: "deployed", stage: "in_progress", demo: "none" });
+  });
+});
+
+describe("buildkiteUrlFromExecutionRef", () => {
+  it("parses a Buildkite build URN into a build URL", () => {
+    assert.equal(
+      buildkiteUrlFromExecutionRef("urn:buildkite:build:gusto:zenpayroll-deployment:192898"),
+      "https://buildkite.com/gusto/zenpayroll-deployment/builds/192898",
+    );
+  });
+
+  it("returns null for a non-Buildkite ref", () => {
+    assert.equal(buildkiteUrlFromExecutionRef("urn:some-other-ci:build:gusto:web:1"), null);
+  });
+
+  it("returns null for a malformed ref", () => {
+    assert.equal(buildkiteUrlFromExecutionRef("urn:buildkite:build:gusto:zenpayroll-deployment:not-a-number"), null);
+    assert.equal(buildkiteUrlFromExecutionRef("not a urn at all"), null);
+  });
+
+  it("returns null for a missing or non-string ref", () => {
+    assert.equal(buildkiteUrlFromExecutionRef(undefined), null);
+    assert.equal(buildkiteUrlFromExecutionRef(null), null);
+  });
+});
+
+describe("parseDeployLinks", () => {
+  it("maps each environment's execution_ref to a Buildkite build URL", () => {
+    const links = parseDeployLinks([
+      { environment: "production", state: "succeeded", execution_ref: "urn:buildkite:build:gusto:zenpayroll-deployment:1" },
+      { environment: "staging", state: "deploying", execution_ref: "urn:buildkite:build:gusto:zenpayroll-deployment:2" },
+    ]);
+    assert.deepEqual(links, {
+      prod: "https://buildkite.com/gusto/zenpayroll-deployment/builds/1",
+      stage: "https://buildkite.com/gusto/zenpayroll-deployment/builds/2",
+      demo: null,
+    });
+  });
+
+  it("picks the most recent entry per environment, same as parseDeployments", () => {
+    const links = parseDeployLinks([
+      { environment: "production", state: "failed", started_at: "2026-08-12T10:00:00Z", execution_ref: "urn:buildkite:build:gusto:zenpayroll-deployment:1" },
+      { environment: "production", state: "succeeded", started_at: "2026-08-12T10:05:00Z", execution_ref: "urn:buildkite:build:gusto:zenpayroll-deployment:2" },
+    ]);
+    assert.equal(links.prod, "https://buildkite.com/gusto/zenpayroll-deployment/builds/2");
+  });
+
+  it("returns null for an environment with no execution_ref", () => {
+    const links = parseDeployLinks([{ environment: "production", state: "succeeded" }]);
+    assert.equal(links.prod, null);
+  });
+
+  it("returns all null for a missing or non-array deployments field", () => {
+    assert.deepEqual(parseDeployLinks(undefined), { prod: null, stage: null, demo: null });
+    assert.deepEqual(parseDeployLinks(null), { prod: null, stage: null, demo: null });
+    assert.deepEqual(parseDeployLinks([]), { prod: null, stage: null, demo: null });
   });
 });
 
