@@ -13,6 +13,39 @@ function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+const PROMPT_LINE = /^\s*[>❯➜](\s|$)/;
+
+/**
+ * The text currently in Claude Code's input box, `""` when the box is empty, or
+ * `null` when the screen holds no prompt line at all.
+ *
+ * Claude Code draws the input box as a bare prompt line (`❯ /reload-plugins`)
+ * between two horizontal rules — there are no vertical borders to key off, and
+ * transcript echoes of earlier submissions use the same shape. So the live input
+ * box is identified by position: it is the bottom-most prompt line on the screen.
+ * Autocomplete suggestion rows are indented and carry no prompt glyph, so they
+ * never match.
+ */
+export function inputBoxText(screen) {
+  if (!screen) return null;
+  const lines = screen.split("\n");
+  for (let i = lines.length - 1; i >= 0; i--) {
+    if (PROMPT_LINE.test(lines[i])) return lines[i].replace(/^\s*[>❯➜]/, "").trim();
+  }
+  return null;
+}
+
+/** True when `text` is still sitting unsubmitted in Claude Code's input box. */
+export function isPendingInput(screen, text) {
+  return inputBoxText(screen) === text;
+}
+
+function describeBox(value) {
+  if (value === null) return "no prompt";
+  if (value === "") return "an empty prompt";
+  return JSON.stringify(value);
+}
+
 export class Refresher {
   #cmux;
   #execFileAsync;
@@ -96,6 +129,78 @@ export class Refresher {
     }
   }
 
+  /** Polls until the input box holds exactly `text`. */
+  async #waitForInputBox(workspaceRef, text, { polls = 20 } = {}) {
+    let seen = null;
+    for (let i = 0; i < polls; i++) {
+      const screen = await this.#cmux.readScreenByWorkspace(workspaceRef);
+      seen = inputBoxText(screen);
+      if (seen === text) return { ok: true, seen };
+      await sleep(this.#pollIntervalMs);
+    }
+    return { ok: false, seen };
+  }
+
+  /**
+   * Classifies the input box after an Enter: submitted (prompt cleared), still
+   * pending (`text` unchanged), or holding something else entirely.
+   */
+  async #readSubmitOutcome(workspaceRef, text, { polls = 6 } = {}) {
+    let current = null;
+    for (let i = 0; i < polls; i++) {
+      await sleep(this.#pollIntervalMs);
+      const screen = await this.#cmux.readScreenByWorkspace(workspaceRef);
+      current = inputBoxText(screen);
+      if (current === null) continue;
+      // An empty prompt is positive evidence: the text we confirmed was in the
+      // box before Enter has left it, so Claude Code accepted the line.
+      if (current === "") return { submitted: true, current };
+      if (current !== text) return { submitted: false, current };
+    }
+    return { submitted: false, current };
+  }
+
+  /**
+   * Types a slash command and submits it, tolerating Claude Code's autocomplete.
+   *
+   * Enter that arrives while the slash-command dropdown is open gets consumed by
+   * the dropdown (it accepts the highlighted suggestion) instead of submitting the
+   * line, leaving the command typed but never run. Waiting for the screen to settle
+   * does not help — a screen with the dropdown open is stable. So each step is
+   * verified against the input box instead: confirm the command landed in the box,
+   * then send Enter and re-send it as long as the box still holds the command.
+   *
+   * @returns {Promise<{ok: boolean, error?: string}>}
+   */
+  async #submitCommand(workspaceId, surfaceRef, workspaceRef, text, { attempts = 3 } = {}) {
+    await this.#cmux.sendText(workspaceId, surfaceRef, text);
+
+    const landed = await this.#waitForInputBox(workspaceRef, text);
+    if (!landed.ok) {
+      return { ok: false, error: `${text} never reached the input box (found ${describeBox(landed.seen)})` };
+    }
+
+    for (let attempt = 0; attempt < attempts; attempt++) {
+      await this.#cmux.sendKey(workspaceId, surfaceRef, "Enter");
+      const outcome = await this.#readSubmitOutcome(workspaceRef, text);
+      if (outcome.submitted) return { ok: true };
+      if (outcome.current === null) {
+        // No prompt line was visible for the whole read window — Claude Code is
+        // likely mid-render (e.g. still processing the command we just sent), not
+        // necessarily still holding it. We can't tell submitted from swallowed here,
+        // and sending another blind Enter risks a spurious keystroke landing once
+        // rendering catches up, so stop instead of retrying.
+        return { ok: false, error: `${text} submission could not be confirmed (no prompt visible after Enter)` };
+      }
+      if (outcome.current !== text) {
+        return { ok: false, error: `${text} was replaced in the input box by ${describeBox(outcome.current)}` };
+      }
+      // Still holding the command: the dropdown swallowed that Enter. It closes on
+      // accepting the suggestion, so the next Enter reaches the input line.
+    }
+    return { ok: false, error: `${text} is still sitting in the input box after ${attempts} attempts` };
+  }
+
   async refreshSession(workspaceId, { dangerous = false } = {}) {
     const agentIds = await this.#cmux.listAgentWorkspaceIds();
     if (!agentIds.has(workspaceId)) {
@@ -170,12 +275,15 @@ export class Refresher {
       // the resume/initialization flow finishes and the input prompt is active.
       await this.#waitForScreenStable(workspaceRef, { timeoutMs: this.#timeoutMs });
 
-      await this.#cmux.sendText(workspaceId, surfaceRef, "/reload-plugins");
-      await this.#cmux.sendKey(workspaceId, surfaceRef, "Enter");
+      const submitted = await this.#submitCommand(workspaceId, surfaceRef, workspaceRef, "/reload-plugins");
 
       // Restore the workspace title
       if (title) {
         try { await this.#cmux.renameWorkspace(workspaceId, title); } catch {}
+      }
+
+      if (!submitted.ok) {
+        return { ok: false, sessionId: sessionId || null, error: `Claude Code restarted, but ${submitted.error}` };
       }
 
       return { ok: true, sessionId: sessionId || null };

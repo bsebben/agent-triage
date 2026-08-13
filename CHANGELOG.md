@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.45.1] - 2026-08-13
+
+### Fixed
+
+- Refreshing a workspace now actually submits `/reload-plugins` instead of leaving it typed in Claude Code's input box. Enter was sent immediately after the text, so the slash-command autocomplete dropdown consumed it as "accept suggestion" rather than "submit". The refresher now reads the input box after every step — it confirms the command landed there, re-sends Enter while the box still holds it, and reports an error if the command never submits or if the dropdown replaced it with a different one.
+
 ## [1.45.0] - 2026-08-13
 
 ### Removed
