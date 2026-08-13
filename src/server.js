@@ -130,6 +130,13 @@ function parseExternalUrl(url) {
   return parsed;
 }
 
+// AppleScript window id of the Chrome window /api/open-external last opened a link into,
+// so subsequent clicks reuse that dedicated window instead of picking whichever other
+// window happens to be open (which was otherwise indistinguishable from the user's own
+// browsing window). Empty string until the first successful open. In-memory only — reset
+// on server restart, which just means the next click creates a fresh window.
+let lastLinksWindowId = "";
+
 function resolveCwd(repo) {
   const workspace = join(HOME, "workspace");
   if (repo) {
@@ -338,30 +345,27 @@ const server = createServer(async (req, res) => {
         console.warn(`[open-external] rejected invalid or missing url: ${JSON.stringify(url)}`);
         return jsonResponse(res, { ok: false, error: "Invalid or missing url" }, 400);
       }
-      // The URL and the dashboard's own origin are passed as argv rather than
-      // interpolated into the script source: a double quote or newline in the URL would
-      // otherwise close the AppleScript string literal and let the caller append
-      // arbitrary AppleScript (including `do shell script`).
+      // The URL is passed as argv rather than interpolated into the script source: a
+      // double quote or newline in the URL would otherwise close the AppleScript string
+      // literal and let the caller append arbitrary AppleScript (including `do shell
+      // script`).
+      //
+      // Reuse only the window *this feature created* (tracked by AppleScript window id
+      // in `lastLinksWindowId`), never "any window that isn't the dashboard" — that
+      // heuristic matched whichever regular browsing window happened to be open and
+      // dumped new tabs into it instead of a dedicated window. If the tracked window was
+      // closed (or this is the first call since the server started), create a fresh one.
       const script = `
         on run argv
           set targetURL to item 1 of argv
-          set dashboardPrefix to item 2 of argv
+          set lastWindowId to item 2 of argv
           tell application "Google Chrome"
             set targetWindow to missing value
-            repeat with w in windows
-              set tabURLs to URL of every tab of w
-              set isDashboard to false
-              repeat with u in tabURLs
-                if u starts with dashboardPrefix then
-                  set isDashboard to true
-                  exit repeat
-                end if
-              end repeat
-              if not isDashboard then
-                set targetWindow to w
-                exit repeat
-              end if
-            end repeat
+            if lastWindowId is not "" then
+              try
+                set targetWindow to window id (lastWindowId as integer)
+              end try
+            end if
             if targetWindow is missing value then
               -- A freshly created window already has one default blank tab. Adding a
               -- second tab here (as the existing-window branch below does) left that
@@ -378,18 +382,22 @@ const server = createServer(async (req, res) => {
             -- the dashboard window the click came from.
             set index of targetWindow to 1
             activate
+            return id of targetWindow
           end tell
         end run`;
       // A failed osascript invocation (Chrome not installed, not running, Automation
       // permission not granted) has no other observable signal. Report it so the
       // caller can fall back to a plain window.open.
-      const error = await new Promise((resolve) => {
-        execFile("osascript", ["-e", script, target.href, `http://localhost:${PORT}`], (err) => resolve(err));
+      const { error, windowId } = await new Promise((resolve) => {
+        execFile("osascript", ["-e", script, target.href, lastLinksWindowId], (err, stdout) => {
+          resolve({ error: err, windowId: stdout && stdout.trim() });
+        });
       });
       if (error) {
         console.error(`[open-external] osascript failed for ${target.href}: ${error.message}`);
         return jsonResponse(res, { ok: false, error: error.message, fallback: true }, 500);
       }
+      if (windowId) lastLinksWindowId = windowId;
       return jsonResponse(res, { ok: true });
     }
 

@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.45.4] - 2026-08-13
+
+### Fixed
+
+- `/api/open-external` no longer reuses "any Chrome window that isn't the dashboard" for external links — that heuristic matched whichever regular browsing window happened to be open and dumped new tabs into it, cluttering the user's own window instead of a dedicated one. It now tracks the AppleScript window id of the window it last opened a link into and only reuses that one, creating a fresh dedicated window if it was closed (or on first use since the server started).
+
 ## [1.45.3] - 2026-08-13
 
 ### Fixed
