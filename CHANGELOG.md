@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.45.6] - 2026-08-13
+
+### Changed
+
+- Clickable deploy dots on the pulls tab now scale up with a ring outline on hover, making it obvious they open the Buildkite build. Dots with no known build stay inert.
+
 ## [1.45.5] - 2026-08-13
 
 ### Fixed

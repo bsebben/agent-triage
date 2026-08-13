@@ -902,6 +902,7 @@ main { padding: 8px; position: relative; }
   color: var(--text-dim);
   background: color-mix(in srgb, var(--text-dim) 15%, var(--card));
   cursor: default;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
 }
 
 /* Deploy dots with a known Buildkite build render as real links (see deployDot() in
@@ -909,6 +910,12 @@ main { padding: 8px; position: relative; }
 a.deploy-dot {
   text-decoration: none;
   cursor: pointer;
+}
+
+/* Only the linked dots grow on hover — plain-span dots have no build to open. */
+a.deploy-dot:hover {
+  transform: scale(1.25);
+  box-shadow: 0 0 0 1px currentColor;
 }
 
 .deploy-dot.deploy-deployed { color: var(--clr-completion); background: color-mix(in srgb, var(--clr-completion) 22%, var(--card)); }
