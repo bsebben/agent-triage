@@ -102,6 +102,41 @@ function getFullData() {
   };
 }
 
+// Every mutating endpoint (new-workspace, restart, update, close, config POST, ...) is
+// reachable from any page the user visits: CORS is wildcard and the server binds all
+// interfaces. A browser cannot forge Origin, so requiring it to match Host blocks
+// cross-site callers. Non-browser clients (curl) send no Origin at all. Applied to every
+// non-GET/HEAD request below rather than per-endpoint, so new mutating routes are covered
+// by default instead of needing to opt in individually.
+function isSameOriginRequest(req) {
+  const origin = req.headers.origin;
+  if (!origin) return true;
+  try {
+    return new URL(origin).host === req.headers.host;
+  } catch {
+    return false;
+  }
+}
+
+function parseExternalUrl(url) {
+  if (typeof url !== "string") return null;
+  let parsed;
+  try {
+    parsed = new URL(url);
+  } catch {
+    return null;
+  }
+  if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return null;
+  return parsed;
+}
+
+// AppleScript window id of the Chrome window /api/open-external last opened a link into,
+// so subsequent clicks reuse that dedicated window instead of picking whichever other
+// window happens to be open (which was otherwise indistinguishable from the user's own
+// browsing window). Empty string until the first successful open. In-memory only — reset
+// on server restart, which just means the next click creates a fresh window.
+let lastLinksWindowId = "";
+
 function resolveCwd(repo) {
   const workspace = join(HOME, "workspace");
   if (repo) {
@@ -119,6 +154,9 @@ const server = createServer(async (req, res) => {
   res.setHeader("Access-Control-Allow-Methods", "GET, POST, PATCH, DELETE, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
   if (req.method === "OPTIONS") { res.writeHead(204); return res.end(); }
+  if (req.method !== "GET" && req.method !== "HEAD" && !isSameOriginRequest(req)) {
+    return jsonResponse(res, { ok: false, error: "Cross-origin request rejected" }, 403);
+  }
 
   try {
     if (req.url === "/api/queue" && req.method === "GET") {
@@ -300,32 +338,74 @@ const server = createServer(async (req, res) => {
 
     if (req.url === "/api/open-external" && req.method === "POST") {
       const { url } = await readBody(req);
-      if (url && /^https?:\/\//.test(url)) {
-        const script = `
+      const target = parseExternalUrl(url);
+      if (!target) {
+        // A missing/malformed url (e.g. pr.url was never populated) hits this branch;
+        // log it so the client's report isn't a dead end with no server-side signal.
+        console.warn(`[open-external] rejected invalid or missing url: ${JSON.stringify(url)}`);
+        return jsonResponse(res, { ok: false, error: "Invalid or missing url" }, 400);
+      }
+      // The URL is passed as argv rather than interpolated into the script source: a
+      // double quote or newline in the URL would otherwise close the AppleScript string
+      // literal and let the caller append arbitrary AppleScript (including `do shell
+      // script`).
+      //
+      // Reuse only the window *this feature created* (tracked by AppleScript window id
+      // in `lastLinksWindowId`), never "any window that isn't the dashboard" — that
+      // heuristic matched whichever regular browsing window happened to be open and
+      // dumped new tabs into it instead of a dedicated window. If the tracked window was
+      // closed (or this is the first call since the server started), create a fresh one.
+      const script = `
+        on run argv
+          set targetURL to item 1 of argv
+          set lastWindowId to item 2 of argv
           tell application "Google Chrome"
             set targetWindow to missing value
-            repeat with w in windows
-              set tabURLs to URL of every tab of w
-              set isDashboard to false
-              repeat with u in tabURLs
-                if u starts with "http://localhost:${PORT}" then
-                  set isDashboard to true
-                  exit repeat
-                end if
-              end repeat
-              if not isDashboard then
-                set targetWindow to w
-                exit repeat
-              end if
-            end repeat
+            if lastWindowId is not "" then
+              try
+                set targetWindow to window id (lastWindowId as integer)
+              end try
+            end if
             if targetWindow is missing value then
+              -- A freshly created window's default tab starts loading Chrome's own
+              -- new-tab-page asynchronously, and that load can race anything we do
+              -- immediately after make new window — including the second-tab-then-close
+              -- approach below, non-deterministically. Retrying the URL set for up to
+              -- 1.5s until it actually sticks (instead of setting it once and hoping)
+              -- covers the race regardless of which step it lands on.
               make new window
               set targetWindow to window 1
+              tell targetWindow to make new tab with properties {URL:targetURL}
+              close tab 1 of targetWindow
+              repeat with i from 1 to 15
+                if (URL of active tab of targetWindow) is not "chrome://new-tab-page/" then exit repeat
+                set URL of active tab of targetWindow to targetURL
+                delay 0.1
+              end repeat
+            else
+              tell targetWindow to make new tab with properties {URL:targetURL}
             end if
-            tell targetWindow to make new tab with properties {URL:"${url}"}
-          end tell`;
-        execFile("osascript", ["-e", script]);
+            -- Raise the window we actually wrote to before activating: a bare activate
+            -- only fronts whichever Chrome window was last frontmost, which is usually
+            -- the dashboard window the click came from.
+            set index of targetWindow to 1
+            activate
+            return id of targetWindow
+          end tell
+        end run`;
+      // A failed osascript invocation (Chrome not installed, not running, Automation
+      // permission not granted) has no other observable signal. Report it so the
+      // caller can fall back to a plain window.open.
+      const { error, windowId } = await new Promise((resolve) => {
+        execFile("osascript", ["-e", script, target.href, lastLinksWindowId], (err, stdout) => {
+          resolve({ error: err, windowId: stdout && stdout.trim() });
+        });
+      });
+      if (error) {
+        console.error(`[open-external] osascript failed for ${target.href}: ${error.message}`);
+        return jsonResponse(res, { ok: false, error: error.message, fallback: true }, 500);
       }
+      if (windowId) lastLinksWindowId = windowId;
       return jsonResponse(res, { ok: true });
     }
 

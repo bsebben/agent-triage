@@ -35,6 +35,10 @@ npm start
 
 Verify: `curl -s http://localhost:7777/api/config` should return JSON.
 
+## Chrome dependency
+
+`/api/open-external` (PR/ticket links, deploy dots) drives **Google Chrome specifically** via AppleScript/`osascript` to open links in a dedicated window — macOS Automation permission for the terminal/process running the server must be granted. There's no equivalent for other browsers. If `osascript` fails (Chrome not installed/running, permission not granted), the client falls back to `window.open()` in whatever browser the dashboard is running in — see `openExternal()` in `src/tabs/pulls.client.js`.
+
 ## Auto-start with cmux
 
 Install the shell hook so the dashboard starts automatically when cmux launches:
@@ -117,7 +121,7 @@ When updating the supported range:
 
 ## Architecture
 
-- `src/server.js` - HTTP + WebSocket server, tab registry, polling
+- `src/server.js` - HTTP + WebSocket server, tab registry, polling; also drives Chrome via AppleScript for `/api/open-external` (see [Chrome dependency](#chrome-dependency))
 - `src/config.js` - Config loader (DEFAULTS + cmux detection, passes `config.tabs` to modules)
 - `src/utils.js` - Shared utilities (startPolling)
 - `src/cmux.js` - Persistent socket RPC to cmux

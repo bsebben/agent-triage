@@ -174,7 +174,7 @@ function repoMergedLink(group) {
   if (!pr || !pr.repoWithOwner || !pr.author) return "";
   const q = encodeURIComponent(`is:pr is:merged author:${pr.author}`);
   const url = `https://github.com/${pr.repoWithOwner}/pulls?q=${q}`;
-  return `<a class="pulls-repo-more" href="${escapeHtml(url)}" title="View all merged PRs for this repo on GitHub" onclick="event.stopPropagation(); openExternal('${escapeHtml(url)}'); return false;">more →</a>`;
+  return `<a class="pulls-repo-more" href="${escapeHtml(url)}" target="_blank" rel="noopener" title="View all merged PRs for this repo on GitHub" onclick="openExternalClick(event, '${escapeHtml(url)}')">more →</a>`;
 }
 
 function renderPullGroup(group, showAuthor, subTab) {
@@ -210,15 +210,26 @@ const DEPLOY_LABELS = {
   unknown: "unknown (deploy-status API unreachable?)",
 };
 
-// Real <a href> + target="_blank" when a Buildkite build link is known (so middle-click,
-// right-click "copy link", and hover-preview all work natively), plain <span> otherwise.
-// stopPropagation keeps the click from also firing the row's own PR-open handler.
+// Shared by every real <a href> link that opens externally (deploy dots, PR/ticket
+// titles, the tickets tab's parent-key chip, action-drawer links): a plain left-click
+// routes through openExternal() so the link lands in a separate Chrome window rather
+// than the dashboard's own. Modifier-clicks keep the browser's native behaviour —
+// preventDefault would swallow cmd/ctrl-click's background tab and route it through the
+// Chrome-only openExternal path instead. stopPropagation keeps the click from also
+// firing a parent row's own click handler.
+function openExternalClick(event, url) {
+  event.stopPropagation();
+  if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+  event.preventDefault();
+  openExternal(url);
+}
+
 function deployDot(letter, envLabel, state, url) {
   const s = state || "unknown";
   const label = DEPLOY_LABELS[s];
   const title = `${envLabel}: ${label}`;
   if (url) {
-    return `<a class="deploy-dot deploy-${s}" href="${escapeHtml(url)}" target="_blank" rel="noopener" title="${title} — view Buildkite build" onclick="event.stopPropagation()">${letter}</a>`;
+    return `<a class="deploy-dot deploy-${s}" href="${escapeHtml(url)}" target="_blank" rel="noopener" title="${title} — view Buildkite build" onclick="openExternalClick(event, '${escapeHtml(url)}')">${letter}</a>`;
   }
   return `<span class="deploy-dot deploy-${s}" title="${title}">${letter}</span>`;
 }
@@ -254,7 +265,7 @@ function renderPullRow(pr, showAuthor, repo, subTab) {
     : `<td class="pull-status"><span class="pull-badge status-${pr.status}">${STATUS_LABELS[pr.status] || pr.status}</span></td>
     <td class="pull-ci">${ciCell(pr.ci)}</td>`;
   return `<tr class="pull-row" onclick="openExternal('${escapeHtml(pr.url)}')">
-    <td class="pull-title"><span class="pull-number">#${pr.number}</span> <span class="pull-title-text">${escapeHtml(pr.title)}</span></td>
+    <td class="pull-title"><a class="pull-title-link" href="${escapeHtml(pr.url)}" target="_blank" rel="noopener" onclick="openExternalClick(event, '${escapeHtml(pr.url)}')"><span class="pull-number">#${pr.number}</span> <span class="pull-title-text">${escapeHtml(pr.title)}</span></a></td>
     ${showAuthor ? `<td class="pull-author">${escapeHtml(pr.author)}</td>` : ""}
     ${statusCells}
     <td class="row-action">${actionBtn}</td>
@@ -262,5 +273,9 @@ function renderPullRow(pr, showAuthor, repo, subTab) {
 }
 
 async function openExternal(url) {
-  await apiPost("open-external", { url });
+  const res = await apiPost("open-external", { url }).catch(() => null);
+  // The server drives Google Chrome specifically. If Chrome isn't installed/running or
+  // Automation permission was never granted, open the URL in whatever browser the
+  // dashboard is running in rather than leaving the click as a silent no-op.
+  if (res && res.fallback) window.open(url, "_blank", "noopener");
 }

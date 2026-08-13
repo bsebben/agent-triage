@@ -5,6 +5,46 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.45.5] - 2026-08-13
+
+### Fixed
+
+- Recreating the dedicated external-links window (after the user closed it) could land on a blank `chrome://new-tab-page/` instead of the target URL — a freshly created Chrome window's default tab starts loading its own new-tab-page asynchronously, which non-deterministically raced whatever we did next to set the real URL. Setting the URL is now retried for up to 1.5s until it actually sticks, instead of being set once and trusted.
+
+### Added
+
+- Documented the hard dependency on Google Chrome (and macOS Automation permission) for opening PR/ticket links and deploy dots — README prerequisites/features and CLAUDE.md, since nothing previously called out that this feature is Chrome-specific with no equivalent for other browsers.
+
+## [1.45.4] - 2026-08-13
+
+### Fixed
+
+- `/api/open-external` no longer reuses "any Chrome window that isn't the dashboard" for external links — that heuristic matched whichever regular browsing window happened to be open and dumped new tabs into it, cluttering the user's own window instead of a dedicated one. It now tracks the AppleScript window id of the window it last opened a link into and only reuses that one, creating a fresh dedicated window if it was closed (or on first use since the server started).
+
+## [1.45.3] - 2026-08-13
+
+### Fixed
+
+- `/api/open-external` no longer interpolates the caller-supplied URL into the AppleScript source. Only `/^https?:\/\//` was checked, so an embedded double quote could close the string literal and append arbitrary AppleScript (including `do shell script`) — reachable from any page in the browser, since CORS is wildcard and the server binds all interfaces. The URL is now parsed with `new URL()` and passed to `osascript` as an argv item.
+- Every mutating endpoint (`/api/new-workspace`, `/api/restart`, `/api/update`, `/api/close`, `/api/config` POST, and others), not just `/api/open-external`, now rejects cross-origin requests — the same wildcard-CORS exposure applied to all of them, not only the one endpoint that happened to touch AppleScript.
+- Opening a link into a brand-new Chrome window (no existing non-dashboard window to reuse) no longer leaves a blank tab focused with the real URL sitting unfocused in a second tab. The new window's existing default tab is navigated directly instead of adding another one.
+- External links now raise the Chrome window they were opened into, instead of just calling `activate` (which fronts whichever Chrome window was last frontmost — usually the dashboard window the click came from).
+- PR/ticket title links, the tickets tab's parent-key chip, the "more →" repo link, and the action drawer's "Open in GitHub"/"Open in Jira" link now respect cmd/ctrl/shift/opt-click for native background-tab/new-window behavior instead of unconditionally preventing default, matching the Buildkite deploy dots' click handling.
+
+### Changed
+
+- Buildkite deploy dots route a plain left-click through `/api/open-external` so the build lands in a separate window rather than the dashboard's own, consistent with every other external link. Cmd/ctrl/shift-click keep native browser behavior, and `openExternal()` now falls back to `window.open` when the server reports that `osascript` failed (Chrome missing, or Automation permission not granted) instead of silently doing nothing.
+
+## [1.45.2] - 2026-08-13
+
+### Fixed
+
+- PR/ticket "Open in GitHub"/"Open in Jira" links (action drawer, row titles, and the tickets tab's parent-key chip) now carry a real `href` instead of relying solely on an `onclick` handler (the action drawer's link was hardcoded to `href="#"`). Middle-click, right-click "copy link"/"open in new tab", and hover-preview now work; a normal left-click still goes through the existing window-reuse flow unchanged.
+
+### Changed
+
+- `/api/open-external` now logs when it rejects a missing/malformed URL, and logs if the underlying `osascript` call fails, instead of silently returning `{ok: true}` either way. A "clicking a PR did nothing" report was previously a dead end with no signal on either the client or server side.
+
 ## [1.45.1] - 2026-08-13
 
 ### Fixed
