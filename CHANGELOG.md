@@ -11,6 +11,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 - Question pills: workspace cards no longer scrape terminal screen content to guess at multi-choice menus and render clickable answer buttons. The heuristic had no structured signal to work from (it can't tell an AskUserQuestion menu from a permission prompt or an arbitrary CLI confirm), so it was fundamentally unable to be both complete and accurate — every fix for a false positive introduced new false negatives. Cards for "waiting" notifications now just show the plain notification body, same as before question detection kicked in. Also removes the now-unused `/api/respond` endpoint and `cmux.readScreen`.
 
+## [1.44.1] - 2026-08-13
+
+### Fixed
+
+- Refreshing a workspace now actually submits `/reload-plugins` instead of leaving it typed in Claude Code's input box. Enter was sent immediately after the text, so the slash-command autocomplete dropdown consumed it as "accept suggestion" rather than "submit". The refresher now reads the input box after every step — it confirms the command landed there, re-sends Enter while the box still holds it, and reports an error if the command never submits or if the dropdown replaced it with a different one.
+
 ## [1.44.0] - 2026-08-12
 
 ### Added
