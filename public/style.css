@@ -532,6 +532,15 @@ main { padding: 8px; position: relative; }
   margin-bottom: 4px;
 }
 
+.card-worktree {
+  display: inline-block;
+  margin-right: 6px;
+  padding: 0 5px;
+  border-radius: 3px;
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+}
+
 .card-header {
   display: flex;
   justify-content: space-between;
