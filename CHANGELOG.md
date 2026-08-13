@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.45.3] - 2026-08-13
+
+### Fixed
+
+- `/api/open-external` no longer interpolates the caller-supplied URL into the AppleScript source. Only `/^https?:\/\//` was checked, so an embedded double quote could close the string literal and append arbitrary AppleScript (including `do shell script`) — reachable from any page in the browser, since CORS is wildcard and the server binds all interfaces. The URL is now parsed with `new URL()` and passed to `osascript` as an argv item.
+- Every mutating endpoint (`/api/new-workspace`, `/api/restart`, `/api/update`, `/api/close`, `/api/config` POST, and others), not just `/api/open-external`, now rejects cross-origin requests — the same wildcard-CORS exposure applied to all of them, not only the one endpoint that happened to touch AppleScript.
+- Opening a link into a brand-new Chrome window (no existing non-dashboard window to reuse) no longer leaves a blank tab focused with the real URL sitting unfocused in a second tab. The new window's existing default tab is navigated directly instead of adding another one.
+- External links now raise the Chrome window they were opened into, instead of just calling `activate` (which fronts whichever Chrome window was last frontmost — usually the dashboard window the click came from).
+- PR/ticket title links, the tickets tab's parent-key chip, the "more →" repo link, and the action drawer's "Open in GitHub"/"Open in Jira" link now respect cmd/ctrl/shift/opt-click for native background-tab/new-window behavior instead of unconditionally preventing default, matching the Buildkite deploy dots' click handling.
+
+### Changed
+
+- Buildkite deploy dots route a plain left-click through `/api/open-external` so the build lands in a separate window rather than the dashboard's own, consistent with every other external link. Cmd/ctrl/shift-click keep native browser behavior, and `openExternal()` now falls back to `window.open` when the server reports that `osascript` failed (Chrome missing, or Automation permission not granted) instead of silently doing nothing.
+
 ## [1.45.2] - 2026-08-13
 
 ### Fixed

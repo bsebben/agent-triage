@@ -30,9 +30,10 @@ function externalLinkIcon() {
 
 // Real href (not "#") so middle-click, right-click "copy link"/"open in new tab", and
 // hover-preview all work even when the onclick's window-reuse flow can't run for some
-// reason. Left-click still goes through openExternal() via preventDefault.
+// reason. openExternalClick (src/tabs/pulls.client.js) leaves cmd/ctrl/shift-click alone
+// so they still get the browser's native new-tab/new-window behaviour.
 function renderExternalLink(url, label) {
-  return `<a class="external-link" href="${escapeHtml(url)}" target="_blank" rel="noopener" title="Opens in new tab" onclick="event.preventDefault(); openExternal('${escapeHtml(url)}'); return false;">${escapeHtml(label)}${externalLinkIcon()}</a>`;
+  return `<a class="external-link" href="${escapeHtml(url)}" target="_blank" rel="noopener" title="Opens in new tab" onclick="openExternalClick(event, '${escapeHtml(url)}')">${escapeHtml(label)}${externalLinkIcon()}</a>`;
 }
 
 function renderPrMeta(pr, repo) {
