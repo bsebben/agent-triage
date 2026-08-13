@@ -72,7 +72,10 @@ export class Queue {
   grouped(maxRecent = 4) {
     const groups = new Map();
     for (const item of this.items()) {
-      const dir = item.workspaceDir || "Unknown";
+      // Group by repo root when the workspace is inside a git repo, so worktrees
+      // of the same repo share a group with the main checkout. Non-repo directories
+      // (e.g. a plain ~/workspace shell) keep grouping by directory as before.
+      const dir = item.repoRoot || item.workspaceDir || "Unknown";
       const label = dirLabel(dir);
       if (!groups.has(label)) {
         groups.set(label, { title: label, directory: dir, items: [] });

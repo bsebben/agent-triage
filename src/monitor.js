@@ -1,4 +1,5 @@
 import * as cmux from "./cmux.js";
+import { resolveWorktree } from "./worktree.js";
 
 const DASHBOARD_WS_NAME = "Agent Triage Dashboard Host";
 
@@ -7,6 +8,7 @@ export async function enrichNotification(notification, workspaces, terminals) {
   const terminal = terminals?.find((t) => t.workspaceId === notification.workspaceId);
 
   const directory = terminal?.directory || workspace?.directory || null;
+  const worktree = await resolveWorktree(directory);
 
   return {
     ...notification,
@@ -14,6 +16,9 @@ export async function enrichNotification(notification, workspaces, terminals) {
     workspaceDir: directory,
     workspaceSelected: workspace?.selected || false,
     gitBranch: terminal?.gitBranch || null,
+    isWorktree: worktree?.isWorktree || false,
+    worktreeName: worktree?.worktreeName || null,
+    repoRoot: worktree?.repoRoot || null,
   };
 }
 
@@ -77,6 +82,8 @@ export class Monitor {
           const syntheticId = `synthetic-${ws.id}`;
           currentIds.add(syntheticId);
           const terminal = terminals?.find((t) => t.workspaceId === ws.id);
+          const directory = terminal?.directory || ws.directory || null;
+          const worktree = await resolveWorktree(directory);
           this.#queue.upsert({
             id: syntheticId,
             workspaceId: ws.id,
@@ -84,9 +91,12 @@ export class Monitor {
             category,
             body: "",
             workspaceTitle: ws.title || null,
-            workspaceDir: terminal?.directory || ws.directory || null,
+            workspaceDir: directory,
             workspaceSelected: ws.selected || false,
             gitBranch: terminal?.gitBranch || null,
+            isWorktree: worktree?.isWorktree || false,
+            worktreeName: worktree?.worktreeName || null,
+            repoRoot: worktree?.repoRoot || null,
             bypassPermissions: bypassWsIds.has(ws.id),
           });
         }
