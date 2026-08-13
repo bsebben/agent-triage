@@ -244,13 +244,6 @@ const server = createServer(async (req, res) => {
       }
     }
 
-    if (req.url === "/api/respond" && req.method === "POST") {
-      const { surfaceId, workspaceId, text } = await readBody(req);
-      await cmux.sendText(workspaceId, surfaceId, text);
-      await cmux.sendKey(workspaceId, surfaceId, "Enter");
-      return jsonResponse(res, { ok: true });
-    }
-
     if (req.url === "/api/refresh-session" && req.method === "POST") {
       const { workspaceId, dangerous } = await readBody(req);
       const result = await refreshSession(workspaceId, { dangerous: !!dangerous });

@@ -265,21 +265,6 @@ export async function renameWorkspace(workspaceId, title) {
   await socketRpc("workspace.rename", { workspace_id: workspaceId, title });
 }
 
-export async function readScreen(surfaceId, lines = 30) {
-  try {
-    const { stdout } = await runCli([
-      "read-screen",
-      "--surface",
-      surfaceId,
-      "--lines",
-      String(lines),
-    ]);
-    return stripAnsi(stdout);
-  } catch {
-    return null;
-  }
-}
-
 export async function readScreenByWorkspace(workspaceRef, lines = 30) {
   try {
     const { stdout } = await runCli([
