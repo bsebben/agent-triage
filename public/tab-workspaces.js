@@ -97,7 +97,7 @@ function renderWorkspaces() {
 }
 
 function categoryIcon(cat) {
-  const icons = { error: "!", permission: "\u{1f512}", question: "?", waiting: "\u{26a1}", completion: "\u{2713}", running: "\u{27f3}", refreshing: "\u{21bb}", terminal: ">_" };
+  const icons = { error: "!", permission: "\u{1f512}", waiting: "\u{26a1}", completion: "\u{2713}", running: "\u{27f3}", refreshing: "\u{21bb}", terminal: ">_" };
   return icons[cat] || "?";
 }
 
@@ -111,16 +111,7 @@ function isGenericBody(body) {
 }
 
 function renderCard(item, { isDismissed = false } = {}) {
-  const hasQuestion = item.parsedQuestion?.question;
-  const options = item.parsedQuestion?.options || [];
   const selectedClass = item.workspaceSelected ? " selected" : "";
-
-  let optionsHtml = "";
-  if (!isDismissed && options.length > 0) {
-    optionsHtml = `<div class="card-options">
-      ${options.map((o, i) => `<button class="btn primary" onclick="respond('${item.workspaceId}','${item.surfaceId}','${i + 1}')">${escapeHtml(o)}</button>`).join("")}
-    </div>`;
-  }
 
   const cardTitle = item.workspaceTitle || "Unknown";
   const subtitle = item.gitBranch || null;
@@ -148,9 +139,7 @@ function renderCard(item, { isDismissed = false } = {}) {
         <span class="card-category ${escapeHtml(displayCategory)}"><span class="card-icon">${categoryIcon(displayCategory)}</span> ${escapeHtml(displayCategory)}</span>
       </div>
     ${subtitle ? `<div class="card-subtitle">${escapeHtml(subtitle)}</div>` : ""}
-    ${hasQuestion ? `<div class="card-question">"${escapeHtml(item.parsedQuestion.question)}"</div>` : ""}
-    ${!hasQuestion && item.body && !isGenericBody(item.body) ? `<div class="card-body">${escapeHtml(item.body)}</div>` : ""}
-    ${optionsHtml}
+    ${item.body && !isGenericBody(item.body) ? `<div class="card-body">${escapeHtml(item.body)}</div>` : ""}
     </div>
   </div>`;
 }
@@ -160,10 +149,6 @@ async function closeWorkspace(workspaceId) {
   applyCloses();
   render();
   await apiPost("close", { workspaceId });
-}
-
-async function respond(workspaceId, surfaceId, text) {
-  await apiPost("respond", { workspaceId, surfaceId, text: String(text) });
 }
 
 async function focusAgent(workspaceId) {

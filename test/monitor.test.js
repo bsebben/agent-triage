@@ -1,36 +1,10 @@
 import { describe, it, mock, beforeEach } from "node:test";
 import assert from "node:assert/strict";
-import { enrichNotification, parseScreenForQuestion, Monitor } from "../src/monitor.js";
+import { enrichNotification, Monitor } from "../src/monitor.js";
 import { Queue } from "../src/queue.js";
 
-describe("parseScreenForQuestion", () => {
-  it("extracts question text and options from screen content", () => {
-    const screen = [
-      "Some output above",
-      "",
-      '  "Which test approach should we use?"',
-      "",
-      "  ❯ Unit tests only",
-      "    Integration tests",
-      "    Both unit and integration",
-      "    Other",
-    ].join("\n");
-
-    const result = parseScreenForQuestion(screen);
-    assert.ok(result);
-    assert.ok(result.question.includes("Which test approach"));
-    assert.ok(result.options.length >= 3);
-  });
-
-  it("returns null when no question is found", () => {
-    const screen = "just regular terminal output\n$ ls\nfile1.js file2.js";
-    const result = parseScreenForQuestion(screen);
-    assert.equal(result, null);
-  });
-});
-
 describe("enrichNotification", () => {
-  it("adds screen data and question info to waiting notifications", async () => {
+  it("adds workspace and terminal info to a notification", async () => {
     const notification = {
       id: "A",
       category: "waiting",
@@ -39,13 +13,11 @@ describe("enrichNotification", () => {
     };
     const workspaces = [{ id: "W1", title: "my-project", directory: "/home/testuser/workspace/my-project" }];
     const terminals = [{ workspaceId: "W1", paneId: "P1", directory: "/home/testuser/workspace/my-project", gitBranch: "main" }];
-    const mockReadScreen = async () => 'Some output\n  "Pick one?"\n  ❯ Option A\n    Option B';
 
-    const result = await enrichNotification(notification, workspaces, terminals, mockReadScreen);
+    const result = await enrichNotification(notification, workspaces, terminals);
     assert.equal(result.workspaceTitle, "my-project");
     assert.equal(result.workspaceDir, "/home/testuser/workspace/my-project");
     assert.equal(result.gitBranch, "main");
-    assert.ok(result.screenContent);
   });
 });
 

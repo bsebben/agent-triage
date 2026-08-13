@@ -2,72 +2,19 @@ import * as cmux from "./cmux.js";
 
 const DASHBOARD_WS_NAME = "Agent Triage Dashboard Host";
 
-export function parseScreenForQuestion(screen) {
-  if (!screen) return null;
-  const lines = screen.split("\n");
-
-  let question = null;
-  const options = [];
-
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i].trim();
-
-    // Detect question lines (quoted text ending in ?)
-    if ((line.startsWith('"') || line.startsWith("'")) && line.includes("?")) {
-      question = line.replace(/^["']|["']$/g, "");
-    }
-
-    // Detect option lines (prefixed with ❯, >, ●, ○, or numbered)
-    if (/^[❯>●○◉◎►▸]\s+/.test(line) || /^\d+[.)]\s+/.test(line)) {
-      const optionText = line.replace(/^[❯>●○◉◎►▸]\s+/, "").replace(/^\d+[.)]\s+/, "");
-      if (optionText && optionText !== "Other") {
-        options.push(optionText);
-      }
-    }
-    // Also detect indented options following the selected one
-    if (options.length > 0 && /^\s{2,}[A-Za-z]/.test(lines[i]) && !line.startsWith('"')) {
-      const optionText = line;
-      if (optionText && optionText !== "Other") {
-        options.push(optionText);
-      }
-    }
-  }
-
-  if (!question && options.length === 0) return null;
-
-  return { question, options };
-}
-
-export async function enrichNotification(notification, workspaces, terminals, readScreenFn) {
+export async function enrichNotification(notification, workspaces, terminals) {
   const workspace = workspaces.find((w) => w.id === notification.workspaceId);
   const terminal = terminals?.find((t) => t.workspaceId === notification.workspaceId);
 
   const directory = terminal?.directory || workspace?.directory || null;
 
-  const enriched = {
+  return {
     ...notification,
     workspaceTitle: workspace?.title || null,
     workspaceDir: directory,
     workspaceSelected: workspace?.selected || false,
     gitBranch: terminal?.gitBranch || null,
-    screenContent: null,
-    parsedQuestion: null,
   };
-
-  if (notification.category === "waiting" || notification.category === "question") {
-    const reader = readScreenFn || cmux.readScreen;
-    enriched.screenContent = await reader(notification.surfaceId, 30);
-
-    if (enriched.screenContent) {
-      const parsed = parseScreenForQuestion(enriched.screenContent);
-      if (parsed) {
-        enriched.parsedQuestion = parsed;
-        enriched.category = "question";
-      }
-    }
-  }
-
-  return enriched;
 }
 
 export class Monitor {
@@ -149,7 +96,7 @@ export class Monitor {
       // or notification ID changes), carry the dismissed state forward to the new
       // ID — unless the new item escalated to an attention-required category
       // (e.g. running → permission), which should surface for the user.
-      const ATTENTION = new Set(["error", "permission", "waiting", "question"]);
+      const ATTENTION = new Set(["error", "permission", "waiting"]);
       const dismissedByWs = new Map();
       for (const item of this.#queue.dismissedItems()) {
         if (item.workspaceId) dismissedByWs.set(item.workspaceId, item);
