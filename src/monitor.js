@@ -9,8 +9,17 @@ export function parseScreenForQuestion(screen) {
   let question = null;
   const options = [];
 
+  // Only the marker line (❯, ●, "1.", …) is self-identifying. Unmarked sibling options are
+  // recognised positionally: they must sit in the same uninterrupted run of lines as the
+  // marker and start at the exact column the marker's own text started at. Without both
+  // bounds, any indented line later on the screen — soft-wrapped agent prose, the
+  // "Update available!" banner — is picked up and rendered as an answer pill.
+  let optionTextColumn = null;
+  let inOptionBlock = false;
+
   for (let i = 0; i < lines.length; i++) {
-    const line = lines[i].trim();
+    const raw = lines[i];
+    const line = raw.trim();
 
     // Detect question lines (quoted text ending in ?)
     if ((line.startsWith('"') || line.startsWith("'")) && line.includes("?")) {
@@ -18,19 +27,32 @@ export function parseScreenForQuestion(screen) {
     }
 
     // Detect option lines (prefixed with ❯, >, ●, ○, or numbered)
-    if (/^[❯>●○◉◎►▸]\s+/.test(line) || /^\d+[.)]\s+/.test(line)) {
+    const marker = raw.match(/^\s*(?:[❯>●○◉◎►▸]\s+|\d+[.)]\s+)/);
+    if (marker) {
       const optionText = line.replace(/^[❯>●○◉◎►▸]\s+/, "").replace(/^\d+[.)]\s+/, "");
       if (optionText && optionText !== "Other") {
         options.push(optionText);
       }
+      if (!inOptionBlock) optionTextColumn = marker[0].length;
+      inOptionBlock = true;
+      continue;
     }
-    // Also detect indented options following the selected one
-    if (options.length > 0 && /^\s{2,}[A-Za-z]/.test(lines[i]) && !line.startsWith('"')) {
-      const optionText = line;
-      if (optionText && optionText !== "Other") {
-        options.push(optionText);
-      }
+
+    // Unmarked siblings of the marker line, still inside the same block.
+    const indent = raw.match(/^\s+(?=\S)/);
+    const alignedContinuation =
+      inOptionBlock &&
+      indent &&
+      indent[0].length === optionTextColumn &&
+      /^[A-Za-z]/.test(line) &&
+      !line.startsWith('"');
+    if (alignedContinuation) {
+      if (line !== "Other") options.push(line);
+      continue;
     }
+
+    // Anything else — a blank line, prose at a different indent, a banner — ends the block.
+    inOptionBlock = false;
   }
 
   if (!question && options.length === 0) return null;

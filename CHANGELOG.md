@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.44.1] - 2026-08-13
+
+### Fixed
+
+- Workspace-tab cards no longer render bogus answer pills. Once a real option marker (`❯`, `●`, `1.`, …) was found, the screen parser treated *every* later indented line as another option, with no requirement to stay in the same block — soft-wrapped agent prose and the "Update available!" banner both turned into blue pill buttons. Unmarked options must now sit in the same uninterrupted block as the marker line and start at the same column.
+
 ## [1.44.0] - 2026-08-12
 
 ### Added
