@@ -367,13 +367,21 @@ const server = createServer(async (req, res) => {
               end try
             end if
             if targetWindow is missing value then
-              -- A freshly created window already has one default blank tab. Adding a
-              -- second tab here (as the existing-window branch below does) left that
-              -- blank tab focused/frontmost with the real URL sitting unfocused in a
-              -- second tab. Navigate the existing tab directly instead.
+              -- A freshly created window's default tab starts loading Chrome's own
+              -- new-tab-page asynchronously, and that load can race anything we do
+              -- immediately after make new window — including the second-tab-then-close
+              -- approach below, non-deterministically. Retrying the URL set for up to
+              -- 1.5s until it actually sticks (instead of setting it once and hoping)
+              -- covers the race regardless of which step it lands on.
               make new window
               set targetWindow to window 1
-              set URL of active tab of targetWindow to targetURL
+              tell targetWindow to make new tab with properties {URL:targetURL}
+              close tab 1 of targetWindow
+              repeat with i from 1 to 15
+                if (URL of active tab of targetWindow) is not "chrome://new-tab-page/" then exit repeat
+                set URL of active tab of targetWindow to targetURL
+                delay 0.1
+              end repeat
             else
               tell targetWindow to make new tab with properties {URL:targetURL}
             end if

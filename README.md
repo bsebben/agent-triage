@@ -7,9 +7,11 @@ A live dashboard for monitoring parallel Claude Code agents running in [cmux](ht
 
 ## Prerequisites
 
+- macOS
 - [cmux](https://cmux.dev) installed and running
 - Node.js 20+
 - [`gh` CLI](https://cli.github.com/) authenticated (for Pull Requests tab)
+- **Google Chrome**, with Automation permission granted to the terminal/process running the server — clicking a PR/ticket link or deploy dot drives Chrome via AppleScript to open it in a dedicated window. Without Chrome or that permission, links fall back to `window.open()` in whatever browser the dashboard itself is running in.
 
 ## Setup
 
@@ -82,6 +84,10 @@ Each Workspaces card for a Claude Code session has a refresh button (&#x21bb;). 
 ### Shift-click danger mode
 
 Hold **Shift** when clicking an action (starting a new session, refreshing a session, or a PR/ticket action) to spawn the Claude session with `--dangerously-skip-permissions`. While Shift is held, the buttons turn red as a visual warning that the next click will run in danger mode.
+
+### Opening links
+
+Clicking a PR/ticket title, the parent-key chip, a "more →" link, or a Buildkite deploy dot drives **Google Chrome** via AppleScript to open the link in its own dedicated window, separate from wherever you clicked from — so it never dumps new tabs into whatever window you happen to be using. Cmd/ctrl/shift/opt-click bypass this and use the browser's native new-tab/new-window behavior instead. Requires Chrome and macOS Automation permission for the terminal/process running the server; without it, links fall back to opening in the dashboard's own browser window.
 
 ## Configuration
 

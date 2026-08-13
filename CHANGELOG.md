@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.45.5] - 2026-08-13
+
+### Fixed
+
+- Recreating the dedicated external-links window (after the user closed it) could land on a blank `chrome://new-tab-page/` instead of the target URL — a freshly created Chrome window's default tab starts loading its own new-tab-page asynchronously, which non-deterministically raced whatever we did next to set the real URL. Setting the URL is now retried for up to 1.5s until it actually sticks, instead of being set once and trusted.
+
+### Added
+
+- Documented the hard dependency on Google Chrome (and macOS Automation permission) for opening PR/ticket links and deploy dots — README prerequisites/features and CLAUDE.md, since nothing previously called out that this feature is Chrome-specific with no equivalent for other browsers.
+
 ## [1.45.4] - 2026-08-13
 
 ### Fixed
