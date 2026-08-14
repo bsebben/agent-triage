@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.46.0] - 2026-08-14
+
+### Added
+
+- Workspace cards show a worktree pill (with repo/worktree tooltip) when the pane is in a linked git worktree.
+
+### Changed
+
+- Workspace groups are now keyed by repo instead of raw directory, so a repo's main checkout and all its worktrees share one group. Non-repo folders (e.g. a plain `~/workspace` shell) still group by directory as before. A pane in a repo subdirectory now folds into that repo's group instead of forming its own.
+
 ## [1.45.6] - 2026-08-13
 
 ### Changed
