@@ -112,7 +112,7 @@ function getNestedValue(obj, dottedKey) {
   return dottedKey.split(".").reduce((o, k) => (o == null ? undefined : o[k]), obj);
 }
 
-const CONFIG_META_KEYS = new Set(["configVersion"]);
+const CONFIG_META_KEYS = new Set(["configVersion", "decidedIntegrations"]);
 
 /**
  * Schema-aware validation. Returns a warnings array; never throws.
@@ -184,16 +184,18 @@ function loadConfigFile() {
 
 /**
  * Build the object to persist on a UI save. Overwrites/prunes all schema-known
- * keys from the form body, but carries `configVersion` through from the existing
- * file verbatim — it is owned by the migration runner, never asserted or dropped
- * by the UI (dropping it would re-trigger every migration on next load).
+ * keys from the form body, but carries meta keys (configVersion,
+ * decidedIntegrations) through from the existing file verbatim — they're owned
+ * by their respective subsystems, never asserted or dropped by the config form.
  */
 export function mergeConfigForSave(body, existing) {
   const merged = { ...body };
-  if (existing && "configVersion" in existing) {
-    merged.configVersion = existing.configVersion;
-  } else {
-    delete merged.configVersion;
+  for (const key of CONFIG_META_KEYS) {
+    if (existing && key in existing) {
+      merged[key] = existing[key];
+    } else {
+      delete merged[key];
+    }
   }
   return merged;
 }

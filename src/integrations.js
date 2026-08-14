@@ -14,10 +14,12 @@ import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { fileURLToPath } from "node:url";
 import { join } from "node:path";
+import { loadRawConfig, writeConfigFile } from "./config.js";
 
 const execFileAsync = promisify(execFile);
 const __dirname = fileURLToPath(new URL(".", import.meta.url));
 const PROJECT_ROOT = join(__dirname, "..");
+const defaultConfigIO = { load: loadRawConfig, save: writeConfigFile };
 
 export const INTEGRATIONS = [
   {
@@ -43,6 +45,24 @@ async function run(scriptPath, args, execFileFn) {
   await exec(join(PROJECT_ROOT, scriptPath), args);
 }
 
+/** Whether the user has ever made an explicit decision (enable or dismiss)
+ * about this integration. Drives the opt-in nudge: undecided means never
+ * shown, regardless of how long the integration has existed or how many
+ * versions the user has skipped — there's no version tracking to get wrong. */
+export function isDecided(id, { configIO = defaultConfigIO } = {}) {
+  findIntegration(id);
+  const raw = configIO.load();
+  return (raw.decidedIntegrations || []).includes(id);
+}
+
+function markDecided(id, configIO) {
+  const raw = configIO.load();
+  const decided = new Set(raw.decidedIntegrations || []);
+  if (decided.has(id)) return;
+  decided.add(id);
+  configIO.save({ ...raw, decidedIntegrations: [...decided] });
+}
+
 /** Live status check — never cached. Returns false on any failure (missing
  * script, missing `jq`, not installed) rather than throwing, since "can't
  * confirm it's enabled" and "confirmed not enabled" both mean the same thing
@@ -57,10 +77,11 @@ export async function status(id, { execFileFn } = {}) {
   }
 }
 
-export async function enable(id, { execFileFn } = {}) {
+export async function enable(id, { execFileFn, configIO = defaultConfigIO } = {}) {
   const integration = findIntegration(id);
   try {
     await run(integration.installScript, [], execFileFn);
+    markDecided(id, configIO);
     return { ok: true };
   } catch (err) {
     return { ok: false, error: err.message };
@@ -75,4 +96,13 @@ export async function disable(id, { execFileFn } = {}) {
   } catch (err) {
     return { ok: false, error: err.message };
   }
+}
+
+/** Silences the opt-in nudge without touching the integration itself — the
+ * user saw it and chose not to enable it, which is as much a decision as
+ * enabling. */
+export function dismiss(id, { configIO = defaultConfigIO } = {}) {
+  findIntegration(id);
+  markDecided(id, configIO);
+  return { ok: true };
 }

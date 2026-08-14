@@ -112,6 +112,49 @@ header h1 {
   transition: opacity 0.3s ease;
 }
 
+#integration-nudge {
+  display: none;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 16px;
+  background: color-mix(in srgb, var(--clr-completion) 12%, var(--surface));
+  border-bottom: 1px solid var(--border);
+  font-size: 12px;
+}
+
+#integration-nudge.visible {
+  display: flex;
+}
+
+.integration-nudge-text {
+  color: var(--text);
+}
+
+.integration-nudge-hint {
+  display: block;
+  color: var(--text-dim);
+  font-size: 11px;
+  margin-top: 2px;
+}
+
+.integration-nudge-actions {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.integration-new-badge {
+  background: var(--clr-completion);
+  color: #1a1a2e;
+  border-radius: 4px;
+  font-size: 9px;
+  font-weight: 700;
+  padding: 1px 5px;
+  vertical-align: middle;
+  margin-left: 4px;
+}
+
 .update-badge {
   display: inline-flex;
   align-items: center;

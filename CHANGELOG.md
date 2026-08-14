@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.48.0] - 2026-08-14
+
+### Added
+
+- New consent-gated integrations now nudge the user instead of waiting to be discovered: a header badge (next to the update indicator) and a "New" cue on the Settings row persist until the user explicitly enables or dismisses it. Clicking the badge opens the same consent dialog Settings uses. Once decided — either way — it never nudges again, tracked via a `decidedIntegrations` list in `config.json` (excluded from the config-shape schema, like `configVersion`, so no migration is needed).
+
 ## [1.47.0] - 2026-08-14
 
 ### Added
