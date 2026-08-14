@@ -68,6 +68,77 @@ describe("Queue", () => {
     assert.equal(zp.items.length, 2);
   });
 
+  it("groups worktrees of the same repo with the main checkout", () => {
+    queue.upsert({
+      id: "A",
+      category: "waiting",
+      workspaceId: "W1",
+      workspaceDir: `${HOME}/workspace/my-project`,
+      repoRoot: `${HOME}/workspace/my-project`,
+      body: "main checkout",
+    });
+    queue.upsert({
+      id: "B",
+      category: "waiting",
+      workspaceId: "W2",
+      workspaceDir: `${HOME}/workspace/my-project-worktrees/wt-a`,
+      repoRoot: `${HOME}/workspace/my-project`,
+      isWorktree: true,
+      worktreeName: "wt-a",
+      body: "worktree a",
+    });
+    queue.upsert({
+      id: "C",
+      category: "waiting",
+      workspaceId: "W3",
+      workspaceDir: `${HOME}/workspace/my-project-worktrees/wt-b`,
+      repoRoot: `${HOME}/workspace/my-project`,
+      isWorktree: true,
+      worktreeName: "wt-b",
+      body: "worktree b",
+    });
+    const { groups } = queue.grouped();
+    assert.equal(groups.length, 1);
+    assert.equal(groups[0].title, "~/workspace/my-project");
+    assert.equal(groups[0].directory, `${HOME}/workspace/my-project`);
+    assert.equal(groups[0].items.length, 3);
+  });
+
+  it("targets new-session/new-terminal at a worktree, not the repo root, when no item is in the main checkout", () => {
+    queue.upsert({
+      id: "A",
+      category: "waiting",
+      workspaceId: "W1",
+      workspaceDir: `${HOME}/workspace/my-project-worktrees/wt-a`,
+      repoRoot: `${HOME}/workspace/my-project`,
+      isWorktree: true,
+      worktreeName: "wt-a",
+      body: "worktree a",
+    });
+    queue.upsert({
+      id: "B",
+      category: "waiting",
+      workspaceId: "W2",
+      workspaceDir: `${HOME}/workspace/my-project-worktrees/wt-b`,
+      repoRoot: `${HOME}/workspace/my-project`,
+      isWorktree: true,
+      worktreeName: "wt-b",
+      body: "worktree b",
+    });
+    const { groups } = queue.grouped();
+    assert.equal(groups.length, 1);
+    assert.notEqual(groups[0].directory, `${HOME}/workspace/my-project`);
+    assert.equal(groups[0].directory, `${HOME}/workspace/my-project-worktrees/wt-a`);
+  });
+
+  it("keeps grouping plain non-repo folders by directory", () => {
+    queue.upsert({ id: "A", category: "waiting", workspaceId: "W1", workspaceDir: `${HOME}/workspace`, body: "plain shell" });
+    const { groups } = queue.grouped();
+    assert.equal(groups.length, 1);
+    assert.equal(groups[0].title, "~/workspace");
+    assert.equal(groups[0].directory, `${HOME}/workspace`);
+  });
+
   it("counts unique workspace IDs from active items", () => {
     queue.upsert({ id: "A", category: "running", workspaceId: "W1", body: "" });
     queue.upsert({ id: "B", category: "waiting", workspaceId: "W1", body: "q" });
