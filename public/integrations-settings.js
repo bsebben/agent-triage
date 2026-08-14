@@ -26,6 +26,7 @@ async function initIntegrations() {
 async function refreshIntegrations() {
   integrationsData = await fetchIntegrations();
   renderSettings();
+  if (typeof renderIntegrationNudge === "function") renderIntegrationNudge();
 }
 
 function renderIntegrationsSection() {
@@ -36,7 +37,7 @@ function renderIntegrationsSection() {
     return `
       <div class="plugin-row">
         <div class="plugin-header">
-          <span class="plugin-name">${escapeHtml(i.name)}</span>
+          <span class="plugin-name">${escapeHtml(i.name)}${i.shouldNudge ? ' <span class="integration-new-badge">New</span>' : ""}</span>
           <span class="plugin-actions">
             <label class="config-toggle" for="${toggleId}">
               <input type="checkbox" id="${toggleId}" ${i.enabled ? "checked" : ""}
@@ -46,6 +47,7 @@ function renderIntegrationsSection() {
           </span>
         </div>
         <div class="config-field-desc">${escapeHtml(i.description)}</div>
+        ${i.shouldNudge ? `<button class="settings-edit-btn" onclick="dismissIntegrationAction('${escapeHtml(i.id)}')">Not now</button>` : ""}
       </div>`;
   }).join("");
 
@@ -109,7 +111,7 @@ function openIntegrationConsentModal(id) {
 }
 
 async function performIntegrationAction(id, verb) {
-  const label = verb === "enable" ? "Enable" : "Disable";
+  const label = verb === "enable" ? "Enable" : verb === "disable" ? "Disable" : "Dismiss";
   try {
     const res = await fetch(`/api/integrations/${encodeURIComponent(id)}/${verb}`, { method: "POST" });
     const result = await res.json();
@@ -127,4 +129,8 @@ function enableIntegrationAction(id) {
 
 function disableIntegrationAction(id) {
   return performIntegrationAction(id, "disable");
+}
+
+function dismissIntegrationAction(id) {
+  return performIntegrationAction(id, "dismiss");
 }

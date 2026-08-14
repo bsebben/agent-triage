@@ -15,7 +15,7 @@ import { buildConfigSchema } from "./config-schema.js";
 import { UpdateChecker } from "./update-checker.js";
 import { detectCmuxVersion } from "./cmux-version.js";
 import * as plugins from "./plugins.js";
-import { INTEGRATIONS, status as integrationStatus, enable as enableIntegration, disable as disableIntegration } from "./integrations.js";
+import { INTEGRATIONS, status as integrationStatus, enable as enableIntegration, disable as disableIntegration, isDecided as integrationIsDecided, dismiss as dismissIntegration } from "./integrations.js";
 import { refreshSession, refreshAll, refreshingIds } from "./refresh.js";
 import loops from "./tabs/loops.js";
 import pulls from "./tabs/pulls.js";
@@ -254,28 +254,38 @@ const server = createServer(async (req, res) => {
 
     if (req.url === "/api/integrations" && req.method === "GET") {
       const list = await Promise.all(
-        INTEGRATIONS.map(async (i) => ({
-          id: i.id,
-          name: i.name,
-          description: i.description,
-          warning: i.warning,
-          enabled: await integrationStatus(i.id),
-        }))
+        INTEGRATIONS.map(async (i) => {
+          const enabled = await integrationStatus(i.id);
+          return {
+            id: i.id,
+            name: i.name,
+            description: i.description,
+            warning: i.warning,
+            enabled,
+            // Nudge-worthy until the user makes an explicit decision either way
+            // (enable or dismiss) — once decided, never shown again.
+            shouldNudge: !enabled && !integrationIsDecided(i.id),
+          };
+        })
       );
       return jsonResponse(res, list);
     }
 
-    const integrationActionMatch = req.url?.match(/^\/api\/integrations\/([^/]+)\/(enable|disable)$/);
+    const integrationActionMatch = req.url?.match(/^\/api\/integrations\/([^/]+)\/(enable|disable|dismiss)$/);
     if (integrationActionMatch && req.method === "POST") {
       const id = decodeURIComponent(integrationActionMatch[1]);
       const action = integrationActionMatch[2];
       try {
+        if (action === "dismiss") {
+          const result = dismissIntegration(id);
+          return jsonResponse(res, { ...result, enabled: await integrationStatus(id), shouldNudge: false });
+        }
         const result = action === "enable" ? await enableIntegration(id) : await disableIntegration(id);
         // Always re-derive from live status rather than trusting the action's
         // own result — the frontend renders this, never the action's outcome,
         // so a partial failure can't leave the toggle showing the wrong state.
         const enabled = await integrationStatus(id);
-        return jsonResponse(res, { ...result, enabled });
+        return jsonResponse(res, { ...result, enabled, shouldNudge: !enabled && !integrationIsDecided(id) });
       } catch (err) {
         return jsonResponse(res, { ok: false, error: err.message }, 404);
       }

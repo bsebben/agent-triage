@@ -45,6 +45,7 @@ function connect() {
   ws.onopen = () => {
     if (pendingReload) return location.reload();
     loadAppConfig();
+    if (typeof initIntegrationNudge === "function") initIntegrationNudge();
     if (sessionStorage.getItem("configSaved")) {
       sessionStorage.removeItem("configSaved");
       showToast("Configuration updated");
