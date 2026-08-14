@@ -18,6 +18,22 @@ describe("enrichNotification", () => {
     assert.equal(result.workspaceTitle, "my-project");
     assert.equal(result.workspaceDir, "/home/testuser/workspace/my-project");
     assert.equal(result.gitBranch, "main");
+    assert.equal(result.isWorktree, false);
+  });
+
+  it("attaches worktree info resolved from the workspace directory", async () => {
+    const notification = { id: "A", category: "waiting", workspaceId: "W1", surfaceId: "S1" };
+    const workspaces = [{ id: "W1", title: "my-project", directory: "/home/user/my-project-worktrees/wt-demo" }];
+    const terminals = [{ workspaceId: "W1", paneId: "P1", directory: "/home/user/my-project-worktrees/wt-demo", gitBranch: "demo" }];
+    const resolveWorktreeFn = async (dir) => {
+      assert.equal(dir, "/home/user/my-project-worktrees/wt-demo");
+      return { isWorktree: true, worktreeName: "wt-demo", repoRoot: "/home/user/my-project", repoName: "my-project" };
+    };
+
+    const result = await enrichNotification(notification, workspaces, terminals, resolveWorktreeFn);
+    assert.equal(result.isWorktree, true);
+    assert.equal(result.worktreeName, "wt-demo");
+    assert.equal(result.repoRoot, "/home/user/my-project");
   });
 });
 
@@ -37,6 +53,28 @@ describe("Monitor terminal detection", () => {
 
   beforeEach(() => {
     queue = new Queue();
+  });
+
+  it("attaches worktree info to a synthetic (notification-less) item", async () => {
+    const cmuxApi = makeCmux({
+      workspaces: [{ id: "W1", title: "my-project", directory: "/home/user/my-project-worktrees/wt-demo" }],
+      terminals: [{ workspaceId: "W1", paneId: "P1", directory: "/home/user/my-project-worktrees/wt-demo", gitBranch: "demo" }],
+      agentWorkspaceIds: new Set(["W1"]),
+    });
+    const resolveWorktreeFn = async () => ({
+      isWorktree: true,
+      worktreeName: "wt-demo",
+      repoRoot: "/home/user/my-project",
+      repoName: "my-project",
+    });
+    const monitor = new Monitor(queue, { cmuxApi, resolveWorktreeFn });
+    await monitor.poll();
+
+    const items = queue.items();
+    assert.equal(items.length, 1);
+    assert.equal(items[0].isWorktree, true);
+    assert.equal(items[0].worktreeName, "wt-demo");
+    assert.equal(items[0].repoRoot, "/home/user/my-project");
   });
 
   it("marks workspace without notification history as terminal", async () => {
