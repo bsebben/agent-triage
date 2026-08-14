@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.46.1] - 2026-08-14
+
+### Fixed
+
+- `bin/install.sh` no longer skips the skill-symlink loop on a re-run when the auto-start hook is already installed — it previously `exit 0`'d before reaching that loop, so a skill added after first install never got linked until the auto-start hook itself was reinstalled from scratch. Also handles a plain file (rather than a symlink) left at the target path, which would otherwise abort the script under `set -e`.
+
 ## [1.46.0] - 2026-08-14
 
 ### Added
