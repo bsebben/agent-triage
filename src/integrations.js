@@ -3,9 +3,9 @@
 // Registry of consent-gated integrations: optional features that change state
 // outside Agent Triage's own footprint (e.g. a global Claude Code hook) and so
 // must never be enabled without an explicit user action. Status is always read
-// live from the actual system state — never cached — so the UI can't drift
-// from reality (see the worktree-hook design discussion in the project history
-// for why this is a hard requirement, not just a nice-to-have).
+// live from the actual system state — never cached — so a partial failure or
+// an external change to that state can't leave the UI showing something that
+// isn't actually true.
 //
 // Each integration owns its own install/uninstall script, invoked with the
 // same DI convention used by src/worktree.js/src/update-checker.js: pass

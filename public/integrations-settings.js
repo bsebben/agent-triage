@@ -68,7 +68,10 @@ function toggleIntegration(id, currentlyEnabled) {
 }
 
 function openIntegrationConsentModal(id) {
-  if (closeIntegrationModal) return;
+  // Close any other integration's modal first rather than dropping this click —
+  // with more than one registry entry, clicking a second toggle while the first
+  // integration's dialog is still open should switch to it, not silently no-op.
+  closeIntegrationModal?.();
   const integration = integrationsData.find((i) => i.id === id);
   if (!integration) return;
 
@@ -105,26 +108,23 @@ function openIntegrationConsentModal(id) {
   });
 }
 
-async function enableIntegrationAction(id) {
+async function performIntegrationAction(id, verb) {
+  const label = verb === "enable" ? "Enable" : "Disable";
   try {
-    const res = await fetch(`/api/integrations/${encodeURIComponent(id)}/enable`, { method: "POST" });
+    const res = await fetch(`/api/integrations/${encodeURIComponent(id)}/${verb}`, { method: "POST" });
     const result = await res.json();
-    if (!result.ok) showToast(`Enable failed: ${result.error || "unknown error"}`);
+    if (!result.ok) showToast(`${label} failed: ${result.error || "unknown error"}`);
   } catch (e) {
-    showToast(`Enable failed: ${e.message}`);
+    showToast(`${label} failed: ${e.message}`);
   } finally {
     await refreshIntegrations();
   }
 }
 
-async function disableIntegrationAction(id) {
-  try {
-    const res = await fetch(`/api/integrations/${encodeURIComponent(id)}/disable`, { method: "POST" });
-    const result = await res.json();
-    if (!result.ok) showToast(`Disable failed: ${result.error || "unknown error"}`);
-  } catch (e) {
-    showToast(`Disable failed: ${e.message}`);
-  } finally {
-    await refreshIntegrations();
-  }
+function enableIntegrationAction(id) {
+  return performIntegrationAction(id, "enable");
+}
+
+function disableIntegrationAction(id) {
+  return performIntegrationAction(id, "disable");
 }
