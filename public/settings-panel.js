@@ -20,6 +20,7 @@ function toggleSettingsPanel() {
   });
 
   initPlugins().then(() => renderSettings());
+  initIntegrations().then(() => renderSettings());
 }
 
 function renderSettings() {
@@ -45,6 +46,7 @@ function renderSettings() {
   const version = appConfig.version ? `v${appConfig.version}` : "";
 
   const pluginsHtml = typeof renderPluginsSection === "function" ? renderPluginsSection() : "";
+  const integrationsHtml = typeof renderIntegrationsSection === "function" ? renderIntegrationsSection() : "";
 
   settingsPanel.innerHTML = `
     <div class="settings-header">
@@ -62,6 +64,7 @@ function renderSettings() {
       <div class="settings-config">${cmuxRow}${tabRows}</div>
     </div>
     ${pluginsHtml}
+    ${integrationsHtml}
     <div class="settings-section settings-logs-section">
       <h3>Server Logs</h3>
       <div class="settings-logs" id="settings-log-output">${renderLogLines()}</div>

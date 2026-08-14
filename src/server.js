@@ -15,6 +15,7 @@ import { buildConfigSchema } from "./config-schema.js";
 import { UpdateChecker } from "./update-checker.js";
 import { detectCmuxVersion } from "./cmux-version.js";
 import * as plugins from "./plugins.js";
+import { INTEGRATIONS, status as integrationStatus, enable as enableIntegration, disable as disableIntegration } from "./integrations.js";
 import { refreshSession, refreshAll, refreshingIds } from "./refresh.js";
 import loops from "./tabs/loops.js";
 import pulls from "./tabs/pulls.js";
@@ -243,6 +244,40 @@ const server = createServer(async (req, res) => {
         return jsonResponse(res, { ok: true });
       } catch (err) {
         return jsonResponse(res, { error: err.message }, 404);
+      }
+    }
+
+    // --- Consent-gated integrations API ---
+    // Status is always computed live (never cached in config.json) so the UI
+    // can't show "enabled" when the underlying install action never ran, or
+    // silently drift if something external changes the actual system state.
+
+    if (req.url === "/api/integrations" && req.method === "GET") {
+      const list = await Promise.all(
+        INTEGRATIONS.map(async (i) => ({
+          id: i.id,
+          name: i.name,
+          description: i.description,
+          warning: i.warning,
+          enabled: await integrationStatus(i.id),
+        }))
+      );
+      return jsonResponse(res, list);
+    }
+
+    const integrationActionMatch = req.url?.match(/^\/api\/integrations\/([^/]+)\/(enable|disable)$/);
+    if (integrationActionMatch && req.method === "POST") {
+      const id = decodeURIComponent(integrationActionMatch[1]);
+      const action = integrationActionMatch[2];
+      try {
+        const result = action === "enable" ? await enableIntegration(id) : await disableIntegration(id);
+        // Always re-derive from live status rather than trusting the action's
+        // own result — the frontend renders this, never the action's outcome,
+        // so a partial failure can't leave the toggle showing the wrong state.
+        const enabled = await integrationStatus(id);
+        return jsonResponse(res, { ...result, enabled });
+      } catch (err) {
+        return jsonResponse(res, { ok: false, error: err.message }, 404);
       }
     }
 

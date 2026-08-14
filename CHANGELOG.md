@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.47.0] - 2026-08-14
+
+### Added
+
+- Settings → Integrations: a dedicated section for consent-gated optional features that change state outside the app's own footprint. Enabling always shows a confirm dialog describing what it does and what it touches; disabling rolls back immediately. Status is always read live, never cached.
+- Worktree indicator hook, as the first integration: registers a Claude Code `PostToolUse` hook (`EnterWorktree`/`ExitWorktree`) that keeps the worktree pill accurate when an agent enters/exits a worktree mid-session, not just when a pane is opened directly at a worktree path. `bin/install-worktree-hook.sh`/`bin/uninstall-worktree-hook.sh` remain directly runnable too — the Settings toggle shells out to the same scripts.
+
 ## [1.46.2] - 2026-08-14
 
 ### Fixed

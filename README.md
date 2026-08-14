@@ -95,11 +95,13 @@ Workspace groups are keyed by repo, so a repo's main checkout and all its git wo
 
 This is detected from the pane's working directory, which only reliably tracks a worktree the pane was *opened* into (directly, or via `cd` before launching an agent). An agent that calls `EnterWorktree` and moves in place, without the pane's directory ever changing, won't show the pill — the card falls back to showing the main repo, silently rather than incorrectly.
 
+To close that gap, enable **Worktree indicator hook** under Settings → Integrations. It registers a `PostToolUse` hook (`EnterWorktree`/`ExitWorktree`) in `~/.claude/settings.json` that reports the new directory directly to cmux, so the card stays accurate even when an agent enters a worktree mid-session. It's additive — merges into your existing hooks rather than overwriting them — and off by default; enabling it shows exactly what it does and what it touches before you confirm. Deliberately scoped to the top-level interactive session: a Task-tool subagent that enters a worktree on its own doesn't affect the parent workspace's card. Disabling it in Settings rolls the change back the same way. Requires `jq`. `bin/install-worktree-hook.sh`/`bin/uninstall-worktree-hook.sh` remain directly runnable too, for scripting — the Settings toggle just shells out to the same scripts, so there's one source of truth either way. If you move or delete this checkout after enabling, re-enable it — the hook command points at a path inside it.
+
 **Best practice:** `cd` is only reliably tracked before a session starts (open the pane there, or `cd` before launching the agent) — treat it as a launch-time decision, not a mid-session one. Once a session is running, use `EnterWorktree`/`ExitWorktree` to switch worktrees, not `cd`. A `cd` run through the agent's shell tool only moves that tool's own subprocess; it doesn't relocate the session's actual working context (file resolution, memory/plans, and worktree registration all stay where they were), so the dashboard correctly ignores it rather than showing a move that didn't really happen. If the goal is working in a different, unrelated directory rather than isolating within the same repo, open a new pane or session there instead of asking a running one to relocate.
 
 ## Configuration
 
-Open the Settings panel in the dashboard to customize config, view live server logs, and manage plugin settings — no file editing required.
+Open the Settings panel in the dashboard to customize config, view live server logs, manage plugin settings, and enable/disable integrations — no file editing required.
 
 ## Development
 
