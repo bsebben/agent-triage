@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.46.2] - 2026-08-14
+
+### Fixed
+
+- `src/worktree.js`'s identity and worktree-registration caches could disagree for up to 30s: a directory removed and recreated at the same path (e.g. a worktree torn down and rebuilt) could report a freshly-rechecked `isWorktree: false` while still returning the old, stale `repoRoot`/`repoName` — a workspace card could stay folded into the wrong repo's group for up to 30 seconds. Both facts are now one cache entry, refreshed together.
+- `src/monitor.js`'s poll cycle resolved each notification/workspace's worktree identity sequentially; a cold or expired cache serialized a git subprocess round-trip per item instead of resolving them concurrently.
+
 ## [1.46.1] - 2026-08-14
 
 ### Fixed

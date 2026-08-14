@@ -80,4 +80,34 @@ describe("resolveWorktree", () => {
     const revParseCalls = execFileFn.calls.filter((c) => c.includes("rev-parse"));
     assert.equal(revParseCalls.length, 1);
   });
+
+  it("re-resolves identity and registration together once the cache expires, never one stale and one fresh", async () => {
+    const realNow = Date.now;
+    let fakeNow = realNow();
+    Date.now = () => fakeNow;
+    try {
+      const execFileFn = makeExec({
+        "rev-parse":
+          "/home/user/my-project/.git/worktrees/wt-demo\n/home/user/my-project/.git\n/home/user/my-project-worktrees/wt-demo",
+        "worktree list": "worktree /home/user/my-project\nworktree /home/user/my-project-worktrees/wt-demo\n",
+      });
+      const first = await resolveWorktree("/home/user/my-project-worktrees/wt-demo", { execFileFn });
+      assert.equal(first.isWorktree, true);
+      assert.equal(first.repoRoot, "/home/user/my-project");
+
+      // Directory torn down and rebuilt as a fresh, unrelated repo at the same
+      // path — a plausible workflow for this exact feature. Both identity and
+      // registration must come from the new state together, not a mix of old
+      // (cached) repoRoot with a freshly-rechecked isWorktree.
+      fakeNow += 31_000;
+      const execFileFn2 = makeExec({
+        "rev-parse": "/home/user/other-project/.git\n/home/user/other-project/.git\n/home/user/other-project",
+      });
+      const second = await resolveWorktree("/home/user/my-project-worktrees/wt-demo", { execFileFn: execFileFn2 });
+      assert.equal(second.isWorktree, false);
+      assert.equal(second.repoRoot, "/home/user/other-project");
+    } finally {
+      Date.now = realNow;
+    }
+  });
 });

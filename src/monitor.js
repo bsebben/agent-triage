@@ -74,26 +74,34 @@ export class Monitor {
       // Find the Dashboard workspace ID so we can exclude its notifications
       const dashboardWsId = workspaces.find((w) => w.title === DASHBOARD_WS_NAME)?.id;
 
-      for (const n of notifications) {
-        if (n.workspaceId === dashboardWsId) continue;
-        currentIds.add(n.id);
-        const enriched = await enrichNotification(n, workspaces, terminals, this.#resolveWorktree);
-        enriched.bypassPermissions = bypassWsIds.has(n.workspaceId);
-        this.#queue.upsert(enriched);
-      }
+      // Enrichment does a git subprocess round-trip per distinct directory
+      // (on a cold or expired worktree cache) — resolve all of a poll cycle's
+      // items concurrently rather than serializing N round-trips through a
+      // sequential await in the loop.
+      const relevantNotifications = notifications.filter((n) => n.workspaceId !== dashboardWsId);
+      for (const n of relevantNotifications) currentIds.add(n.id);
+      const enrichedNotifications = await Promise.all(
+        relevantNotifications.map(async (n) => {
+          const enriched = await enrichNotification(n, workspaces, terminals, this.#resolveWorktree);
+          enriched.bypassPermissions = bypassWsIds.has(n.workspaceId);
+          return enriched;
+        })
+      );
+      for (const enriched of enrichedNotifications) this.#queue.upsert(enriched);
 
       const notifiedWorkspaceIds = new Set(notifications.map((n) => n.workspaceId));
-      for (const ws of workspaces) {
-        if (ws.title === DASHBOARD_WS_NAME) continue;
-        if (!notifiedWorkspaceIds.has(ws.id)) {
+      const syntheticWorkspaces = workspaces.filter(
+        (ws) => ws.title !== DASHBOARD_WS_NAME && !notifiedWorkspaceIds.has(ws.id)
+      );
+      for (const ws of syntheticWorkspaces) currentIds.add(`synthetic-${ws.id}`);
+      const syntheticItems = await Promise.all(
+        syntheticWorkspaces.map(async (ws) => {
           const category = this.#knownAgentWorkspaces.has(ws.id) ? "running" : "terminal";
-          const syntheticId = `synthetic-${ws.id}`;
-          currentIds.add(syntheticId);
           const terminal = terminals?.find((t) => t.workspaceId === ws.id);
           const directory = terminal?.directory || ws.directory || null;
           const worktree = await this.#resolveWorktree(directory);
-          this.#queue.upsert({
-            id: syntheticId,
+          return {
+            id: `synthetic-${ws.id}`,
             workspaceId: ws.id,
             surfaceId: null,
             category,
@@ -104,9 +112,10 @@ export class Monitor {
             gitBranch: terminal?.gitBranch || null,
             ...worktreeFields(worktree),
             bypassPermissions: bypassWsIds.has(ws.id),
-          });
-        }
-      }
+          };
+        })
+      );
+      for (const item of syntheticItems) this.#queue.upsert(item);
 
       // When a workspace's representation rotates IDs (synthetic ↔ notification,
       // or notification ID changes), carry the dismissed state forward to the new
