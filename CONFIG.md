@@ -138,3 +138,13 @@ If you need to override the auto-detected URL (e.g. you have multiple Runlayer J
 Editable in the settings UI. The clause is AND-joined onto the base query; if you also set a custom `jql` that uses a top-level `OR`, wrap it in parentheses yourself so the exclusion binds correctly.
 
 If auto-detection fails for cmux (required for the dashboard itself), the server exits with a clear message telling you which config field to set.
+
+## Integrations
+
+Integrations are consent-gated optional features that change state outside this app's own footprint — they are **not** part of `config.json`. There's no field for them here, no `configVersion` bump when one is added, and no `config.shape.json` change: enabling/disabling happens entirely through Settings → Integrations, and status shown there is always read live from the actual system state, never cached.
+
+| Integration | What it does | Scripts |
+|-------------|---------------|---------|
+| Worktree indicator hook | Registers a Claude Code `PostToolUse` hook (`EnterWorktree`/`ExitWorktree`) so the worktree pill stays accurate when an agent enters a worktree mid-session | `bin/install-worktree-hook.sh` / `bin/uninstall-worktree-hook.sh` |
+
+Removing an integration's effect is either toggling it off in Settings, or running its uninstall script directly — both do the same thing.

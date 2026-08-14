@@ -55,6 +55,16 @@ To remove:
 bin/uninstall.sh
 ```
 
+## Integrations
+
+Consent-gated integrations — optional features that change state outside this app's own footprint (a global Claude Code hook, for example) — live in a dedicated **Integrations** section of the Settings panel, not the regular config form. Enabling one always shows a confirm dialog with what it does and what it touches before making any change; disabling rolls it back immediately with no re-confirmation. Status shown in the UI is always read live from the actual system state (never cached in `config.json`), so it can't drift from reality.
+
+`src/integrations.js` holds the registry — each entry pairs an `id`/`name`/`description`/`warning` with its own `installScript`/`uninstallScript` (a plain shell script pair, following the same contract as `bin/install-worktree-hook.sh`/`bin/uninstall-worktree-hook.sh`: no-arg to install/uninstall, `--check` to report status with no side effects). `src/server.js` exposes this generically via `GET /api/integrations` and `POST /api/integrations/:id/enable`/`disable` — adding a new integration is a new registry entry plus its own install/uninstall scripts, no server or UI changes needed.
+
+The worktree indicator hook is the first entry: it registers a `PostToolUse` hook (`EnterWorktree`/`ExitWorktree`) in `~/.claude/settings.json` that reports the new directory directly to cmux, closing the one gap in the worktree pill (see `README.md`): without it, an agent that calls `EnterWorktree` in place — without the pane's directory ever changing — won't show the pill. Deliberately scoped to the top-level interactive session, not project-wide, because it needs to fire while working in *any* repo. `bin/install-worktree-hook.sh` merges into the user's existing `hooks.PostToolUse` array via `jq` rather than overwriting it, is idempotent, and backs up `settings.json` before each change; `bin/uninstall-worktree-hook.sh` reverses it, restoring any other hooks that shared the same matcher. Both remain directly runnable outside the UI too — the Settings toggle just shells out to them, so there's one source of truth either way. The hook command references an absolute path inside this checkout — moving or deleting it means re-enabling.
+
+**Best practice:** switch worktrees mid-session with `EnterWorktree`/`ExitWorktree`, not `cd` — a shell `cd` only moves that tool's own subprocess, not the session's actual working context, so it won't show up here regardless of whether the worktree hook above is enabled. See `README.md`'s Worktree indicator section for the full rationale.
+
 ## Installing as a PWA
 
 For a clean full-screen experience (no tab bar or address bar), install as a Chrome PWA:
@@ -127,6 +137,8 @@ When updating the supported range:
 - `src/cmux.js` - Persistent socket RPC to cmux
 - `src/monitor.js` - Polls cmux for workspace/notification state
 - `src/queue.js` - In-memory queue with dismiss/restore
+- `src/worktree.js` - Resolves a directory's git worktree/repo identity, for the workspace-card worktree pill
+- `src/integrations.js` - Registry of consent-gated integrations (see [Integrations](#integrations))
 - `src/tabs/loops.js` - Tab module: Claude Loops integration
 - `src/tabs/pulls.js` - Tab module: GitHub PR monitoring via `gh` CLI
 - `src/tabs/tickets.js` - Tab module: Jira tickets via MCP (auto-detected)
