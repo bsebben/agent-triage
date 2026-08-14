@@ -132,13 +132,16 @@ function renderCard(item, { isDismissed = false } = {}) {
   const displayCategory = refreshing ? "refreshing" : item.category;
   const bypassClass = item.bypassPermissions ? " bypass" : "";
   const bypassTip = item.bypassPermissions ? ` title="Running with --dangerously-skip-permissions"` : "";
+  const worktreePill = item.isWorktree
+    ? `<span class="card-worktree" title="Worktree of ${escapeHtml(item.repoRoot || "")}">&#9095; ${escapeHtml(item.worktreeName || "")}</span>`
+    : "";
   return `<div class="card${selectedClass}${bypassClass} cat-${escapeHtml(displayCategory)}" data-workspace-id="${item.workspaceId}"${bypassTip} onclick="cardClick(event,'${item.workspaceId}')">
     <div class="card-title-row"><span class="card-title-group"><span class="card-title">${escapeHtml(cardTitle)}</span><a class="card-edit" data-workspace-id="${escapeHtml(item.workspaceId)}" data-title="${escapeHtml(cardTitle)}" onclick="event.stopPropagation();startRename(this,this.dataset.workspaceId,this.dataset.title)">&#9998;</a></span><span class="card-actions-col"><span class="card-actions-right">${refreshBtn}${dismissBtn}${closeBtn}</span>${item.createdAt ? `<span class="card-time">\u{1f559} ${timeAgo(item.createdAt)}</span>` : ""}</span></div>
     <div class="card-content">
       <div class="card-header">
         <span class="card-category ${escapeHtml(displayCategory)}"><span class="card-icon">${categoryIcon(displayCategory)}</span> ${escapeHtml(displayCategory)}</span>
       </div>
-    ${subtitle ? `<div class="card-subtitle">${escapeHtml(subtitle)}</div>` : ""}
+    ${subtitle || worktreePill ? `<div class="card-subtitle">${worktreePill}${worktreePill && subtitle ? " / " : ""}${subtitle ? escapeHtml(subtitle) : ""}</div>` : ""}
     ${item.body && !isGenericBody(item.body) ? `<div class="card-body">${escapeHtml(item.body)}</div>` : ""}
     </div>
   </div>`;

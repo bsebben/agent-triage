@@ -1,12 +1,22 @@
 import * as cmux from "./cmux.js";
+import { resolveWorktree as defaultResolveWorktree } from "./worktree.js";
 
 const DASHBOARD_WS_NAME = "Agent Triage Dashboard Host";
 
-export async function enrichNotification(notification, workspaces, terminals) {
+function worktreeFields(worktree) {
+  return {
+    isWorktree: worktree?.isWorktree || false,
+    worktreeName: worktree?.worktreeName || null,
+    repoRoot: worktree?.repoRoot || null,
+  };
+}
+
+export async function enrichNotification(notification, workspaces, terminals, resolveWorktreeFn = defaultResolveWorktree) {
   const workspace = workspaces.find((w) => w.id === notification.workspaceId);
   const terminal = terminals?.find((t) => t.workspaceId === notification.workspaceId);
 
   const directory = terminal?.directory || workspace?.directory || null;
+  const worktree = await resolveWorktreeFn(directory);
 
   return {
     ...notification,
@@ -14,6 +24,7 @@ export async function enrichNotification(notification, workspaces, terminals) {
     workspaceDir: directory,
     workspaceSelected: workspace?.selected || false,
     gitBranch: terminal?.gitBranch || null,
+    ...worktreeFields(worktree),
   };
 }
 
@@ -24,12 +35,14 @@ export class Monitor {
   #pollIntervalMs;
   #knownAgentWorkspaces = new Set();
   #cmux;
+  #resolveWorktree;
 
-  constructor(queue, { pollIntervalMs = 5000, onUpdate = null, cmuxApi = null } = {}) {
+  constructor(queue, { pollIntervalMs = 5000, onUpdate = null, cmuxApi = null, resolveWorktreeFn = null } = {}) {
     this.#queue = queue;
     this.#pollIntervalMs = pollIntervalMs;
     this.#onUpdate = onUpdate;
     this.#cmux = cmuxApi || cmux;
+    this.#resolveWorktree = resolveWorktreeFn || defaultResolveWorktree;
   }
 
   start() {
@@ -64,7 +77,7 @@ export class Monitor {
       for (const n of notifications) {
         if (n.workspaceId === dashboardWsId) continue;
         currentIds.add(n.id);
-        const enriched = await enrichNotification(n, workspaces, terminals);
+        const enriched = await enrichNotification(n, workspaces, terminals, this.#resolveWorktree);
         enriched.bypassPermissions = bypassWsIds.has(n.workspaceId);
         this.#queue.upsert(enriched);
       }
@@ -77,6 +90,8 @@ export class Monitor {
           const syntheticId = `synthetic-${ws.id}`;
           currentIds.add(syntheticId);
           const terminal = terminals?.find((t) => t.workspaceId === ws.id);
+          const directory = terminal?.directory || ws.directory || null;
+          const worktree = await this.#resolveWorktree(directory);
           this.#queue.upsert({
             id: syntheticId,
             workspaceId: ws.id,
@@ -84,9 +99,10 @@ export class Monitor {
             category,
             body: "",
             workspaceTitle: ws.title || null,
-            workspaceDir: terminal?.directory || ws.directory || null,
+            workspaceDir: directory,
             workspaceSelected: ws.selected || false,
             gitBranch: terminal?.gitBranch || null,
+            ...worktreeFields(worktree),
             bypassPermissions: bypassWsIds.has(ws.id),
           });
         }

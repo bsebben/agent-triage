@@ -532,6 +532,16 @@ main { padding: 8px; position: relative; }
   margin-bottom: 4px;
 }
 
+.card-worktree {
+  display: inline-block;
+  margin-right: 0;
+  padding: 1px 6px;
+  border-radius: 3px;
+  font-weight: 600;
+  background: color-mix(in srgb, var(--text-dim) 30%, var(--card));
+  color: var(--text);
+}
+
 .card-header {
   display: flex;
   justify-content: space-between;
