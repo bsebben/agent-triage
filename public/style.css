@@ -534,11 +534,12 @@ main { padding: 8px; position: relative; }
 
 .card-worktree {
   display: inline-block;
-  margin-right: 6px;
-  padding: 0 5px;
+  margin-right: 0;
+  padding: 1px 6px;
   border-radius: 3px;
-  border: 1px solid var(--border);
-  color: var(--text-dim);
+  font-weight: 600;
+  background: color-mix(in srgb, var(--text-dim) 30%, var(--card));
+  color: var(--text);
 }
 
 .card-header {

@@ -1,14 +1,14 @@
 import * as cmux from "./cmux.js";
-import { resolveWorktree } from "./worktree.js";
+import { resolveWorktree as defaultResolveWorktree } from "./worktree.js";
 
 const DASHBOARD_WS_NAME = "Agent Triage Dashboard Host";
 
-export async function enrichNotification(notification, workspaces, terminals) {
+export async function enrichNotification(notification, workspaces, terminals, resolveWorktreeFn = defaultResolveWorktree) {
   const workspace = workspaces.find((w) => w.id === notification.workspaceId);
   const terminal = terminals?.find((t) => t.workspaceId === notification.workspaceId);
 
   const directory = terminal?.directory || workspace?.directory || null;
-  const worktree = await resolveWorktree(directory);
+  const worktree = await resolveWorktreeFn(directory);
 
   return {
     ...notification,
@@ -29,12 +29,14 @@ export class Monitor {
   #pollIntervalMs;
   #knownAgentWorkspaces = new Set();
   #cmux;
+  #resolveWorktree;
 
-  constructor(queue, { pollIntervalMs = 5000, onUpdate = null, cmuxApi = null } = {}) {
+  constructor(queue, { pollIntervalMs = 5000, onUpdate = null, cmuxApi = null, resolveWorktreeFn = null } = {}) {
     this.#queue = queue;
     this.#pollIntervalMs = pollIntervalMs;
     this.#onUpdate = onUpdate;
     this.#cmux = cmuxApi || cmux;
+    this.#resolveWorktree = resolveWorktreeFn || defaultResolveWorktree;
   }
 
   start() {
@@ -69,7 +71,7 @@ export class Monitor {
       for (const n of notifications) {
         if (n.workspaceId === dashboardWsId) continue;
         currentIds.add(n.id);
-        const enriched = await enrichNotification(n, workspaces, terminals);
+        const enriched = await enrichNotification(n, workspaces, terminals, this.#resolveWorktree);
         enriched.bypassPermissions = bypassWsIds.has(n.workspaceId);
         this.#queue.upsert(enriched);
       }
@@ -83,7 +85,7 @@ export class Monitor {
           currentIds.add(syntheticId);
           const terminal = terminals?.find((t) => t.workspaceId === ws.id);
           const directory = terminal?.directory || ws.directory || null;
-          const worktree = await resolveWorktree(directory);
+          const worktree = await this.#resolveWorktree(directory);
           this.#queue.upsert({
             id: syntheticId,
             workspaceId: ws.id,

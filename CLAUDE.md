@@ -55,6 +55,14 @@ To remove:
 bin/uninstall.sh
 ```
 
+## Worktree hook (optional)
+
+`bin/install-worktree-hook.sh` registers a Claude Code `PostToolUse` hook (`EnterWorktree`/`ExitWorktree`) in `~/.claude/settings.json`, pointing at `bin/hooks/report-worktree-cwd.sh`. This closes the one gap in the workspace-card worktree indicator (see `README.md`): without it, an agent that calls `EnterWorktree` in place — without the pane's directory ever changing — won't show the worktree pill.
+
+It's a global Claude Code hook, not project-scoped, because it needs to fire while working in *any* repo, not just this one. The installer merges into the user's existing `hooks.PostToolUse` array via `jq` rather than overwriting it, is idempotent, and backs up `settings.json` before each change. `bin/uninstall-worktree-hook.sh` reverses it, restoring any other hooks that shared the same matcher. The hook command references an absolute path inside this checkout — moving or deleting it means re-running the installer.
+
+**Best practice:** switch worktrees mid-session with `EnterWorktree`/`ExitWorktree`, not `cd` — a shell `cd` only moves that tool's own subprocess, not the session's actual working context, so it won't show up here regardless of whether the hook above is installed. See `README.md`'s Worktree indicator section for the full rationale.
+
 ## Installing as a PWA
 
 For a clean full-screen experience (no tab bar or address bar), install as a Chrome PWA:

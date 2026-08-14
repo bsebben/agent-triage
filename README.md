@@ -89,6 +89,16 @@ Hold **Shift** when clicking an action (starting a new session, refreshing a ses
 
 Clicking a PR/ticket title, the parent-key chip, a "more →" link, or a Buildkite deploy dot drives **Google Chrome** via AppleScript to open the link in its own dedicated window, separate from wherever you clicked from — so it never dumps new tabs into whatever window you happen to be using. Cmd/ctrl/shift/opt-click bypass this and use the browser's native new-tab/new-window behavior instead. Requires Chrome and macOS Automation permission for the terminal/process running the server; without it, links fall back to opening in the dashboard's own browser window.
 
+### Worktree indicator
+
+Workspace groups are keyed by repo, so a repo's main checkout and all its git worktrees share one group instead of appearing as unrelated siblings. A card whose pane is in a linked worktree shows a small pill with the worktree's name (hover for the full paths); the main checkout's own card shows no pill.
+
+This is detected from the pane's working directory, which only reliably tracks a worktree the pane was *opened* into (directly, or via `cd` before launching an agent). An agent that calls `EnterWorktree` and moves in place, without the pane's directory ever changing, won't show the pill — the card falls back to showing the main repo, silently rather than incorrectly.
+
+To close that gap, run `bin/install-worktree-hook.sh` once. It registers a `PostToolUse` hook (`EnterWorktree`/`ExitWorktree`) in `~/.claude/settings.json` that reports the new directory directly to cmux, so the card stays accurate even when an agent enters a worktree mid-session. It's additive — merges into your existing hooks rather than overwriting them — and off by default. Deliberately scoped to the top-level interactive session: a Task-tool subagent that enters a worktree on its own doesn't affect the parent workspace's card. Remove it with `bin/uninstall-worktree-hook.sh`. Requires `jq`. If you move or delete this checkout after installing, re-run the installer — the hook command points at a path inside it.
+
+**Best practice:** `cd` is only reliably tracked before a session starts (open the pane there, or `cd` before launching the agent) — treat it as a launch-time decision, not a mid-session one. Once a session is running, use `EnterWorktree`/`ExitWorktree` to switch worktrees, not `cd`. A `cd` run through the agent's shell tool only moves that tool's own subprocess; it doesn't relocate the session's actual working context (file resolution, memory/plans, and worktree registration all stay where they were), so the dashboard correctly ignores it rather than showing a move that didn't really happen. If the goal is working in a different, unrelated directory rather than isolating within the same repo, open a new pane or session there instead of asking a running one to relocate.
+
 ## Configuration
 
 Open the Settings panel in the dashboard to customize config, view live server logs, and manage plugin settings — no file editing required.
