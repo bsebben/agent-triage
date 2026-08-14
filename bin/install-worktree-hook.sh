@@ -12,6 +12,16 @@ HOOK_SCRIPT="$SCRIPT_DIR/hooks/report-worktree-cwd.sh"
 MATCHER="EnterWorktree|ExitWorktree"
 SETTINGS="${HOME}/.claude/settings.json"
 
+# --check: exit 0 if already installed, 1 otherwise. No side effects — lets
+# bin/install.sh decide whether to prompt without duplicating this query.
+if [[ "$1" == "--check" ]]; then
+  command -v jq >/dev/null 2>&1 || exit 1
+  jq -e --arg cmd "$HOOK_SCRIPT" --arg matcher "$MATCHER" \
+    '(.hooks.PostToolUse // []) | any(.matcher == $matcher and (.hooks[]?.command == $cmd))' \
+    "$SETTINGS" >/dev/null 2>&1
+  exit $?
+fi
+
 if ! command -v jq >/dev/null 2>&1; then
   echo "jq is required to install this hook (safely merges into ~/.claude/settings.json)." >&2
   echo "Install it (e.g. \`brew install jq\`) and re-run this script." >&2

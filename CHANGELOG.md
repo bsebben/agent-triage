@@ -10,7 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ### Added
 
 - Workspace cards show a worktree pill (with repo/worktree tooltip) when the pane is in a linked git worktree.
-- `bin/install-worktree-hook.sh` (optional, off by default): registers a Claude Code hook that keeps the worktree pill accurate when an agent calls `EnterWorktree`/`ExitWorktree` in place, not just when a pane is opened directly at a worktree path. See README for details; `bin/uninstall-worktree-hook.sh` reverses it.
+- `bin/install-worktree-hook.sh` (optional, off by default): registers a Claude Code hook that keeps the worktree pill accurate when an agent calls `EnterWorktree`/`ExitWorktree` in place, not just when a pane is opened directly at a worktree path. See README for details; `bin/uninstall-worktree-hook.sh` reverses it. `bin/install.sh` now offers to enable it interactively (skipped if already installed or non-interactive) so new and upgrading users see the option instead of having to find it in the README.
 
 ### Changed
 
