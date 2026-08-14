@@ -7,7 +7,7 @@ import assert from "node:assert/strict";
 import { readFileSync, mkdtempSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import config, { buildSchema, FIELD_META, loadRawConfig, writeConfigFile } from "../src/config.js";
+import config, { buildSchema, FIELD_META, loadRawConfig, writeConfigFile, mergeConfigForSave } from "../src/config.js";
 
 // writeConfigFile/loadRawConfig round-trip against a scratch file rather than
 // the real config.json — other test files read config.json synchronously at
@@ -96,5 +96,30 @@ describe("writeConfigFile", () => {
     const content = readFileSync(scratchConfigPath, "utf-8");
     assert.ok(content.includes("\n  "), "should have 2-space indentation");
     assert.ok(content.endsWith("\n"), "should end with newline");
+  });
+});
+
+describe("mergeConfigForSave", () => {
+  it("carries configVersion through from the existing file, ignoring the form body", () => {
+    const merged = mergeConfigForSave({ port: 8080 }, { configVersion: 3 });
+    assert.equal(merged.configVersion, 3);
+    assert.equal(merged.port, 8080);
+  });
+
+  it("carries decidedIntegrations through from the existing file, ignoring the form body", () => {
+    const merged = mergeConfigForSave({ port: 8080 }, { decidedIntegrations: ["worktree-hook"] });
+    assert.deepEqual(merged.decidedIntegrations, ["worktree-hook"]);
+  });
+
+  it("drops meta keys entirely when the existing file has none", () => {
+    const merged = mergeConfigForSave({ port: 8080, configVersion: 99 }, {});
+    assert.equal("configVersion" in merged, false);
+    assert.equal("decidedIntegrations" in merged, false);
+  });
+
+  it("drops meta keys when there is no existing file at all", () => {
+    const merged = mergeConfigForSave({ port: 8080 }, undefined);
+    assert.equal("configVersion" in merged, false);
+    assert.equal("decidedIntegrations" in merged, false);
   });
 });
