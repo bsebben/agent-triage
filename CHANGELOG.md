@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.49.0] - 2026-08-20
+
+### Added
+
+- Ticket drawer now shows an editable directory picker so "Discuss It", "Investigate and plan", and "Start work on it" dispatch to the right working directory instead of always falling back to the default. Guessed in order: this ticket's Jira project's most-recently-used directory, then global recency, then the default directory — which is a pickable entry in its own right, so picking it sticks and is remembered like any other choice. Every ticket dispatch — whether you changed the field or left the guess — updates the history, so the guess keeps improving with use. Launching an agent from a PR doesn't touch it.
+- New `GET /api/directories` endpoint backing the picker; excludes git worktrees from the listed directories, since a linked worktree isn't an independent checkout and would just duplicate its main repo in the list. Returns the guess explicitly rather than leaving the client to read it off the top of the list, so a fresh install with no history guesses the default directory instead of whichever checkout sorts first alphabetically.
+
+### Fixed
+
+- `resolveCwd` now honors `config.defaultDirectory` instead of a hardcoded `~/workspace`.
+
 ## [1.48.0] - 2026-08-14
 
 ### Added

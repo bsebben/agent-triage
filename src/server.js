@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { WebSocketServer } from "ws";
 import { Queue } from "./queue.js";
+import { DirectoryHistory, listDirectories, resolveDirectory } from "./directory-history.js";
 import { Monitor } from "./monitor.js";
 import * as cmux from "./cmux.js";
 import { execFile } from "node:child_process";
@@ -37,6 +38,7 @@ const PUBLIC_DIR = join(__dirname, "..", "public");
 const TABS_DIR = join(__dirname, "tabs");
 const DATA_DIR = join(__dirname, "..", "data");
 const TASKS_DATA_PATH = join(DATA_DIR, "tasks.json");
+const DIRECTORY_HISTORY_PATH = join(DATA_DIR, "ticket-directory-history.json");
 const PORT = process.env.PORT || config.port;
 
 // --- Tab registry ---
@@ -57,6 +59,9 @@ function sendToAll(payload) {
 
 const queue = new Queue();
 await queue.load(join(DATA_DIR, "queue.json"));
+
+const directoryHistory = new DirectoryHistory();
+await directoryHistory.load(DIRECTORY_HISTORY_PATH);
 
 function broadcast() {
   const payload = JSON.stringify({ type: "update", data: getFullData() });
@@ -138,15 +143,8 @@ function parseExternalUrl(url) {
 // on server restart, which just means the next click creates a fresh window.
 let lastLinksWindowId = "";
 
-function resolveCwd(repo) {
-  const workspace = join(HOME, "workspace");
-  if (repo) {
-    const repoName = repo.split("/").pop();
-    const repoPath = join(workspace, repoName);
-    if (existsSync(repoPath)) return repoPath;
-  }
-  if (existsSync(workspace)) return workspace;
-  return HOME;
+function resolveCwd(pick) {
+  return resolveDirectory(pick, { defaultDirectory: config.defaultDirectory, home: HOME });
 }
 
 
@@ -477,18 +475,40 @@ const server = createServer(async (req, res) => {
       if (config.maxSessions !== null && getSessionCount() >= config.maxSessions) {
         return jsonResponse(res, { error: "Workspace limit reached", limit: config.maxSessions, current: getSessionCount() }, 429);
       }
-      const { prompt, repo, dangerous } = await readBody(req);
+      // `directory` is the ticket drawer's explicit pick; `repo` is the PR drawer's GitHub
+      // repo name. Kept as separate fields so only a deliberate directory choice feeds the
+      // picker's history — a PR dispatch shouldn't reorder the ticket guess.
+      const { prompt, repo, directory, dangerous, jiraProject } = await readBody(req);
       if (!prompt || typeof prompt !== "string") {
         return jsonResponse(res, { error: "prompt required" }, 400);
       }
       const escaped = "'" + prompt.replace(/'/g, "'\\''") + "'";
       const flags = dangerous ? " --dangerously-skip-permissions" : "";
       await cmux.createWorkspace({
-        cwd: resolveCwd(repo),
+        cwd: resolveCwd(directory || repo),
         command: `claude${flags} ${escaped}`,
       });
       await monitor.poll();
+      // Remember the pick so this ticket's project (and directories in general) guess better
+      // next time — best-effort, never blocks the response on a disk write.
+      if (directory) {
+        directoryHistory.use(jiraProject || null, directory);
+        directoryHistory.save(DIRECTORY_HISTORY_PATH).catch(() => {});
+      }
       return jsonResponse(res, { ok: true });
+    }
+
+    // Directory choices for the ticket drawer's directory picker, plus the guess to pre-fill.
+    // The datalist shows this project's most-recently-used directory first, then the global
+    // recency cache, then the default directory, then the rest alphabetically. `suggested` is
+    // returned explicitly rather than implied by list position, so the client never guesses an
+    // arbitrary alphabetically-first checkout when there's no history to go on.
+    if (req.url?.startsWith("/api/directories") && req.method === "GET") {
+      const { searchParams } = new URL(req.url, "http://localhost");
+      const projectKey = searchParams.get("project") || null;
+      const names = await listDirectories(config.defaultDirectory);
+      const { directories, suggested } = directoryHistory.directoryOptions(projectKey, names, config.defaultDirectory);
+      return jsonResponse(res, { directories, suggested, defaultDirectory: config.defaultDirectory });
     }
 
     if (req.url === "/api/check-update" && req.method === "POST") {
