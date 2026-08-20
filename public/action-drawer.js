@@ -59,6 +59,23 @@ function renderTicketMeta(ticket) {
   `;
 }
 
+// Tickets carry no working directory of their own (unlike PRs, which are grouped by GitHub
+// repo) and aren't always tied to a git repo at all, so the drawer offers an editable guess
+// instead — a combobox, not a static field, since the guess can be wrong. It sits in its own
+// bar right under the header, visible before any action is clicked, so glancing at (or
+// correcting) it doubles as the confirmation step — no separate modal, and no action button
+// is ever disabled while it loads.
+function renderDirectoryPicker() {
+  return `
+    <div class="drawer-directory-bar">
+      <label for="drawer-directory-input">Directory</label>
+      <input id="drawer-directory-input" class="drawer-directory-input is-loading" list="drawer-directory-options"
+        placeholder="Finding directory…" autocomplete="off" spellcheck="false" />
+      <datalist id="drawer-directory-options"></datalist>
+    </div>
+  `;
+}
+
 function renderDrawerContent(item, type, repo) {
   const actions = type === "pr" ? prActions : ticketActions;
   const title = type === "pr"
@@ -76,6 +93,7 @@ function renderDrawerContent(item, type, repo) {
       <div class="drawer-title">${title}</div>
       <button class="drawer-close" aria-label="Close" onclick="closeActionDrawer()">×</button>
     </div>
+    ${type === "ticket" ? renderDirectoryPicker() : ""}
     <div class="drawer-body">
       <section class="drawer-section">
         <h3 class="drawer-section-label">Details</h3>
@@ -89,6 +107,47 @@ function renderDrawerContent(item, type, repo) {
   `;
 }
 
+// Populates the directory picker's datalist and guess. Runs async after the drawer is already
+// interactive — action buttons work immediately — but the field shows a loading state until
+// the guess lands, and a click that happens first waits for it rather than silently
+// dispatching without one.
+//
+// The guess is surfaced via `placeholder` + `data-suggested`, not `input.value`: a native
+// <input list> filters its <datalist> dropdown to options that start with the input's current
+// value, so pre-filling `.value` with the guess would hide every other option behind that one
+// prefix the moment the guess isn't itself a shared prefix of the others. Leaving `.value`
+// empty keeps the dropdown showing everything; the click handler falls back to
+// `data-suggested` if the user never typed anything.
+//
+// `suggested` comes from the server explicitly rather than being read off the top of the list
+// — with no history the list starts at whichever checkout sorts first alphabetically, which
+// is not a guess worth dispatching to.
+async function loadDirectoryOptions(ticketKey, expectedDrawerEl) {
+  const input = expectedDrawerEl.querySelector("#drawer-directory-input");
+  const datalist = expectedDrawerEl.querySelector("#drawer-directory-options");
+  const projectKey = ticketKey.split("-")[0];
+  let directories = [];
+  let suggested = null;
+  let defaultDirectory = null;
+  try {
+    const res = await fetch(`/api/directories?project=${encodeURIComponent(projectKey)}`);
+    ({ directories = [], suggested = null, defaultDirectory = null } = await res.json());
+  } catch {
+    // Field stays empty — falls back to the configured default directory server-side.
+  }
+  // Writes go to the elements captured above, not to whatever drawer is open now, so a
+  // drawer replaced mid-fetch is never touched — and an in-flight click on this drawer still
+  // gets its guess even if the drawer itself has since closed.
+  if (!datalist || !input) return;
+  input.classList.remove("is-loading");
+  input.placeholder = defaultDirectory ? `${defaultDirectory} (default)` : "workspace (default)";
+  datalist.innerHTML = directories.map((d) => `<option value="${escapeHtml(d)}"></option>`).join("");
+  if (!input.value && suggested) {
+    input.placeholder = suggested;
+    input.dataset.suggested = suggested;
+  }
+}
+
 function openActionDrawer(item, type, repo) {
   if (closeDrawer) closeDrawer();
 
@@ -97,16 +156,30 @@ function openActionDrawer(item, type, repo) {
   drawerEl.dataset.type = type;
   drawerEl.innerHTML = renderDrawerContent(item, type, repo);
 
+  const directoryOptionsLoaded = type === "ticket" ? loadDirectoryOptions(item.key, drawerEl) : null;
+
   drawerEl.querySelectorAll(".drawer-action-btn").forEach((btn) => {
-    btn.addEventListener("click", (e) => {
+    btn.addEventListener("click", async (e) => {
       const actionId = btn.dataset.actionId;
       const actions = type === "pr" ? prActions : ticketActions;
       const action = actions.find((a) => a.id === actionId);
       if (!action) return;
+      const dangerous = e.shiftKey;
+      const el = drawerEl;
       const body = { prompt: action.prompt(item), repo };
-      if (e.shiftKey) body.dangerous = true;
+      if (type === "ticket") {
+        const directoryInput = el.querySelector("#drawer-directory-input");
+        // A click can land before the guess does. Typing beats the guess, so only an
+        // untouched field has to wait — dispatching without the guess would send the agent
+        // somewhere the user never saw.
+        if (!directoryInput?.value.trim()) await directoryOptionsLoaded;
+        const pickedDirectory = directoryInput?.value.trim() || directoryInput?.dataset.suggested;
+        if (pickedDirectory) body.directory = pickedDirectory;
+        body.jiraProject = item.key.split("-")[0];
+      }
+      if (dangerous) body.dangerous = true;
       apiPost("agent-workspace", body);
-      closeActionDrawer();
+      if (drawerEl === el) closeActionDrawer(); // a slow guess may have outlived this drawer
     });
   });
 
