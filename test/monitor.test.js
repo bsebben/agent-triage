@@ -428,6 +428,41 @@ describe("Monitor terminal detection", () => {
     assert.equal(queue.items()[0].id, "notif-abc");
     assert.equal(queue.dismissedItems().length, 0, "stale dismissed synthetic should be evicted");
   });
+
+  it("excludes and reaps notifications for workspaces outside the hosting window", async () => {
+    // notification.list is global, but workspace.list only reflects the
+    // window Agent Triage is hosted in — a notification for a workspace in
+    // some other window (e.g. a stray second cmux window) should never
+    // surface as a permanent, unresolved "Unknown" card.
+    const state = {
+      notifications: [
+        { id: "notif-own", category: "waiting", workspaceId: "W1", surfaceId: "S1", body: "waiting" },
+        { id: "notif-foreign", category: "permission", workspaceId: "GHOST-1", surfaceId: "S2", body: "approve?" },
+      ],
+      workspaces: [{ id: "W1", title: "claude-session", directory: "/home/user/project" }],
+    };
+    const cmuxApi = {
+      listNotifications: async () => state.notifications,
+      listWorkspaces: async () => state.workspaces,
+      listTerminals: async () => [],
+      listAgentWorkspaceIds: async () => new Set(),
+      listBypassWorkspaceIds: async () => new Set(),
+      readScreen: async () => null,
+    };
+    const monitor = new Monitor(queue, { cmuxApi });
+
+    await monitor.poll();
+
+    const items = queue.items();
+    assert.equal(items.length, 1, "only the notification for a known workspace should surface");
+    assert.equal(items[0].workspaceId, "W1");
+
+    // Even if cmux keeps re-reporting the foreign notification on every
+    // poll (as it did live — the ghost window doesn't go away on its own),
+    // it should never accumulate as a permanent item.
+    await monitor.poll();
+    assert.equal(queue.items().length, 1);
+  });
 });
 
 describe("Monitor tab order sync", () => {
@@ -578,6 +613,94 @@ describe("Monitor tab order sync", () => {
     await new Promise((resolve) => setTimeout(resolve, 50));
 
     assert.equal(pollCount, pollsBeforeEvent, "a reordered event shouldn't trigger an extra poll");
+    monitor.stop();
+  });
+
+  it("skips syncing tab order while more than one cmux window is open", async () => {
+    const calls = [];
+    const cmuxApi = {
+      listNotifications: async () => [],
+      listWorkspaces: async () => [
+        { id: "W1", windowId: "WIN1", title: "b-project", directory: "/home/user/b" },
+        { id: "W2", windowId: "WIN1", title: "a-project", directory: "/home/user/a" },
+      ],
+      listTerminals: async () => [],
+      listAgentWorkspaceIds: async () => new Set(["W1", "W2"]),
+      listBypassWorkspaceIds: async () => new Set(),
+      readScreen: async () => null,
+      reorderWorkspaces: async (windowId, order) => calls.push({ windowId, order }),
+      getWindowCount: async () => 2,
+    };
+    const monitor = new Monitor(queue, { cmuxApi, resolveWorktreeFn: async () => ({ isWorktree: false }) });
+
+    await monitor.poll();
+
+    assert.equal(calls.length, 0, "should not reorder while a second window is open");
+    assert.equal(monitor.windowCount, 2);
+  });
+});
+
+describe("Monitor reentrancy and dependency injection", () => {
+  let queue;
+
+  beforeEach(() => {
+    queue = new Queue();
+  });
+
+  it("defers an overlapping poll instead of running it concurrently", async () => {
+    let inFlight = 0;
+    let maxConcurrent = 0;
+    let listWorkspacesCalls = 0;
+    const cmuxApi = {
+      listNotifications: async () => [],
+      listWorkspaces: async () => {
+        listWorkspacesCalls++;
+        inFlight++;
+        maxConcurrent = Math.max(maxConcurrent, inFlight);
+        await new Promise((resolve) => setTimeout(resolve, 20));
+        inFlight--;
+        return [];
+      },
+      listTerminals: async () => [],
+      listAgentWorkspaceIds: async () => new Set(),
+      listBypassWorkspaceIds: async () => new Set(),
+      readScreen: async () => null,
+    };
+    const monitor = new Monitor(queue, { cmuxApi });
+
+    const first = monitor.poll();
+    const second = monitor.poll(); // fires while `first` is still in flight
+    await Promise.all([first, second]);
+    // The deferred poll runs after `first` resolves, asynchronously — give
+    // it a tick to complete before asserting the final call count.
+    await new Promise((resolve) => setTimeout(resolve, 30));
+
+    assert.equal(maxConcurrent, 1, "polls should never run concurrently");
+    assert.equal(listWorkspacesCalls, 2, "the overlapping call should still run once, right after the first");
+  });
+
+  it("uses subscribeWorkspaceEvents from an injected cmuxApi without a separate override", async () => {
+    let subscribed = false;
+    const cmuxApi = {
+      listNotifications: async () => [],
+      listWorkspaces: async () => [],
+      listTerminals: async () => [],
+      listAgentWorkspaceIds: async () => new Set(),
+      listBypassWorkspaceIds: async () => new Set(),
+      readScreen: async () => null,
+      subscribeWorkspaceEvents: () => {
+        subscribed = true;
+        return () => {};
+      },
+    };
+    // Deliberately no subscribeWorkspaceEventsFn override — the injected
+    // cmuxApi's own subscribeWorkspaceEvents should be used instead of
+    // falling through to the real module (which would open a real socket).
+    const monitor = new Monitor(queue, { cmuxApi, pollIntervalMs: 60_000 });
+
+    monitor.start();
+
+    assert.equal(subscribed, true);
     monitor.stop();
   });
 });
