@@ -8,6 +8,14 @@ import { homedir } from "node:os";
 
 const HOME = homedir();
 
+// Tiebreak for equal-priority/equal-dismissedAt items. `item.id` can rotate
+// (synthetic ↔ notification handoff) without the underlying workspace's
+// state changing, so sorting by it would reorder ties for no real reason —
+// `workspaceId` is the one thing that stays constant for a given workspace.
+function compareByWorkspaceId(a, b) {
+  return (a.workspaceId || "").localeCompare(b.workspaceId || "");
+}
+
 function dirLabel(dir) {
   if (!dir || dir === HOME) return "~";
   if (dir.startsWith(HOME + "/")) return "~/" + dir.slice(HOME.length + 1);
@@ -56,13 +64,13 @@ export class Queue {
   items() {
     return [...this.#items.values()]
       .filter((i) => !i.dismissed)
-      .sort((a, b) => (PRIORITY[a.category] ?? 99) - (PRIORITY[b.category] ?? 99));
+      .sort((a, b) => (PRIORITY[a.category] ?? 99) - (PRIORITY[b.category] ?? 99) || compareByWorkspaceId(a, b));
   }
 
   dismissedItems() {
     return [...this.#items.values()]
       .filter((i) => i.dismissed)
-      .sort((a, b) => (b.dismissedAt || 0) - (a.dismissedAt || 0));
+      .sort((a, b) => (b.dismissedAt || 0) - (a.dismissedAt || 0) || compareByWorkspaceId(a, b));
   }
 
   get recentDirCount() {

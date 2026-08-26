@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.50.0] - 2026-08-26
+
+### Added
+
+- Workspace switches now reflect in the dashboard instantly instead of waiting for the next 5s poll: `Monitor` subscribes to cmux's `events.stream` (category `workspace`) over a dedicated socket connection and triggers a debounced out-of-cycle poll whenever cmux reports a workspace created/selected/closed/renamed/moved/reordered. Falls back to the existing polling loop if the event connection drops, and auto-reconnects if cmux restarts.
+- Cmd+↑/↓ now works from the dashboard itself, not just inside cmux: it moves cmux's selection to the adjacent workspace in the dashboard's own displayed order (not cmux's tab order, which can differ) and brings cmux to the foreground, mirroring cmux's own shortcut. `POST /api/focus` gained an `activate` flag for this.
+- `Monitor` now pushes Agent Triage's own display order into cmux's real per-window tab order on every poll (active items grouped/sorted as shown, dismissed items pushed to the end), so cmux's native tab navigation — including whatever you have cmd+↑/↓ bound to — walks the same order the dashboard shows, without needing to intercept cmux's shortcut at all. Agent Triage owns the ordering; a manual drag in cmux gets overwritten on the next poll.
+
+### Fixed
+
+- `queue.js`'s priority sort now breaks ties by `workspaceId` instead of Map insertion order, so the list order no longer silently reshuffles when a notification's ID rotates (synthetic ↔ real) without the underlying workspace's actual state changing.
+- `listWorkspaces()` was reading a per-workspace `window_id` field that doesn't exist — `workspace.list` returns one `window_id` for the whole batch, not per item — so every workspace's `windowId` was silently `null`. Fixed at the source.
+
 ## [1.49.0] - 2026-08-20
 
 ### Added

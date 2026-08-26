@@ -289,8 +289,31 @@ window.addEventListener("focus", syncWindowFocus);
 window.addEventListener("blur", syncWindowFocus);
 syncWindowFocus();
 
+// Finds the workspace adjacent to the currently cmux-selected card in the
+// dashboard's own displayed order (not cmux's tab order, which can differ).
+// Falls back to the first card if nothing is marked selected yet.
+function adjacentWorkspaceId(direction) {
+  const cards = getVisibleCards();
+  if (cards.length === 0) return null;
+  const currentIndex = cards.findIndex((c) => c.classList.contains("selected"));
+  if (currentIndex === -1) return cards[0].dataset.workspaceId || null;
+  const offset = direction === "previous" ? -1 : 1;
+  const targetIndex = (currentIndex + offset + cards.length) % cards.length;
+  return cards[targetIndex].dataset.workspaceId || null;
+}
+
 document.addEventListener("keydown", (e) => {
   if (e.target.tagName === "INPUT") return;
+
+  // Cmd+↑/↓ mirrors cmux's own workspace-switch shortcut instead of moving
+  // the dashboard's local keyboard-focus highlight below — but walks the
+  // dashboard's own displayed order, not cmux's tab order.
+  if (e.metaKey && (e.key === "ArrowUp" || e.key === "ArrowDown")) {
+    e.preventDefault();
+    const workspaceId = adjacentWorkspaceId(e.key === "ArrowDown" ? "next" : "previous");
+    if (workspaceId) apiPost("focus", { workspaceId, activate: true });
+    return;
+  }
 
   const cards = getVisibleCards();
   if (cards.length === 0) return;

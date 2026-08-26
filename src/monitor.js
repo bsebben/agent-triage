@@ -36,22 +36,55 @@ export class Monitor {
   #knownAgentWorkspaces = new Set();
   #cmux;
   #resolveWorktree;
+  #subscribeWorkspaceEvents;
+  #immediatePollDebounceMs;
+  #unsubscribeWorkspaceEvents = null;
+  #debounceTimer = null;
 
-  constructor(queue, { pollIntervalMs = 5000, onUpdate = null, cmuxApi = null, resolveWorktreeFn = null } = {}) {
+  constructor(queue, {
+    pollIntervalMs = 5000,
+    onUpdate = null,
+    cmuxApi = null,
+    resolveWorktreeFn = null,
+    subscribeWorkspaceEventsFn = null,
+    immediatePollDebounceMs = 150,
+  } = {}) {
     this.#queue = queue;
     this.#pollIntervalMs = pollIntervalMs;
     this.#onUpdate = onUpdate;
     this.#cmux = cmuxApi || cmux;
     this.#resolveWorktree = resolveWorktreeFn || defaultResolveWorktree;
+    this.#subscribeWorkspaceEvents = subscribeWorkspaceEventsFn || cmux.subscribeWorkspaceEvents;
+    this.#immediatePollDebounceMs = immediatePollDebounceMs;
   }
 
   start() {
     this.poll();
     this.#interval = setInterval(() => this.poll(), this.#pollIntervalMs);
+    this.#unsubscribeWorkspaceEvents = this.#subscribeWorkspaceEvents((event) => {
+      // Skip our own tab-order sync (below) echoing back as a "reordered"
+      // event — Agent Triage owns ordering now, so there's no external
+      // reorder left to react to instantly; a stray manual drag just gets
+      // overwritten on the next regular poll anyway.
+      if (event?.name === "workspace.reordered") return;
+      this.#scheduleImmediatePoll();
+    });
   }
 
   stop() {
     if (this.#interval) clearInterval(this.#interval);
+    if (this.#debounceTimer) clearTimeout(this.#debounceTimer);
+    this.#unsubscribeWorkspaceEvents?.();
+  }
+
+  // Debounces bursts of workspace events (e.g. holding cmd+↓ to cycle
+  // through several workspaces) into a single out-of-cycle poll.
+  #scheduleImmediatePoll() {
+    if (this.#debounceTimer) clearTimeout(this.#debounceTimer);
+    this.#debounceTimer = setTimeout(() => {
+      this.#debounceTimer = null;
+      this.poll();
+    }, this.#immediatePollDebounceMs);
   }
 
   async poll() {
@@ -154,8 +187,55 @@ export class Monitor {
       }
 
       if (this.#onUpdate) this.#onUpdate();
+
+      await this.#syncTabOrder(workspaces);
     } catch (err) {
       console.error("Poll error:", err.message);
     }
   }
+
+  // Pushes Agent Triage's own display order (grouped/sorted, dismissed
+  // items last) into cmux's real per-window tab order, so cmux's native
+  // navigation (and the dashboard's own Cmd+↑/↓) walks the same order
+  // shown here. Agent Triage owns ordering — this always wins over a
+  // manual drag in cmux.
+  async #syncTabOrder(workspaces) {
+    const windowIdByWorkspaceId = new Map(workspaces.map((w) => [w.id, w.windowId]));
+
+    const desiredIds = [
+      ...this.#queue.grouped().groups.flatMap((g) => g.items.map((i) => i.workspaceId)),
+      ...this.#queue.dismissedItems().map((i) => i.workspaceId),
+    ].filter((id) => id && windowIdByWorkspaceId.has(id));
+
+    const desiredByWindow = new Map();
+    for (const id of desiredIds) {
+      const windowId = windowIdByWorkspaceId.get(id);
+      if (!desiredByWindow.has(windowId)) desiredByWindow.set(windowId, []);
+      desiredByWindow.get(windowId).push(id);
+    }
+
+    const knownIds = new Set(desiredIds);
+    const currentByWindow = new Map();
+    for (const w of workspaces) {
+      if (!knownIds.has(w.id)) continue;
+      if (!currentByWindow.has(w.windowId)) currentByWindow.set(w.windowId, []);
+      currentByWindow.get(w.windowId).push(w.id);
+    }
+
+    const changedWindows = [...desiredByWindow.entries()].filter(([windowId, order]) => {
+      if (order.length < 2) return false;
+      return !arraysEqual(order, currentByWindow.get(windowId) || []);
+    });
+    if (changedWindows.length === 0) return;
+
+    try {
+      await Promise.all(changedWindows.map(([windowId, order]) => this.#cmux.reorderWorkspaces?.(windowId, order)));
+    } catch (err) {
+      console.error("Tab order sync error:", err.message);
+    }
+  }
+}
+
+function arraysEqual(a, b) {
+  return a.length === b.length && a.every((v, i) => v === b[i]);
 }
