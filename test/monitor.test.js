@@ -40,7 +40,7 @@ describe("enrichNotification", () => {
 describe("Monitor terminal detection", () => {
   let queue;
 
-  function makeCmux({ notifications = [], workspaces = [], terminals = [], agentWorkspaceIds = new Set(), bypassWorkspaceIds = new Set() }) {
+  function makeCmux({ notifications = [], workspaces = [], terminals = [], agentWorkspaceIds = new Set(), bypassWorkspaceIds = new Set(), reorderWorkspaces = async () => {} }) {
     return {
       listNotifications: async () => notifications,
       listWorkspaces: async () => workspaces,
@@ -48,6 +48,7 @@ describe("Monitor terminal detection", () => {
       listAgentWorkspaceIds: async () => agentWorkspaceIds,
       listBypassWorkspaceIds: async () => bypassWorkspaceIds,
       readScreen: async () => null,
+      reorderWorkspaces,
     };
   }
 
@@ -318,6 +319,85 @@ describe("Monitor terminal detection", () => {
     assert.equal(queue.items()[0].bypassPermissions, false);
   });
 
+  it("triggers an out-of-cycle poll when a workspace event fires", async () => {
+    const state = {
+      workspaces: [{ id: "W1", title: "claude-session", directory: "/home/user/project" }],
+      agentWorkspaceIds: new Set(["W1"]),
+    };
+    const cmuxApi = {
+      listNotifications: async () => [],
+      listWorkspaces: async () => state.workspaces,
+      listTerminals: async () => [],
+      listAgentWorkspaceIds: async () => state.agentWorkspaceIds,
+      listBypassWorkspaceIds: async () => new Set(),
+      readScreen: async () => null,
+    };
+    let onEvent;
+    const subscribeWorkspaceEventsFn = (cb) => {
+      onEvent = cb;
+      return () => {};
+    };
+    const monitor = new Monitor(queue, {
+      cmuxApi,
+      resolveWorktreeFn: async () => ({ isWorktree: false }),
+      subscribeWorkspaceEventsFn,
+      pollIntervalMs: 60_000,
+      immediatePollDebounceMs: 0,
+    });
+
+    monitor.start();
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    assert.equal(queue.items().length, 1, "initial start() poll should have populated the queue");
+
+    state.workspaces = [
+      { id: "W1", title: "claude-session", directory: "/home/user/project" },
+      { id: "W2", title: "another-session", directory: "/home/user/other" },
+    ];
+    state.agentWorkspaceIds = new Set(["W1", "W2"]);
+    onEvent({ type: "event", name: "workspace.selected", category: "workspace" });
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
+    assert.equal(queue.items().length, 2, "event should have triggered an immediate poll picking up W2");
+    monitor.stop();
+  });
+
+  it("debounces a burst of workspace events into a single poll", async () => {
+    const cmuxApi = makeCmux({
+      workspaces: [{ id: "W1", title: "claude-session", directory: "/home/user/project" }],
+      agentWorkspaceIds: new Set(["W1"]),
+    });
+    let pollCount = 0;
+    const originalListWorkspaces = cmuxApi.listWorkspaces;
+    cmuxApi.listWorkspaces = async () => {
+      pollCount++;
+      return originalListWorkspaces();
+    };
+    let onEvent;
+    const subscribeWorkspaceEventsFn = (cb) => {
+      onEvent = cb;
+      return () => {};
+    };
+    const monitor = new Monitor(queue, {
+      cmuxApi,
+      resolveWorktreeFn: async () => ({ isWorktree: false }),
+      subscribeWorkspaceEventsFn,
+      pollIntervalMs: 60_000,
+      immediatePollDebounceMs: 20,
+    });
+
+    monitor.start();
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    const pollsBeforeBurst = pollCount;
+
+    onEvent({ type: "event", name: "workspace.selected" });
+    onEvent({ type: "event", name: "workspace.selected" });
+    onEvent({ type: "event", name: "workspace.selected" });
+    await new Promise((resolve) => setTimeout(resolve, 80));
+
+    assert.equal(pollCount - pollsBeforeBurst, 1, "a burst of events should coalesce into one poll");
+    monitor.stop();
+  });
+
   it("evicts a dismissed synthetic entry when the workspace starts producing notifications", async () => {
     const state = {
       notifications: [],
@@ -347,5 +427,157 @@ describe("Monitor terminal detection", () => {
     assert.equal(queue.items().length, 1, "notification should be the only active entry");
     assert.equal(queue.items()[0].id, "notif-abc");
     assert.equal(queue.dismissedItems().length, 0, "stale dismissed synthetic should be evicted");
+  });
+});
+
+describe("Monitor tab order sync", () => {
+  let queue;
+
+  function makeCmux({ notifications = [], workspaces = [], terminals = [], agentWorkspaceIds = new Set(), bypassWorkspaceIds = new Set(), reorderWorkspaces = async () => {} }) {
+    return {
+      listNotifications: async () => notifications,
+      listWorkspaces: async () => workspaces,
+      listTerminals: async () => terminals,
+      listAgentWorkspaceIds: async () => agentWorkspaceIds,
+      listBypassWorkspaceIds: async () => bypassWorkspaceIds,
+      readScreen: async () => null,
+      reorderWorkspaces,
+    };
+  }
+
+  beforeEach(() => {
+    queue = new Queue();
+  });
+
+  it("pushes Agent Triage's order to cmux when it differs from cmux's current order", async () => {
+    const calls = [];
+    const cmuxApi = makeCmux({
+      workspaces: [
+        { id: "W1", windowId: "WIN1", title: "b-project", directory: "/home/user/b" },
+        { id: "W2", windowId: "WIN1", title: "a-project", directory: "/home/user/a" },
+      ],
+      agentWorkspaceIds: new Set(["W1", "W2"]),
+      reorderWorkspaces: async (windowId, order) => calls.push({ windowId, order }),
+    });
+    const monitor = new Monitor(queue, { cmuxApi, resolveWorktreeFn: async () => ({ isWorktree: false }) });
+
+    await monitor.poll();
+
+    // Directory groups sort alphabetically ("a" before "b"), so Agent
+    // Triage's own order puts W2 first even though cmux currently has W1 first.
+    assert.equal(calls.length, 1);
+    assert.equal(calls[0].windowId, "WIN1");
+    assert.deepEqual(calls[0].order, ["W2", "W1"]);
+  });
+
+  it("does not call reorder when cmux's order already matches", async () => {
+    const calls = [];
+    const cmuxApi = makeCmux({
+      workspaces: [
+        { id: "W2", windowId: "WIN1", title: "a-project", directory: "/home/user/a" },
+        { id: "W1", windowId: "WIN1", title: "b-project", directory: "/home/user/b" },
+      ],
+      agentWorkspaceIds: new Set(["W1", "W2"]),
+      reorderWorkspaces: async (windowId, order) => calls.push({ windowId, order }),
+    });
+    const monitor = new Monitor(queue, { cmuxApi, resolveWorktreeFn: async () => ({ isWorktree: false }) });
+
+    await monitor.poll();
+
+    assert.equal(calls.length, 0);
+  });
+
+  it("does not reorder a window with only one known workspace", async () => {
+    const calls = [];
+    const cmuxApi = makeCmux({
+      workspaces: [{ id: "W1", windowId: "WIN1", title: "solo", directory: "/home/user/solo" }],
+      agentWorkspaceIds: new Set(["W1"]),
+      reorderWorkspaces: async (windowId, order) => calls.push({ windowId, order }),
+    });
+    const monitor = new Monitor(queue, { cmuxApi, resolveWorktreeFn: async () => ({ isWorktree: false }) });
+
+    await monitor.poll();
+
+    assert.equal(calls.length, 0);
+  });
+
+  it("keeps each window's reorder independent", async () => {
+    const calls = [];
+    const cmuxApi = makeCmux({
+      workspaces: [
+        { id: "W1", windowId: "WIN1", title: "b-project", directory: "/home/user/b" },
+        { id: "W2", windowId: "WIN1", title: "a-project", directory: "/home/user/a" },
+        { id: "W3", windowId: "WIN2", title: "y-project", directory: "/home/user/y" },
+        { id: "W4", windowId: "WIN2", title: "x-project", directory: "/home/user/x" },
+      ],
+      agentWorkspaceIds: new Set(["W1", "W2", "W3", "W4"]),
+      reorderWorkspaces: async (windowId, order) => calls.push({ windowId, order }),
+    });
+    const monitor = new Monitor(queue, { cmuxApi, resolveWorktreeFn: async () => ({ isWorktree: false }) });
+
+    await monitor.poll();
+
+    assert.equal(calls.length, 2);
+    const byWindow = Object.fromEntries(calls.map((c) => [c.windowId, c.order]));
+    assert.deepEqual(byWindow.WIN1, ["W2", "W1"]);
+    assert.deepEqual(byWindow.WIN2, ["W4", "W3"]);
+  });
+
+  it("places dismissed workspaces after active ones in the pushed order", async () => {
+    const calls = [];
+    const cmuxApi = makeCmux({
+      workspaces: [
+        { id: "W1", windowId: "WIN1", title: "a-project", directory: "/home/user/a" },
+        { id: "W2", windowId: "WIN1", title: "b-project", directory: "/home/user/b" },
+      ],
+      agentWorkspaceIds: new Set(["W1", "W2"]),
+      reorderWorkspaces: async (windowId, order) => calls.push({ windowId, order }),
+    });
+    const monitor = new Monitor(queue, { cmuxApi, resolveWorktreeFn: async () => ({ isWorktree: false }) });
+
+    await monitor.poll();
+    assert.equal(calls.length, 0, "already in order, nothing to push yet");
+
+    queue.dismiss("synthetic-W1");
+    calls.length = 0;
+    await monitor.poll();
+
+    assert.equal(calls.length, 1);
+    assert.deepEqual(calls[0].order, ["W2", "W1"]);
+  });
+
+  it("ignores its own workspace.reordered event instead of scheduling another poll", async () => {
+    const cmuxApi = makeCmux({
+      workspaces: [{ id: "W1", windowId: "WIN1", title: "solo", directory: "/home/user/solo" }],
+      agentWorkspaceIds: new Set(["W1"]),
+    });
+    let pollCount = 0;
+    const originalListWorkspaces = cmuxApi.listWorkspaces;
+    cmuxApi.listWorkspaces = async () => {
+      pollCount++;
+      return originalListWorkspaces();
+    };
+    let onEvent;
+    const subscribeWorkspaceEventsFn = (cb) => {
+      onEvent = cb;
+      return () => {};
+    };
+    const monitor = new Monitor(queue, {
+      cmuxApi,
+      resolveWorktreeFn: async () => ({ isWorktree: false }),
+      subscribeWorkspaceEventsFn,
+      pollIntervalMs: 60_000,
+      immediatePollDebounceMs: 0,
+    });
+
+    monitor.start();
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    const pollsBeforeEvent = pollCount;
+
+    onEvent({ type: "event", name: "workspace.reordered" });
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
+    assert.equal(pollCount, pollsBeforeEvent, "a reordered event shouldn't trigger an extra poll");
+    monitor.stop();
   });
 });
