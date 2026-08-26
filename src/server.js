@@ -100,6 +100,7 @@ function getFullData() {
     stats: queue.stats(),
     maxSessions: config.maxSessions,
     sessionCount: getSessionCount(),
+    windowCount: monitor.windowCount,
     updateStatus: updateChecker.data,
     cmuxVersion,
     refreshing: [...refreshingIds()],

@@ -40,6 +40,9 @@ export class Monitor {
   #immediatePollDebounceMs;
   #unsubscribeWorkspaceEvents = null;
   #debounceTimer = null;
+  #isPolling = false;
+  #pollPending = false;
+  #windowCount = 1;
 
   constructor(queue, {
     pollIntervalMs = 5000,
@@ -54,8 +57,14 @@ export class Monitor {
     this.#onUpdate = onUpdate;
     this.#cmux = cmuxApi || cmux;
     this.#resolveWorktree = resolveWorktreeFn || defaultResolveWorktree;
-    this.#subscribeWorkspaceEvents = subscribeWorkspaceEventsFn || cmux.subscribeWorkspaceEvents;
+    this.#subscribeWorkspaceEvents = subscribeWorkspaceEventsFn || this.#cmux.subscribeWorkspaceEvents;
     this.#immediatePollDebounceMs = immediatePollDebounceMs;
+  }
+
+  // Number of open cmux windows as of the last poll. >1 means the dashboard
+  // can only see one of them (see cmux.getWindowCount's doc comment).
+  get windowCount() {
+    return this.#windowCount;
   }
 
   start() {
@@ -87,15 +96,41 @@ export class Monitor {
     }, this.#immediatePollDebounceMs);
   }
 
+  // Reentrancy guard: an event-triggered poll can now land while the 5s
+  // timer's poll is still in flight (e.g. a slow reorder-workspaces CLI
+  // call). Overlapping polls interleaving Queue mutations — and, worse,
+  // issuing concurrent reorder-workspaces calls against the same cmux
+  // window — is exactly what corrupted cmux's tab state during testing.
+  // If a poll is already running, remember to run once more right after
+  // instead of dropping the request.
   async poll() {
+    if (this.#isPolling) {
+      this.#pollPending = true;
+      return;
+    }
+    this.#isPolling = true;
     try {
-      const [notifications, workspaces, terminals, agentWsIds, bypassWsIds] = await Promise.all([
+      await this.#doPoll();
+    } finally {
+      this.#isPolling = false;
+      if (this.#pollPending) {
+        this.#pollPending = false;
+        this.poll();
+      }
+    }
+  }
+
+  async #doPoll() {
+    try {
+      const [notifications, workspaces, terminals, agentWsIds, bypassWsIds, windowCount] = await Promise.all([
         this.#cmux.listNotifications(),
         this.#cmux.listWorkspaces(),
         this.#cmux.listTerminals(),
         this.#cmux.listAgentWorkspaceIds(),
         this.#cmux.listBypassWorkspaceIds(),
+        this.#cmux.getWindowCount ? this.#cmux.getWindowCount() : 1,
       ]);
+      this.#windowCount = windowCount;
 
       for (const id of agentWsIds) this.#knownAgentWorkspaces.add(id);
       for (const id of this.#knownAgentWorkspaces) {
@@ -107,11 +142,20 @@ export class Monitor {
       // Find the Dashboard workspace ID so we can exclude its notifications
       const dashboardWsId = workspaces.find((w) => w.title === DASHBOARD_WS_NAME)?.id;
 
+      // workspace.list only ever returns our own window's workspaces, but
+      // notification.list is global — if a second cmux window exists, its
+      // notifications keep showing up here forever with no way to resolve
+      // a title/directory for them. Scope to workspaces we actually know
+      // about so a stray window can't leave permanent "Unknown" ghost cards.
+      const knownWorkspaceIds = new Set(workspaces.map((w) => w.id));
+
       // Enrichment does a git subprocess round-trip per distinct directory
       // (on a cold or expired worktree cache) — resolve all of a poll cycle's
       // items concurrently rather than serializing N round-trips through a
       // sequential await in the loop.
-      const relevantNotifications = notifications.filter((n) => n.workspaceId !== dashboardWsId);
+      const relevantNotifications = notifications.filter(
+        (n) => n.workspaceId !== dashboardWsId && knownWorkspaceIds.has(n.workspaceId)
+      );
       for (const n of relevantNotifications) currentIds.add(n.id);
       const enrichedNotifications = await Promise.all(
         relevantNotifications.map(async (n) => {
@@ -179,16 +223,21 @@ export class Monitor {
       // Reap dismissed items whose workspace cmux no longer reports. Otherwise a
       // card for a closed workspace lingers forever in the Dismissed list and
       // can't be cleared — "close" only acts on a live cmux workspace.
-      const liveWsIds = new Set(workspaces.map((w) => w.id));
       for (const item of this.#queue.dismissedItems()) {
-        if (!item.workspaceId || !liveWsIds.has(item.workspaceId)) {
+        if (!item.workspaceId || !knownWorkspaceIds.has(item.workspaceId)) {
           this.#queue.remove(item.id);
         }
       }
 
       if (this.#onUpdate) this.#onUpdate();
 
-      await this.#syncTabOrder(workspaces);
+      // Skip while a second window exists — workspace.list only reflects
+      // one window, so we can't be sure `workspaces` here is even the
+      // right set to reorder, and syncing against the wrong window's data
+      // is exactly what corrupted cmux's tab state last time.
+      if (windowCount <= 1) {
+        await this.#syncTabOrder(workspaces);
+      }
     } catch (err) {
       console.error("Poll error:", err.message);
     }

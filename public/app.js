@@ -37,6 +37,7 @@ function connect() {
       applyCloses();
       if (!renaming) render();
       if (typeof renderCmuxCompatIndicator === "function") renderCmuxCompatIndicator();
+      if (typeof renderWindowCountIndicator === "function") renderWindowCountIndicator();
       if (typeof renderUpdateIndicator === "function") renderUpdateIndicator();
     } else if (msg.type === "log" || msg.type === "logs") {
       if (typeof handleLogMessage === "function") handleLogMessage(msg);
@@ -303,7 +304,7 @@ function adjacentWorkspaceId(direction) {
 }
 
 document.addEventListener("keydown", (e) => {
-  if (e.target.tagName === "INPUT") return;
+  if (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA" || e.target.isContentEditable) return;
 
   // Cmd+↑/↓ mirrors cmux's own workspace-switch shortcut instead of moving
   // the dashboard's local keyboard-focus highlight below — but walks the

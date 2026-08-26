@@ -144,12 +144,16 @@ export function subscribeWorkspaceEvents(onEvent) {
       }
     });
 
-    s.on("error", scheduleReconnect);
+    s.on("error", (err) => {
+      console.error("Workspace event stream error:", err.message);
+      scheduleReconnect();
+    });
     s.on("close", scheduleReconnect);
   }
 
   function scheduleReconnect() {
     if (closed || reconnectTimer) return;
+    console.error(`Workspace event stream disconnected — reconnecting in ${EVENTS_RECONNECT_DELAY_MS}ms`);
     reconnectTimer = setTimeout(() => {
       reconnectTimer = null;
       connect();
@@ -222,6 +226,21 @@ export function categorizeNotification(n) {
 }
 
 export const AGENT_TITLE_PREFIX = /^[✳⠂⠐]/;
+
+/**
+ * Number of open cmux windows. `workspace.list` is scoped to just the
+ * caller's own window, so this is the only way to detect that a second
+ * window exists — which corrupts the dashboard's view (see
+ * Monitor#windowCount / the multi-window indicator).
+ */
+export async function getWindowCount() {
+  try {
+    const raw = await rpc("system.top");
+    return (raw.windows || []).length;
+  } catch {
+    return 1;
+  }
+}
 
 export async function listAgentWorkspaceIds() {
   try {
