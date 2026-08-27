@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.50.2] - 2026-08-27
+
+### Fixed
+
+- Pulls tab's GitHub GraphQL polling (`gh api graphql`) retries transient 502/504 gateway errors up to 3 times before falling back to stale data, instead of eating a full 2-minute poll cycle on the first hiccup. GitHub's search endpoint intermittently times out on the nested `commits`/`statusCheckRollup`/`reviewRequests` resolvers fanned out over up to 100 results — an external, load-dependent limitation, not something fixable by changing the query shape.
+
 ## [1.50.1] - 2026-08-27
 
 ### Fixed
