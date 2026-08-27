@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { parseNotifications, categorizeNotification, AGENT_TITLE_PREFIX } from "../src/cmux.js";
+import { parseNotifications, categorizeNotification, AGENT_TITLE_PREFIX, findWindowIdForWorkspace } from "../src/cmux.js";
 
 describe("parseNotifications", () => {
   it("parses cmux notification JSON into structured items", () => {
@@ -93,5 +93,32 @@ describe("AGENT_TITLE_PREFIX", () => {
   });
   it("does not match titles with prefix mid-string", () => {
     assert.equal(AGENT_TITLE_PREFIX.test("my ✳ session"), false);
+  });
+});
+
+describe("findWindowIdForWorkspace", () => {
+  // Mirrors system.top's shape: top-level windows[], each with its own
+  // workspaces[] — this is what listWorkspaces() uses to resolve which
+  // window the dashboard's own host workspace lives in, since workspace.list
+  // itself scopes to cmux's currently-*selected* window, not the caller's.
+  const raw = {
+    windows: [
+      { id: "WIN-1", workspaces: [{ id: "WS-1" }, { id: "WS-2" }] },
+      { id: "WIN-2", workspaces: [{ id: "WS-3" }] },
+    ],
+  };
+
+  it("finds the window containing the given workspace id", () => {
+    assert.equal(findWindowIdForWorkspace(raw, "WS-2"), "WIN-1");
+    assert.equal(findWindowIdForWorkspace(raw, "WS-3"), "WIN-2");
+  });
+
+  it("returns null when no window contains the workspace", () => {
+    assert.equal(findWindowIdForWorkspace(raw, "WS-unknown"), null);
+  });
+
+  it("returns null when windows/workspaces are missing", () => {
+    assert.equal(findWindowIdForWorkspace({}, "WS-1"), null);
+    assert.equal(findWindowIdForWorkspace({ windows: [{ id: "WIN-1" }] }, "WS-1"), null);
   });
 });

@@ -1,4 +1,5 @@
 import { createServer } from "node:http";
+import { randomUUID } from "node:crypto";
 import { readFileSync, existsSync, utimesSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
@@ -40,6 +41,13 @@ const DATA_DIR = join(__dirname, "..", "data");
 const TASKS_DATA_PATH = join(DATA_DIR, "tasks.json");
 const DIRECTORY_HISTORY_PATH = join(DATA_DIR, "ticket-directory-history.json");
 const PORT = process.env.PORT || config.port;
+
+// Generated once per process start. The client compares this on every
+// websocket message and reloads on mismatch — the websocket itself silently
+// reconnects across a server restart with no page reload otherwise, so a
+// tab left open keeps running whatever HTML/JS it loaded before the
+// restart (missing new indicators, stale bugfixes, etc.) indefinitely.
+const BOOT_ID = randomUUID();
 
 // --- Tab registry ---
 // Each tab module exports: { status, data, init(onUpdate) }
@@ -101,6 +109,7 @@ function getFullData() {
     maxSessions: config.maxSessions,
     sessionCount: getSessionCount(),
     windowCount: monitor.windowCount,
+    bootId: BOOT_ID,
     updateStatus: updateChecker.data,
     cmuxVersion,
     refreshing: [...refreshingIds()],

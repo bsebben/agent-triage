@@ -616,7 +616,11 @@ describe("Monitor tab order sync", () => {
     monitor.stop();
   });
 
-  it("skips syncing tab order while more than one cmux window is open", async () => {
+  it("still syncs tab order while more than one cmux window is open", async () => {
+    // listWorkspaces() pins itself to our own window explicitly (see
+    // cmux.js#resolveOwnWindowId), so `workspaces` here is reliably our own
+    // window's data regardless of windowCount — other cmux windows existing
+    // or being focused shouldn't affect this dashboard at all.
     const calls = [];
     const cmuxApi = {
       listNotifications: async () => [],
@@ -635,8 +639,10 @@ describe("Monitor tab order sync", () => {
 
     await monitor.poll();
 
-    assert.equal(calls.length, 0, "should not reorder while a second window is open");
-    assert.equal(monitor.windowCount, 2);
+    assert.equal(calls.length, 1);
+    assert.equal(calls[0].windowId, "WIN1");
+    assert.deepEqual(calls[0].order, ["W2", "W1"]);
+    assert.equal(monitor.windowCount, 2, "windowCount is still tracked for the informational badge");
   });
 });
 
