@@ -359,13 +359,35 @@ export function parseDeployLinks(deployments) {
   return links;
 }
 
+// GitHub's search GraphQL endpoint intermittently 502/504s on this query — the nested
+// commits -> statusCheckRollup -> contexts resolvers fanned out over up to 100 search
+// results occasionally exceed GitHub's own backend budget, independent of anything on
+// our end (reproduces identically running `gh api graphql` by hand, outside this app).
+// Retry a couple of times before letting poll()'s allSettled fallback (see settlePollResults)
+// absorb it as stale data. Only the transient gateway errors are retried — anything else
+// (auth, malformed query) should surface immediately rather than being masked for 6+ seconds.
+const RETRYABLE_HTTP_ERROR = /HTTP 50[234]/;
+
+async function fetchPrNodes(query, attempts = 3) {
+  for (let attempt = 0; attempt < attempts; attempt++) {
+    if (attempt > 0) await new Promise((r) => setTimeout(r, 3000));
+    try {
+      const { stdout } = await execFileAsync(
+        "gh", ["api", "graphql", "-F", `query=${PR_QUERY}`, "-F", `q=${query}`],
+        { timeout: 30000 },
+      );
+      return JSON.parse(stdout).data.search.nodes;
+    } catch (err) {
+      const match = err.message.match(RETRYABLE_HTTP_ERROR);
+      if (!match || attempt === attempts - 1) throw err;
+      console.error(`[pulls] graphql ${match[0]}, retrying (attempt ${attempt + 2}/${attempts})...`);
+    }
+  }
+}
+
 async function searchPrs(query, filter, sortFn) {
   console.log(`[pulls] polling: ${query}`);
-  const { stdout } = await execFileAsync(
-    "gh", ["api", "graphql", "-F", `query=${PR_QUERY}`, "-F", `q=${query}`],
-    { timeout: 30000 },
-  );
-  const nodes = JSON.parse(stdout).data.search.nodes;
+  const nodes = await fetchPrNodes(query);
   console.log(`[pulls] got ${nodes.length} results`);
 
   const orgFilter = cfg.orgFilter;
