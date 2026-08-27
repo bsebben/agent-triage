@@ -190,8 +190,8 @@ async function runCli(args, timeoutMs = 10000) {
 
 // --- Public API ---
 
-export async function rpc(method) {
-  return socketRpc(method);
+export async function rpc(method, params) {
+  return socketRpc(method, params);
 }
 
 export async function listNotifications() {
@@ -228,23 +228,79 @@ export function categorizeNotification(n) {
 export const AGENT_TITLE_PREFIX = /^[✳⠂⠐]/;
 
 /**
- * Number of open cmux windows. `workspace.list` is scoped to just the
- * caller's own window, so this is the only way to detect that a second
- * window exists — which corrupts the dashboard's view (see
- * Monitor#windowCount / the multi-window indicator).
+ * Number of open cmux windows. Purely informational (see Monitor#windowCount
+ * / the multi-window indicator) — `listWorkspaces` below pins itself to our
+ * own window explicitly, so this count no longer needs to gate any behavior.
  */
 export async function getWindowCount() {
   try {
-    const raw = await rpc("system.top");
+    // Like workspace.list, system.top without all_windows scopes to
+    // whichever window is currently *selected* app-wide, not every open
+    // window — silently undercounting to 1 otherwise.
+    const raw = await rpc("system.top", { all_windows: true });
     return (raw.windows || []).length;
   } catch {
     return 1;
   }
 }
 
+let ownWindowIdPromise = null;
+
+/**
+ * Resolves the cmux window this process's own host workspace lives in.
+ *
+ * `workspace.list`/`system.top` without an explicit `window_id` don't scope
+ * to "the caller's window" — they scope to whichever window cmux currently
+ * has *selected*, app-wide. Opening or focusing a second window flips that
+ * target out from under us mid-poll, so the dashboard briefly renders the
+ * other window's workspaces as its own. cmux sets `CMUX_WORKSPACE_ID` on any
+ * process it launches (this dashboard must run inside a cmux-hosted
+ * terminal), which stays pinned to our own workspace regardless of focus —
+ * cross-reference it against `system.top` once to find our window's real id.
+ *
+ * Returns null (and callers fall back to the old ambient-scoped behavior) if
+ * we're not running inside cmux or the lookup fails.
+ */
+export function findWindowIdForWorkspace(raw, workspaceId) {
+  for (const win of raw.windows || []) {
+    if ((win.workspaces || []).some((ws) => ws.id === workspaceId)) {
+      return win.id;
+    }
+  }
+  return null;
+}
+
+async function resolveOwnWindowId() {
+  const ownWorkspaceId = process.env.CMUX_WORKSPACE_ID;
+  if (!ownWorkspaceId) return null;
+
+  try {
+    // all_windows: true — without it system.top only returns the
+    // currently-*selected* window, which may not be our own, so we'd never
+    // find our workspace in it.
+    const raw = await rpc("system.top", { all_windows: true });
+    return findWindowIdForWorkspace(raw, ownWorkspaceId);
+  } catch {}
+  return null;
+}
+
+function getOwnWindowId() {
+  if (!ownWindowIdPromise) ownWindowIdPromise = resolveOwnWindowId();
+  return ownWindowIdPromise;
+}
+
+// Scopes system.top to just our own window when it's resolvable, so agent/
+// bypass tags from other cmux windows can't leak into our own workspace
+// roster. Falls back to every window (the old behavior) when we can't
+// resolve our own — e.g. running outside cmux entirely.
+async function systemTopScopedToOwnWindow() {
+  const ownWindowId = await getOwnWindowId();
+  return rpc("system.top", ownWindowId ? { window_id: ownWindowId } : { all_windows: true });
+}
+
 export async function listAgentWorkspaceIds() {
   try {
-    const raw = await rpc("system.top");
+    const raw = await systemTopScopedToOwnWindow();
     const ids = new Set();
     for (const win of raw.windows || []) {
       for (const ws of win.workspaces || []) {
@@ -274,7 +330,7 @@ export async function listAgentWorkspaceIds() {
  */
 export async function listBypassWorkspaceIds() {
   try {
-    const raw = await rpc("system.top");
+    const raw = await systemTopScopedToOwnWindow();
     const ttyByWsId = new Map();
     for (const win of raw.windows || []) {
       for (const ws of win.workspaces || []) {
@@ -316,10 +372,13 @@ export async function listBypassWorkspaceIds() {
 }
 
 export async function listWorkspaces() {
-  const raw = await rpc("workspace.list");
-  // "workspace.list" is scoped to one window — window_id is a top-level
-  // field of the response, not per-workspace, so every entry it returns
-  // belongs to that same window.
+  const ownWindowId = await getOwnWindowId();
+  // Pin explicitly to our own window (see resolveOwnWindowId) rather than
+  // trusting workspace.list's default scoping, which follows cmux's
+  // currently-*selected* window app-wide, not the caller's own window.
+  const raw = await rpc("workspace.list", ownWindowId ? { window_id: ownWindowId } : undefined);
+  // window_id is a top-level field of the response, not per-workspace, so
+  // every entry it returns belongs to that same window.
   const windowId = raw.window_id || null;
   return (raw.workspaces || []).map((w) => ({
     id: w.id,

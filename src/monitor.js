@@ -231,13 +231,11 @@ export class Monitor {
 
       if (this.#onUpdate) this.#onUpdate();
 
-      // Skip while a second window exists — workspace.list only reflects
-      // one window, so we can't be sure `workspaces` here is even the
-      // right set to reorder, and syncing against the wrong window's data
-      // is exactly what corrupted cmux's tab state last time.
-      if (windowCount <= 1) {
-        await this.#syncTabOrder(workspaces);
-      }
+      // listWorkspaces() pins itself to our own window explicitly (see
+      // cmux.js#resolveOwnWindowId), so `workspaces` is reliably our own
+      // window's data regardless of how many other cmux windows are open —
+      // no need to skip syncing just because windowCount > 1.
+      await this.#syncTabOrder(workspaces);
     } catch (err) {
       console.error("Poll error:", err.message);
     }

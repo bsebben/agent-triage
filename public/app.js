@@ -7,6 +7,7 @@ let ws;
 let state = { groups: [], recentGroups: [], dismissed: [], stats: { total: 0, pending: 0, completed: 0, dismissed: 0 } };
 let renaming = false;
 let pendingReload = false;
+let serverBootId = null;
 const recentRenames = new Map();
 const recentCloses = new Map();
 
@@ -32,6 +33,14 @@ function connect() {
   ws.onmessage = (e) => {
     const msg = JSON.parse(e.data);
     if (msg.type === "update") {
+      // The websocket reconnects transparently across a plain server
+      // restart (not just the explicit self-update flow pendingReload
+      // covers) — without this, a tab left open keeps running whatever
+      // HTML/JS it loaded before the restart, indefinitely.
+      if (msg.data.bootId && serverBootId && msg.data.bootId !== serverBootId) {
+        return location.reload();
+      }
+      serverBootId = msg.data.bootId || serverBootId;
       state = msg.data;
       applyRenames();
       applyCloses();

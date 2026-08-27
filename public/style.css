@@ -78,7 +78,8 @@ header h1 {
 
 .app-version:hover { color: var(--text); }
 
-#cmux-compat-indicator {
+#cmux-compat-indicator,
+#window-count-indicator {
   opacity: 0;
   transition: opacity 0.3s ease;
 }

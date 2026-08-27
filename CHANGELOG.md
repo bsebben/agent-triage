@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.50.1] - 2026-08-27
+
+### Fixed
+
+- `workspace.list`/`system.top` calls were scoped to whichever cmux window is currently *selected* app-wide, not the dashboard's own hosting window — opening or focusing another cmux window could make the dashboard briefly render that window's workspaces as its own, corrupting cards. `listWorkspaces()` now pins itself explicitly to its own window (resolved once via `CMUX_WORKSPACE_ID`), so other cmux windows have no effect regardless of focus. Tab-order sync no longer needs to skip itself when more than one window is open.
+- `system.top` without `all_windows: true` also only reflects the currently-selected window, not every open window — `getWindowCount()` was silently undercounting to 1 (the header badge never appeared even with multiple real windows open), and agent/bypass-permission tag detection was scoped to whichever window happened to be selected rather than consistently our own. Fixed at all four call sites.
+- A dashboard tab left open across a plain server restart (not just the self-update flow) kept running its stale HTML/JS indefinitely — the websocket reconnects silently with no page reload. The client now compares a per-boot server id on every update and reloads on mismatch.
+
 ## [1.50.0] - 2026-08-26
 
 ### Added
