@@ -48,6 +48,42 @@ describe("Queue", () => {
     assert.equal(items[2].category, "terminal");
   });
 
+  it("breaks priority ties by workspaceId, not insertion order", () => {
+    queue.upsert({ id: "A", category: "waiting", workspaceId: "W2", body: "" });
+    queue.upsert({ id: "B", category: "waiting", workspaceId: "W1", body: "" });
+    queue.upsert({ id: "C", category: "waiting", workspaceId: "W3", body: "" });
+    assert.deepEqual(queue.items().map((i) => i.workspaceId), ["W1", "W2", "W3"]);
+  });
+
+  it("keeps a stable order across an item ID rotation for the same workspace", () => {
+    queue.upsert({ id: "A", category: "waiting", workspaceId: "W2", body: "" });
+    queue.upsert({ id: "B", category: "waiting", workspaceId: "W1", body: "" });
+    const before = queue.items().map((i) => i.workspaceId);
+
+    // Simulate a notification ID rotation for W1: remove the old entry and
+    // upsert under a new id, as Monitor does when cmux's notification ID
+    // changes — the workspace itself hasn't changed, so order shouldn't either.
+    queue.remove("B");
+    queue.upsert({ id: "B2", category: "waiting", workspaceId: "W1", body: "" });
+
+    assert.deepEqual(queue.items().map((i) => i.workspaceId), before);
+  });
+
+  it("breaks dismissedAt ties by workspaceId", () => {
+    let fakeNow = Date.now();
+    const realNow = Date.now;
+    Date.now = () => fakeNow;
+    try {
+      queue.upsert({ id: "A", category: "waiting", workspaceId: "W2", body: "" });
+      queue.upsert({ id: "B", category: "waiting", workspaceId: "W1", body: "" });
+      queue.dismiss("A");
+      queue.dismiss("B");
+      assert.deepEqual(queue.dismissedItems().map((i) => i.workspaceId), ["W1", "W2"]);
+    } finally {
+      Date.now = realNow;
+    }
+  });
+
   it("excludes running and terminal from pending count", () => {
     queue.upsert({ id: "T1", category: "terminal", workspaceId: "W1", body: "" });
     queue.upsert({ id: "R1", category: "running", workspaceId: "W2", body: "" });

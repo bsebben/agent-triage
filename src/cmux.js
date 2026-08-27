@@ -96,6 +96,79 @@ async function socketRpc(method, params = {}) {
   });
 }
 
+// --- Event stream (separate connection: events.stream takes over whatever
+// socket it's sent on, so it can't share the RPC connection above) ---
+
+const EVENTS_RECONNECT_DELAY_MS = 3000;
+
+/**
+ * Subscribes to cmux's live event stream, filtered to the "workspace"
+ * category (created/selected/closed/renamed/moved/reordered — covers
+ * workspace switches from shortcuts, sidebar clicks, and CLI/socket
+ * commands alike). Reconnects on error/close so a cmux restart doesn't
+ * kill the subscription. Returns an unsubscribe function.
+ *
+ * @param {(event: object) => void} onEvent
+ * @returns {() => void} unsubscribe
+ */
+export function subscribeWorkspaceEvents(onEvent) {
+  let closed = false;
+  let socket = null;
+  let reconnectTimer = null;
+  let eventBuffer = "";
+
+  function connect() {
+    if (closed) return;
+    eventBuffer = "";
+    const s = createConnection(SOCKET_PATH);
+    socket = s;
+    s.setEncoding("utf8");
+
+    s.on("connect", () => {
+      s.write(JSON.stringify({ method: "events.stream", params: { categories: ["workspace"] } }) + "\n");
+    });
+
+    s.on("data", (chunk) => {
+      eventBuffer += chunk;
+      let idx;
+      while ((idx = eventBuffer.indexOf("\n")) !== -1) {
+        const line = eventBuffer.slice(0, idx);
+        eventBuffer = eventBuffer.slice(idx + 1);
+        try {
+          const frame = JSON.parse(line);
+          if (frame.type === "event") onEvent(frame);
+        } catch {
+          eventBuffer = line + "\n" + eventBuffer;
+          break;
+        }
+      }
+    });
+
+    s.on("error", (err) => {
+      console.error("Workspace event stream error:", err.message);
+      scheduleReconnect();
+    });
+    s.on("close", scheduleReconnect);
+  }
+
+  function scheduleReconnect() {
+    if (closed || reconnectTimer) return;
+    console.error(`Workspace event stream disconnected — reconnecting in ${EVENTS_RECONNECT_DELAY_MS}ms`);
+    reconnectTimer = setTimeout(() => {
+      reconnectTimer = null;
+      connect();
+    }, EVENTS_RECONNECT_DELAY_MS);
+  }
+
+  connect();
+
+  return function unsubscribe() {
+    closed = true;
+    if (reconnectTimer) clearTimeout(reconnectTimer);
+    socket?.destroy();
+  };
+}
+
 // --- CLI fallback for commands not available via RPC ---
 
 // SIGTERM mid-write crashes cmux's helper (unhandled NSFileHandleOperationException),
@@ -153,6 +226,21 @@ export function categorizeNotification(n) {
 }
 
 export const AGENT_TITLE_PREFIX = /^[✳⠂⠐]/;
+
+/**
+ * Number of open cmux windows. `workspace.list` is scoped to just the
+ * caller's own window, so this is the only way to detect that a second
+ * window exists — which corrupts the dashboard's view (see
+ * Monitor#windowCount / the multi-window indicator).
+ */
+export async function getWindowCount() {
+  try {
+    const raw = await rpc("system.top");
+    return (raw.windows || []).length;
+  } catch {
+    return 1;
+  }
+}
 
 export async function listAgentWorkspaceIds() {
   try {
@@ -229,12 +317,16 @@ export async function listBypassWorkspaceIds() {
 
 export async function listWorkspaces() {
   const raw = await rpc("workspace.list");
+  // "workspace.list" is scoped to one window — window_id is a top-level
+  // field of the response, not per-workspace, so every entry it returns
+  // belongs to that same window.
+  const windowId = raw.window_id || null;
   return (raw.workspaces || []).map((w) => ({
     id: w.id,
     title: w.title,
     directory: w.current_directory || null,
     ref: w.ref,
-    windowId: w.window_id || null,
+    windowId,
     selected: w.selected || false,
   }));
 }
@@ -255,6 +347,18 @@ export async function selectWorkspace(workspaceId) {
   if (result?.window_id) {
     await socketRpc("window.focus", { window_id: result.window_id });
   }
+}
+
+/**
+ * Reorders workspaces within one window to match `orderedWorkspaceIds`.
+ * `reorder-workspaces` is CLI-only (not in the RPC method list) — per its
+ * own docs, unmentioned workspaces (e.g. the dashboard's own host
+ * workspace) simply keep their relative order after the listed ones, so
+ * callers don't need to enumerate every workspace in the window.
+ */
+export async function reorderWorkspaces(windowId, orderedWorkspaceIds) {
+  if (orderedWorkspaceIds.length < 2) return;
+  await runCli(["reorder-workspaces", "--window", windowId, "--order", orderedWorkspaceIds.join(",")]);
 }
 
 export async function closeWorkspace(workspaceId) {
@@ -307,7 +411,7 @@ export async function createWorkspace({ cwd, command } = {}) {
   return { workspace_id: workspaceId };
 }
 
-function activateCmux() {
+export function activateCmux() {
   execFile("osascript", ["-e", 'tell application "cmux" to activate'], () => {});
 }
 

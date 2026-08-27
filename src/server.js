@@ -100,6 +100,7 @@ function getFullData() {
     stats: queue.stats(),
     maxSessions: config.maxSessions,
     sessionCount: getSessionCount(),
+    windowCount: monitor.windowCount,
     updateStatus: updateChecker.data,
     cmuxVersion,
     refreshing: [...refreshingIds()],
@@ -338,8 +339,14 @@ const server = createServer(async (req, res) => {
     }
 
     if (req.url === "/api/focus" && req.method === "POST") {
-      const { workspaceId } = await readBody(req);
+      // `activate` brings cmux to the foreground (osascript app activate) on
+      // top of the plain workspace.select + window.focus RPC — used by the
+      // dashboard's Cmd+↑/↓ shortcut to mirror cmux's own behavior
+      // exactly; the click/Enter paths leave it off so triaging from the
+      // dashboard doesn't keep jumping you away from it.
+      const { workspaceId, activate } = await readBody(req);
       await cmux.selectWorkspace(workspaceId);
+      if (activate) cmux.activateCmux();
       return jsonResponse(res, { ok: true });
     }
 
