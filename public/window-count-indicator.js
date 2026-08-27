@@ -33,7 +33,7 @@ function openWindowCountModal() {
       <button class="modal-close" type="button" aria-label="Close">&times;</button>
     </div>
     <div class="modal-body">
-      <p>Only one cmux window should run the Agent Triage host process. This dashboard only ever shows workspaces from that host window — other open cmux windows have no effect on it, and don't need to be closed.</p>
+      <p>Only one cmux window should run the Agent Triage host process. This dashboard only ever shows workspaces from that host window — other open cmux windows have no effect on it and won't be reflected in Agent Triage. It is recommended that you run only one cmux window.</p>
     </div>
   `;
   panel.querySelector(".modal-close").addEventListener("click", () => closeWindowCountModal?.());
