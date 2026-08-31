@@ -35,6 +35,22 @@ describe("enrichNotification", () => {
     assert.equal(result.worktreeName, "wt-demo");
     assert.equal(result.repoRoot, "/home/user/my-project");
   });
+
+  it("flags a notification belonging to the dashboard host workspace", async () => {
+    const notification = { id: "A", category: "waiting", workspaceId: "HOST", surfaceId: "S1" };
+    const workspaces = [{ id: "HOST", title: "Agent Triage Dashboard Host", directory: "/home/user/agent-triage" }];
+
+    const result = await enrichNotification(notification, workspaces, []);
+    assert.equal(result.isHost, true);
+  });
+
+  it("does not flag a regular workspace's notification as the host", async () => {
+    const notification = { id: "A", category: "waiting", workspaceId: "W1", surfaceId: "S1" };
+    const workspaces = [{ id: "W1", title: "my-project", directory: "/home/user/my-project" }];
+
+    const result = await enrichNotification(notification, workspaces, []);
+    assert.equal(result.isHost, false);
+  });
 });
 
 describe("Monitor terminal detection", () => {
@@ -88,6 +104,58 @@ describe("Monitor terminal detection", () => {
     assert.equal(items.length, 1);
     assert.equal(items[0].category, "terminal");
     assert.equal(items[0].workspaceId, "W1");
+  });
+
+  it("exposes the dashboard host's workspace id for callers that need to guard against it", async () => {
+    const cmuxApi = makeCmux({
+      workspaces: [
+        { id: "HOST", title: "Agent Triage Dashboard Host", directory: "/home/user/agent-triage" },
+        { id: "W1", title: "my-project", directory: "/home/user/my-project" },
+      ],
+    });
+    const monitor = new Monitor(queue, { cmuxApi });
+    assert.equal(monitor.hostWorkspaceId, null, "unset before the first poll");
+
+    await monitor.poll();
+    assert.equal(monitor.hostWorkspaceId, "HOST");
+  });
+
+  it("clears the exposed host workspace id once cmux no longer reports it", async () => {
+    const state = { workspaces: [{ id: "HOST", title: "Agent Triage Dashboard Host", directory: "/home/user/agent-triage" }] };
+    const cmuxApi = makeCmux({ workspaces: state.workspaces });
+    cmuxApi.listWorkspaces = async () => state.workspaces;
+    const monitor = new Monitor(queue, { cmuxApi });
+
+    await monitor.poll();
+    assert.equal(monitor.hostWorkspaceId, "HOST");
+
+    state.workspaces = [];
+    await monitor.poll();
+    assert.equal(monitor.hostWorkspaceId, null);
+  });
+
+  it("gives the dashboard host workspace a real, flagged card", async () => {
+    const cmuxApi = makeCmux({
+      workspaces: [{ id: "HOST", title: "Agent Triage Dashboard Host", directory: "/home/user/agent-triage" }],
+    });
+    const monitor = new Monitor(queue, { cmuxApi });
+    await monitor.poll();
+
+    const items = queue.items();
+    assert.equal(items.length, 1);
+    assert.equal(items[0].workspaceId, "HOST");
+    assert.equal(items[0].category, "terminal");
+    assert.equal(items[0].isHost, true);
+  });
+
+  it("does not flag a regular workspace's card as the host", async () => {
+    const cmuxApi = makeCmux({
+      workspaces: [{ id: "W1", title: "my-terminal", directory: "/home/user" }],
+    });
+    const monitor = new Monitor(queue, { cmuxApi });
+    await monitor.poll();
+
+    assert.equal(queue.items()[0].isHost, false);
   });
 
   it("marks workspace with claude_code tag as running", async () => {

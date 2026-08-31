@@ -24,6 +24,7 @@ export async function enrichNotification(notification, workspaces, terminals, re
     workspaceDir: directory,
     workspaceSelected: workspace?.selected || false,
     gitBranch: terminal?.gitBranch || null,
+    isHost: workspace?.title === DASHBOARD_WS_NAME,
     ...worktreeFields(worktree),
   };
 }
@@ -43,6 +44,7 @@ export class Monitor {
   #isPolling = false;
   #pollPending = false;
   #windowCount = 1;
+  #hostWorkspaceId = null;
 
   constructor(queue, {
     pollIntervalMs = 5000,
@@ -65,6 +67,14 @@ export class Monitor {
   // can only see one of them (see cmux.getWindowCount's doc comment).
   get windowCount() {
     return this.#windowCount;
+  }
+
+  // The dashboard's own hosting workspace, as of the last poll — the one
+  // workspace no API endpoint should ever be allowed to close or rename,
+  // since that's the terminal running this server. null before the first
+  // poll or if cmux hasn't reported it (e.g. run outside cmux).
+  get hostWorkspaceId() {
+    return this.#hostWorkspaceId;
   }
 
   start() {
@@ -137,10 +147,13 @@ export class Monitor {
         if (!agentWsIds.has(id)) this.#knownAgentWorkspaces.delete(id);
       }
 
-      const currentIds = new Set();
+      // Computed once per poll and reused everywhere a "is this the host"
+      // check is needed (tagging items below, tab-order pinning, and the
+      // server's own close/rename guards), rather than re-deriving it
+      // independently at each call site.
+      this.#hostWorkspaceId = workspaces.find((w) => w.title === DASHBOARD_WS_NAME)?.id ?? null;
 
-      // Find the Dashboard workspace ID so we can exclude its notifications
-      const dashboardWsId = workspaces.find((w) => w.title === DASHBOARD_WS_NAME)?.id;
+      const currentIds = new Set();
 
       // workspace.list only ever returns our own window's workspaces, but
       // notification.list is global — if a second cmux window exists, its
@@ -153,9 +166,7 @@ export class Monitor {
       // (on a cold or expired worktree cache) — resolve all of a poll cycle's
       // items concurrently rather than serializing N round-trips through a
       // sequential await in the loop.
-      const relevantNotifications = notifications.filter(
-        (n) => n.workspaceId !== dashboardWsId && knownWorkspaceIds.has(n.workspaceId)
-      );
+      const relevantNotifications = notifications.filter((n) => knownWorkspaceIds.has(n.workspaceId));
       for (const n of relevantNotifications) currentIds.add(n.id);
       const enrichedNotifications = await Promise.all(
         relevantNotifications.map(async (n) => {
@@ -167,9 +178,7 @@ export class Monitor {
       for (const enriched of enrichedNotifications) this.#queue.upsert(enriched);
 
       const notifiedWorkspaceIds = new Set(notifications.map((n) => n.workspaceId));
-      const syntheticWorkspaces = workspaces.filter(
-        (ws) => ws.title !== DASHBOARD_WS_NAME && !notifiedWorkspaceIds.has(ws.id)
-      );
+      const syntheticWorkspaces = workspaces.filter((ws) => !notifiedWorkspaceIds.has(ws.id));
       for (const ws of syntheticWorkspaces) currentIds.add(`synthetic-${ws.id}`);
       const syntheticItems = await Promise.all(
         syntheticWorkspaces.map(async (ws) => {
@@ -187,6 +196,7 @@ export class Monitor {
             workspaceDir: directory,
             workspaceSelected: ws.selected || false,
             gitBranch: terminal?.gitBranch || null,
+            isHost: ws.id === this.#hostWorkspaceId,
             ...worktreeFields(worktree),
             bypassPermissions: bypassWsIds.has(ws.id),
           };
@@ -257,21 +267,15 @@ export class Monitor {
   async #syncTabOrder(workspaces) {
     const windowIdByWorkspaceId = new Map(workspaces.map((w) => [w.id, w.windowId]));
     const pinnedByWorkspaceId = new Map(workspaces.map((w) => [w.id, !!w.pinned]));
-    const dashboardWsId = workspaces.find((w) => w.title === DASHBOARD_WS_NAME)?.id;
+    const dashboardWsId = this.#hostWorkspaceId;
 
-    // The host doesn't normally become a queue item (see #doPoll, which
-    // excludes it by title), so it would otherwise be left unmentioned in the
-    // --order list and merely inherit cmux's "unmentioned workspaces trail
-    // listed peers" default. Listing it explicitly makes the intent
-    // load-bearing rather than incidental. The title-based exclusion isn't an
-    // airtight invariant (a host workspace seen before cmux titled it can get
-    // carded and dismissed, and dismissed items only get reaped once their
-    // workspace disappears), so it can still surface here as a grouped or
-    // dismissed item. Strip it out of both before appending it explicitly —
-    // dedupe via `Set` alone would keep its *first* occurrence, which can
-    // strand it mid-list instead of last (dismissedItems() sorts
-    // most-recently-dismissed first, so a host dismissed before some other
-    // item sorts ahead of it).
+    // The host is a queue item like any other workspace, grouped by its own
+    // directory — that position is wherever its directory happens to sort,
+    // not "last". Strip it out of both the grouped and dismissed lists
+    // before appending it explicitly at the end — dedupe via `Set` alone
+    // would keep its *first* occurrence, which can strand it mid-list
+    // instead of last (dismissedItems() sorts most-recently-dismissed
+    // first, so a host dismissed before some other item sorts ahead of it).
     const withoutHost = (ids) => ids.filter((id) => id !== dashboardWsId);
     const desiredIds = [
       ...withoutHost(this.#queue.grouped().groups.flatMap((g) => g.items.map((i) => i.workspaceId))),

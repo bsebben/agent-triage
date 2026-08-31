@@ -116,14 +116,26 @@ function renderCard(item, { isDismissed = false } = {}) {
   const cardTitle = item.workspaceTitle || "Unknown";
   const subtitle = item.gitBranch || null;
 
-  const dismissBtn = isDismissed
-    ? `<a class="card-dismiss" onclick="event.stopPropagation();restore('${item.id}')">restore</a>`
-    : `<a class="card-dismiss" onclick="event.stopPropagation();dismiss('${item.id}')">dismiss</a>`;
+  // The host is where this dashboard's own server is running — closing,
+  // dismissing, refreshing, or renaming it from here doesn't make sense (in
+  // close's case, it'd kill the terminal serving this page). Focus-to-select
+  // is the only action that stays.
+  const editLink = item.isHost
+    ? ""
+    : `<a class="card-edit" data-workspace-id="${escapeHtml(item.workspaceId)}" data-title="${escapeHtml(cardTitle)}" onclick="event.stopPropagation();startRename(this,this.dataset.workspaceId,this.dataset.title)">&#9998;</a>`;
 
-  const closeBtn = `<a class="card-close" onclick="event.stopPropagation();closeWorkspace('${item.workspaceId}')">close</a>`;
+  const dismissBtn = item.isHost
+    ? ""
+    : isDismissed
+      ? `<a class="card-dismiss" onclick="event.stopPropagation();restore('${item.id}')">restore</a>`
+      : `<a class="card-dismiss" onclick="event.stopPropagation();dismiss('${item.id}')">dismiss</a>`;
+
+  const closeBtn = item.isHost
+    ? ""
+    : `<a class="card-close" onclick="event.stopPropagation();closeWorkspace('${item.workspaceId}')">close</a>`;
 
   const serverRefreshing = (state.refreshing || []).includes(item.workspaceId);
-  const isRefreshable = !isDismissed && item.category !== "terminal";
+  const isRefreshable = !item.isHost && !isDismissed && item.category !== "terminal";
   const refreshing = refreshingWorkspaces.has(item.workspaceId) || refreshAllInFlight || serverRefreshing;
   const refreshBtn = isRefreshable
     ? `<a class="card-refresh${refreshing ? " refreshing" : ""}" data-tip="Refresh session" data-tip-dangerous="Refresh session (dangerously)" onclick="event.stopPropagation();refreshOneSession('${item.workspaceId}', event.shiftKey)"${refreshing ? " style=\"pointer-events:none\"" : ""}>&#x21bb;</a>`
@@ -136,7 +148,7 @@ function renderCard(item, { isDismissed = false } = {}) {
     ? `<span class="card-worktree" title="Worktree of ${escapeHtml(item.repoRoot || "")}">&#9095; ${escapeHtml(item.worktreeName || "")}</span>`
     : "";
   return `<div class="card${selectedClass}${bypassClass} cat-${escapeHtml(displayCategory)}" data-workspace-id="${item.workspaceId}"${bypassTip} onclick="cardClick(event,'${item.workspaceId}')">
-    <div class="card-title-row"><span class="card-title-group"><span class="card-title">${escapeHtml(cardTitle)}</span><a class="card-edit" data-workspace-id="${escapeHtml(item.workspaceId)}" data-title="${escapeHtml(cardTitle)}" onclick="event.stopPropagation();startRename(this,this.dataset.workspaceId,this.dataset.title)">&#9998;</a></span><span class="card-actions-col"><span class="card-actions-right">${refreshBtn}${dismissBtn}${closeBtn}</span>${item.createdAt ? `<span class="card-time">\u{1f559} ${timeAgo(item.createdAt)}</span>` : ""}</span></div>
+    <div class="card-title-row"><span class="card-title-group"><span class="card-title">${escapeHtml(cardTitle)}</span>${editLink}</span><span class="card-actions-col"><span class="card-actions-right">${refreshBtn}${dismissBtn}${closeBtn}</span>${item.createdAt ? `<span class="card-time">\u{1f559} ${timeAgo(item.createdAt)}</span>` : ""}</span></div>
     <div class="card-content">
       <div class="card-header">
         <span class="card-category ${escapeHtml(displayCategory)}"><span class="card-icon">${categoryIcon(displayCategory)}</span> ${escapeHtml(displayCategory)}</span>

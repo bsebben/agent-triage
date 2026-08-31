@@ -90,7 +90,12 @@ const monitor = new Monitor(queue, { onUpdate: broadcast });
 
 function getSessionCount() {
   const ids = new Set();
-  for (const item of queue.items()) ids.add(item.workspaceId);
+  // The dashboard's own host workspace always has a card now (see monitor.js)
+  // but isn't a session a user is managing — counting it would enforce
+  // config.maxSessions one slot early, permanently.
+  for (const item of queue.items()) {
+    if (!item.isHost) ids.add(item.workspaceId);
+  }
   return ids.size;
 }
 
@@ -391,6 +396,13 @@ const server = createServer(async (req, res) => {
 
     if (req.url === "/api/close" && req.method === "POST") {
       const { workspaceId } = await readBody(req);
+      // The UI hides the close button on the host's own card, but that's
+      // just a rendering choice — nothing stops a stale page or a direct
+      // request from reaching this endpoint with the host's id, and closing
+      // it would kill the terminal running this very server.
+      if (workspaceId && workspaceId === monitor.hostWorkspaceId) {
+        return jsonResponse(res, { error: "Cannot close the dashboard's own host workspace" }, 400);
+      }
       await cmux.closeWorkspace(workspaceId);
       return jsonResponse(res, { ok: true });
     }
