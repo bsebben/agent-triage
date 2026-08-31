@@ -242,16 +242,41 @@ export class Monitor {
   }
 
   // Pushes Agent Triage's own display order (grouped/sorted, dismissed
-  // items last) into cmux's real per-window tab order, so cmux's native
-  // navigation (and the dashboard's own Cmd+↑/↓) walks the same order
-  // shown here. Agent Triage owns ordering — this always wins over a
-  // manual drag in cmux.
+  // items last, dashboard host last of all) into cmux's real per-window tab
+  // order, so cmux's native navigation (and the dashboard's own Cmd+↑/↓)
+  // walks the same order shown here. Agent Triage owns ordering — this
+  // always wins over a manual drag in cmux.
+  //
+  // cmux's ordering is group-scoped (see cmux.js#reorderWorkspaces): the
+  // pinned group always precedes the unpinned one and `--order` only sets the
+  // leading order *within* each group. So "last" here means last within the
+  // host's own pin group — if the user pins the host tab, it stays ahead of
+  // the unpinned agent workspaces no matter what we push. Comparisons below
+  // are likewise per pin group, otherwise a desired order that crosses groups
+  // could never match what cmux reports and we'd re-push on every poll.
   async #syncTabOrder(workspaces) {
     const windowIdByWorkspaceId = new Map(workspaces.map((w) => [w.id, w.windowId]));
+    const pinnedByWorkspaceId = new Map(workspaces.map((w) => [w.id, !!w.pinned]));
+    const dashboardWsId = workspaces.find((w) => w.title === DASHBOARD_WS_NAME)?.id;
 
+    // The host doesn't normally become a queue item (see #doPoll, which
+    // excludes it by title), so it would otherwise be left unmentioned in the
+    // --order list and merely inherit cmux's "unmentioned workspaces trail
+    // listed peers" default. Listing it explicitly makes the intent
+    // load-bearing rather than incidental. The title-based exclusion isn't an
+    // airtight invariant (a host workspace seen before cmux titled it can get
+    // carded and dismissed, and dismissed items only get reaped once their
+    // workspace disappears), so it can still surface here as a grouped or
+    // dismissed item. Strip it out of both before appending it explicitly —
+    // dedupe via `Set` alone would keep its *first* occurrence, which can
+    // strand it mid-list instead of last (dismissedItems() sorts
+    // most-recently-dismissed first, so a host dismissed before some other
+    // item sorts ahead of it).
+    const withoutHost = (ids) => ids.filter((id) => id !== dashboardWsId);
     const desiredIds = [
-      ...this.#queue.grouped().groups.flatMap((g) => g.items.map((i) => i.workspaceId)),
-      ...this.#queue.dismissedItems().map((i) => i.workspaceId),
+      ...withoutHost(this.#queue.grouped().groups.flatMap((g) => g.items.map((i) => i.workspaceId))),
+      ...withoutHost(this.#queue.dismissedItems().map((i) => i.workspaceId)),
+      dashboardWsId,
     ].filter((id) => id && windowIdByWorkspaceId.has(id));
 
     const desiredByWindow = new Map();
@@ -271,7 +296,13 @@ export class Monitor {
 
     const changedWindows = [...desiredByWindow.entries()].filter(([windowId, order]) => {
       if (order.length < 2) return false;
-      return !arraysEqual(order, currentByWindow.get(windowId) || []);
+      const current = currentByWindow.get(windowId) || [];
+      // Only the within-group order is achievable, so only that is compared.
+      const inGroup = (ids, pinned) => ids.filter((id) => pinnedByWorkspaceId.get(id) === pinned);
+      return (
+        !arraysEqual(inGroup(order, true), inGroup(current, true)) ||
+        !arraysEqual(inGroup(order, false), inGroup(current, false))
+      );
     });
     if (changedWindows.length === 0) return;
 

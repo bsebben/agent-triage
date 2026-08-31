@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.50.3] - 2026-08-31
+
+### Fixed
+
+- Tab-order sync now lists the dashboard's own host workspace explicitly in the `reorder-workspaces` call, placing it last within its own pin group instead of relying on cmux's "unmentioned workspaces trail listed peers" default. Note that cmux always keeps pinned tabs ahead of unpinned ones and `--order` can only sort within a pin group, so a host tab the user has pinned still sits first — that is a cmux constraint, not something the dashboard can override.
+- Tab-order sync compares against cmux's reported order per pin group rather than as one flat list, so it no longer re-runs `reorder-workspaces` on every 5-second poll when any tab in the window is pinned. The desired flat order was unreachable in that case, so the comparison never matched and the CLI was re-invoked indefinitely.
+- Tab-order sync de-duplicates workspace IDs before pushing an order, so a dismissed card that happens to point at the host workspace can't emit a malformed order with a repeated ID on every poll.
+
 ## [1.50.2] - 2026-08-27
 
 ### Fixed
