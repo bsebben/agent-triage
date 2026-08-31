@@ -28,6 +28,11 @@ function dirLabel(dir) {
   return dir;
 }
 
+// Sentinel group key for the dashboard's own host workspace — never a real
+// dirLabel() output (those are always an absolute path or "~"-prefixed), so
+// it can't collide with an actual directory group.
+const HOST_GROUP_KEY = "\0host";
+
 export class Queue {
   #items = new Map();
   #recentDirs = new Map();
@@ -90,50 +95,60 @@ export class Queue {
 
   grouped(maxRecent = 4) {
     const groups = new Map();
+    // The real directory the host's item would have grouped under were it
+    // not pulled into its own dedicated group — tracked so that directory
+    // never gets mistaken for "recently closed" below just because nothing
+    // *else* is active there (the host itself still is).
+    let hostDirLabel = null;
     for (const item of this.items()) {
-      // Group by repo root when the workspace is inside a git repo, so worktrees
-      // of the same repo share a group with the main checkout. Non-repo directories
-      // (e.g. a plain ~/workspace shell) keep grouping by directory as before.
-      const groupKey = item.repoRoot || item.workspaceDir || "Unknown";
-      const label = dirLabel(groupKey);
-      if (!groups.has(label)) {
+      // The host gets a dedicated group of its own, keyed separately from any
+      // real directory — never mixed into (or hidden behind) an actual
+      // project group, even one for its own repo. There's only ever one host
+      // workspace, so this group is always exactly one item; no grouping
+      // nuance to worry about inside it. Everything else groups by repo root
+      // when the workspace is inside a git repo, so worktrees of the same
+      // repo share a group with the main checkout — non-repo directories
+      // (e.g. a plain ~/workspace shell) keep grouping by directory.
+      const rawGroupKey = item.repoRoot || item.workspaceDir || "Unknown";
+      const realLabel = dirLabel(rawGroupKey);
+      if (item.isHost) hostDirLabel = realLabel;
+      const groupKey = item.isHost ? HOST_GROUP_KEY : realLabel;
+      if (!groups.has(groupKey)) {
+        const label = item.isHost ? item.workspaceTitle || "Dashboard Host" : groupKey;
         // "New session"/"New terminal" for this group should land wherever this
         // (highest-priority) item actually lives, not always the repo root —
         // otherwise a group made up entirely of worktree items would silently
         // launch new sessions in the main checkout instead of either worktree.
-        groups.set(label, { title: label, directory: item.workspaceDir || groupKey, items: [] });
+        groups.set(groupKey, { title: label, directory: item.workspaceDir || rawGroupKey, items: [] });
       }
-      groups.get(label).items.push(item);
+      groups.get(groupKey).items.push(item);
     }
 
     const now = Date.now();
-    // Computed once per group here (not inside the sort comparator below,
-    // which sort() would otherwise re-run on every pairwise comparison) — a
-    // group counts as host-only when every item in it is the host, so a
-    // group that also holds real agent work isn't demoted along with it.
-    const hostOnlyByLabel = new Map();
-    for (const [label, group] of groups) {
-      this.#recentDirs.set(label, { label, directory: group.directory, lastSeenAt: now });
-      hostOnlyByLabel.set(label, group.items.every((i) => i.isHost));
+    for (const [key, group] of groups) {
+      // The host isn't a project directory a user would ever want a "recently
+      // active" stub for once its group disappears — skip tracking it.
+      if (key === HOST_GROUP_KEY) continue;
+      this.#recentDirs.set(key, { label: key, directory: group.directory, lastSeenAt: now });
     }
     this.#pruneRecentDirs();
 
-    // A group holding nothing but the dashboard's own host workspace sorts
-    // after every other group, regardless of its directory name, so an idle
-    // "just the dashboard" group doesn't land wherever that directory
-    // happens to sort alphabetically. This is a display-only preference,
-    // independent of monitor.js#syncTabOrder's own (unconditional) guarantee
-    // that the host's real cmux tab is always last — that one still has to
-    // strip the host out and re-append it itself, since a group holding real
-    // agent work alongside the host stays in its normal alphabetical spot here.
-    const activeGroups = [...groups.values()].sort(
-      (a, b) =>
-        hostRank(hostOnlyByLabel.get(a.title)) - hostRank(hostOnlyByLabel.get(b.title)) ||
-        a.title.localeCompare(b.title, undefined, { sensitivity: "base" })
-    );
+    // The host's dedicated group sorts after every other group, regardless of
+    // title — it's always the dashboard's own tab, which is always last in
+    // cmux's real order too (see monitor.js#syncTabOrder, which independently
+    // guarantees that for the actual cmux tab order; this is just the display
+    // list agreeing with it). Host-ness is derived from the sentinel key
+    // itself rather than a second stored flag, so there's one source of truth.
+    const activeGroups = [...groups.entries()]
+      .sort(
+        ([keyA, a], [keyB, b]) =>
+          hostRank(keyA === HOST_GROUP_KEY) - hostRank(keyB === HOST_GROUP_KEY) ||
+          a.title.localeCompare(b.title, undefined, { sensitivity: "base" })
+      )
+      .map(([, group]) => group);
 
     const recentGroups = [...this.#recentDirs.values()]
-      .filter((d) => !groups.has(d.label))
+      .filter((d) => !groups.has(d.label) && d.label !== hostDirLabel)
       .sort((a, b) => b.lastSeenAt - a.lastSeenAt)
       .slice(0, maxRecent)
       .map((d) => ({ title: d.label, directory: d.directory, items: [], recent: true, lastSeenAt: d.lastSeenAt }));

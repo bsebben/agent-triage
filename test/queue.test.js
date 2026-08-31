@@ -221,28 +221,70 @@ describe("Queue", () => {
     assert.deepEqual(after.map((g) => g.title), ["~/workspace/agent-triage", "~/workspace/middle", "~/workspace/my-project"]);
   });
 
-  it("sorts a group holding nothing but the host after every other group", () => {
-    queue.upsert({ id: "A1", category: "running", workspaceId: "W1", workspaceDir: `${HOME}/workspace/agent-triage`, isHost: true, body: "" });
-    queue.upsert({ id: "M1", category: "error", workspaceId: "W2", workspaceDir: `${HOME}/workspace/middle`, body: "boom" });
-    queue.upsert({ id: "Z1", category: "running", workspaceId: "W3", workspaceDir: `${HOME}/workspace/zzz-project`, body: "" });
-    // Alphabetically "agent-triage" sorts first — the host flag must override that.
-    const { groups } = queue.grouped();
-    assert.deepEqual(groups.map((g) => g.title), ["~/workspace/middle", "~/workspace/zzz-project", "~/workspace/agent-triage"]);
-  });
-
-  it("does not demote a group that also holds real (non-host) activity, only the host card within it", () => {
+  it("puts the host in its own dedicated group, separate from its actual directory's group", () => {
     // A real agent workspace can share the host's own repo (e.g. someone
     // working on agent-triage itself, in the same checkout the dashboard
-    // runs from) — that group must stay findable in its normal alphabetical
-    // spot rather than getting buried just because the host also lives there.
-    queue.upsert({ id: "A1", category: "running", workspaceId: "W1", workspaceDir: `${HOME}/workspace/agent-triage`, isHost: true, body: "" });
+    // runs from) — that must stay a normal, independently-sorted group, not
+    // get merged with (or bury) the host.
+    queue.upsert({
+      id: "A1",
+      category: "running",
+      workspaceId: "W1",
+      workspaceDir: `${HOME}/workspace/agent-triage`,
+      workspaceTitle: "Agent Triage Dashboard Host",
+      isHost: true,
+      body: "",
+    });
     queue.upsert({ id: "A2", category: "running", workspaceId: "W2", workspaceDir: `${HOME}/workspace/agent-triage`, body: "" });
     queue.upsert({ id: "M1", category: "error", workspaceId: "W3", workspaceDir: `${HOME}/workspace/middle`, body: "boom" });
     const { groups } = queue.grouped();
-    assert.deepEqual(groups.map((g) => g.title), ["~/workspace/agent-triage", "~/workspace/middle"]);
-    const hostGroup = groups.find((g) => g.title === "~/workspace/agent-triage");
-    assert.equal(hostGroup.items.length, 2);
-    assert.deepEqual(hostGroup.items.map((i) => i.workspaceId), ["W2", "W1"]);
+
+    assert.deepEqual(groups.map((g) => g.title), ["~/workspace/agent-triage", "~/workspace/middle", "Agent Triage Dashboard Host"]);
+    const dirGroup = groups.find((g) => g.title === "~/workspace/agent-triage");
+    assert.equal(dirGroup.items.length, 1);
+    assert.equal(dirGroup.items[0].workspaceId, "W2");
+    const hostGroup = groups.find((g) => g.title === "Agent Triage Dashboard Host");
+    assert.equal(hostGroup.items.length, 1);
+    assert.equal(hostGroup.items[0].workspaceId, "W1");
+  });
+
+  it("sorts the host's dedicated group after every other group regardless of its title", () => {
+    // "Agent Triage Dashboard Host" would sort alphabetically before
+    // "zzz-project" — the host flag must override that, not just happen to
+    // win on title text.
+    queue.upsert({ id: "H1", category: "terminal", workspaceId: "HOST", workspaceTitle: "Agent Triage Dashboard Host", isHost: true, body: "" });
+    queue.upsert({ id: "Z1", category: "running", workspaceId: "W1", workspaceDir: `${HOME}/workspace/zzz-project`, body: "" });
+    const { groups } = queue.grouped();
+    assert.deepEqual(groups.map((g) => g.title), ["~/workspace/zzz-project", "Agent Triage Dashboard Host"]);
+  });
+
+  it("does not resurface the host's own directory as a recently-active group once other activity there closes", () => {
+    queue.upsert({ id: "R1", category: "running", workspaceId: "W1", workspaceDir: `${HOME}/workspace/agent-triage`, body: "" });
+    queue.upsert({
+      id: "H1",
+      category: "terminal",
+      workspaceId: "HOST",
+      workspaceDir: `${HOME}/workspace/agent-triage`,
+      workspaceTitle: "Agent Triage Dashboard Host",
+      isHost: true,
+      body: "",
+    });
+    queue.grouped(); // registers "~/workspace/agent-triage" as an active directory (via W1)
+    queue.remove("R1"); // W1 closes; only the host is left in that directory now
+
+    const { groups, recentGroups } = queue.grouped();
+    assert.equal(groups.some((g) => g.title === "~/workspace/agent-triage"), false, "no bare directory group — the host has its own");
+    assert.equal(
+      recentGroups.some((g) => g.title === "~/workspace/agent-triage"),
+      false,
+      "the host itself still occupies that directory, so it's not actually 'recently closed'"
+    );
+  });
+
+  it("falls back to a generic label for the host's group if it has no title yet", () => {
+    queue.upsert({ id: "H1", category: "terminal", workspaceId: "HOST", isHost: true, body: "" });
+    const { groups } = queue.grouped();
+    assert.equal(groups[0].title, "Dashboard Host");
   });
 
   it("tracks directories seen via grouped()", () => {

@@ -45,14 +45,21 @@ function renderWorkspaces() {
         const title = g.title || "Unknown";
         const isCollapsed = collapsedGroups.has(title);
         const dir = g.directory || "";
+        // The host's dedicated group is always exactly one item \u2014 no new
+        // session/terminal affordance for it, same reasoning as its card:
+        // this group represents the dashboard's own tab, not a project.
+        const isHostGroup = g.items.some((i) => i.isHost);
+        const actions = isHostGroup
+          ? ""
+          : `<span class="group-actions" onclick="event.stopPropagation()">
+          <button class="btn-group-add btn-new-session" data-cwd="${escapeHtml(dir)}" onclick="newSession(this.dataset.cwd, event.shiftKey)" data-tip="New Session" data-tip-dangerous="New Session (dangerously)"${disabledAttr}>${claudeIcon()}</button>
+          <button class="btn-group-add" data-cwd="${escapeHtml(dir)}" onclick="newWorkspace(this.dataset.cwd)" data-tip="New Terminal"${disabledAttr}>&gt;_</button>
+        </span>`;
         return `<div class="group">
       <div class="group-header" onclick="toggleGroup(this)">
         <span class="chevron${isCollapsed ? " collapsed" : ""}">\u25bc</span> <span>${escapeHtml(title)}</span>
         <span class="count">(${g.items.length})</span>
-        <span class="group-actions" onclick="event.stopPropagation()">
-          <button class="btn-group-add btn-new-session" data-cwd="${escapeHtml(dir)}" onclick="newSession(this.dataset.cwd, event.shiftKey)" data-tip="New Session" data-tip-dangerous="New Session (dangerously)"${disabledAttr}>${claudeIcon()}</button>
-          <button class="btn-group-add" data-cwd="${escapeHtml(dir)}" onclick="newWorkspace(this.dataset.cwd)" data-tip="New Terminal"${disabledAttr}>&gt;_</button>
-        </span>
+        ${actions}
       </div>
       <div class="group-items${isCollapsed ? " collapsed" : ""}">${g.items.map((i) => renderCard(i)).join("")}</div>
     </div>`;

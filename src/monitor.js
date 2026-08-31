@@ -269,17 +269,15 @@ export class Monitor {
     const pinnedByWorkspaceId = new Map(workspaces.map((w) => [w.id, !!w.pinned]));
     const dashboardWsId = this.#hostWorkspaceId;
 
-    // queue.js#grouped() only pushes the host's group last when it holds
-    // nothing but the host — a group that also has real agent work in the
-    // same directory keeps its normal alphabetical spot there, with the host
-    // merely sorting last *within* it. That's a display preference, not the
-    // unconditional guarantee this method needs for cmux's real tab order,
-    // so strip the host out of both the grouped and dismissed lists here and
-    // append it explicitly at the end regardless of where it landed above —
-    // dedupe via `Set` alone would keep its *first* occurrence, which can
-    // strand it mid-list instead of last (dismissedItems() sorts
-    // most-recently-dismissed first, so a host dismissed before some other
-    // item sorts ahead of it).
+    // queue.js#grouped() already puts the host's own dedicated group last, so
+    // it's normally redundant to strip and re-append it here — but that's a
+    // display preference in a different method, not something this one
+    // should depend on for its own correctness. Strip the host out of both
+    // the grouped and dismissed lists and append it explicitly at the end
+    // regardless of where it landed above — dedupe via `Set` alone would
+    // keep its *first* occurrence, which can strand it mid-list instead of
+    // last (dismissedItems() sorts most-recently-dismissed first, so a host
+    // dismissed before some other item sorts ahead of it).
     const withoutHost = (ids) => ids.filter((id) => id !== dashboardWsId);
     const desiredIds = [
       ...withoutHost(this.#queue.grouped().groups.flatMap((g) => g.items.map((i) => i.workspaceId))),
