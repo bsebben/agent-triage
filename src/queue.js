@@ -16,6 +16,12 @@ function compareByWorkspaceId(a, b) {
   return (a.workspaceId || "").localeCompare(b.workspaceId || "");
 }
 
+// Shared tiebreak piece for sorting host-flagged entries (items in items(),
+// whole groups in grouped()) after everything else.
+function hostRank(isHost) {
+  return isHost ? 1 : 0;
+}
+
 function dirLabel(dir) {
   if (!dir || dir === HOME) return "~";
   if (dir.startsWith(HOME + "/")) return "~/" + dir.slice(HOME.length + 1);
@@ -64,7 +70,12 @@ export class Queue {
   items() {
     return [...this.#items.values()]
       .filter((i) => !i.dismissed)
-      .sort((a, b) => (PRIORITY[a.category] ?? 99) - (PRIORITY[b.category] ?? 99) || compareByWorkspaceId(a, b));
+      .sort(
+        (a, b) =>
+          (PRIORITY[a.category] ?? 99) - (PRIORITY[b.category] ?? 99) ||
+          hostRank(a.isHost) - hostRank(b.isHost) ||
+          compareByWorkspaceId(a, b)
+      );
   }
 
   dismissedItems() {
@@ -96,13 +107,29 @@ export class Queue {
     }
 
     const now = Date.now();
+    // Computed once per group here (not inside the sort comparator below,
+    // which sort() would otherwise re-run on every pairwise comparison) — a
+    // group counts as host-only when every item in it is the host, so a
+    // group that also holds real agent work isn't demoted along with it.
+    const hostOnlyByLabel = new Map();
     for (const [label, group] of groups) {
       this.#recentDirs.set(label, { label, directory: group.directory, lastSeenAt: now });
+      hostOnlyByLabel.set(label, group.items.every((i) => i.isHost));
     }
     this.#pruneRecentDirs();
 
-    const activeGroups = [...groups.values()].sort((a, b) =>
-      a.title.localeCompare(b.title, undefined, { sensitivity: "base" })
+    // A group holding nothing but the dashboard's own host workspace sorts
+    // after every other group, regardless of its directory name, so an idle
+    // "just the dashboard" group doesn't land wherever that directory
+    // happens to sort alphabetically. This is a display-only preference,
+    // independent of monitor.js#syncTabOrder's own (unconditional) guarantee
+    // that the host's real cmux tab is always last — that one still has to
+    // strip the host out and re-append it itself, since a group holding real
+    // agent work alongside the host stays in its normal alphabetical spot here.
+    const activeGroups = [...groups.values()].sort(
+      (a, b) =>
+        hostRank(hostOnlyByLabel.get(a.title)) - hostRank(hostOnlyByLabel.get(b.title)) ||
+        a.title.localeCompare(b.title, undefined, { sensitivity: "base" })
     );
 
     const recentGroups = [...this.#recentDirs.values()]

@@ -48,6 +48,22 @@ describe("Queue", () => {
     assert.equal(items[2].category, "terminal");
   });
 
+  it("sorts a host item after a same-category peer, ignoring workspaceId order", () => {
+    queue.upsert({ id: "H1", category: "terminal", workspaceId: "A-host", isHost: true, body: "" });
+    queue.upsert({ id: "T1", category: "terminal", workspaceId: "Z-other", body: "" });
+    // "A-host" would sort before "Z-other" by plain workspaceId comparison —
+    // isHost must override that tie-break so the host is still last.
+    assert.deepEqual(queue.items().map((i) => i.workspaceId), ["Z-other", "A-host"]);
+  });
+
+  it("applies the host tie-break regardless of which category the host item carries", () => {
+    // enrichNotification sets isHost independent of category, so the host
+    // could in principle surface with any category, not just "terminal".
+    queue.upsert({ id: "H1", category: "running", workspaceId: "A-host", isHost: true, body: "" });
+    queue.upsert({ id: "R1", category: "running", workspaceId: "Z-other", body: "" });
+    assert.deepEqual(queue.items().map((i) => i.workspaceId), ["Z-other", "A-host"]);
+  });
+
   it("breaks priority ties by workspaceId, not insertion order", () => {
     queue.upsert({ id: "A", category: "waiting", workspaceId: "W2", body: "" });
     queue.upsert({ id: "B", category: "waiting", workspaceId: "W1", body: "" });
@@ -203,6 +219,30 @@ describe("Queue", () => {
     queue.upsert({ id: "A1", category: "permission", workspaceId: "W2", workspaceDir: `${HOME}/workspace/agent-triage`, body: "approve?" });
     const { groups: after } = queue.grouped();
     assert.deepEqual(after.map((g) => g.title), ["~/workspace/agent-triage", "~/workspace/middle", "~/workspace/my-project"]);
+  });
+
+  it("sorts a group holding nothing but the host after every other group", () => {
+    queue.upsert({ id: "A1", category: "running", workspaceId: "W1", workspaceDir: `${HOME}/workspace/agent-triage`, isHost: true, body: "" });
+    queue.upsert({ id: "M1", category: "error", workspaceId: "W2", workspaceDir: `${HOME}/workspace/middle`, body: "boom" });
+    queue.upsert({ id: "Z1", category: "running", workspaceId: "W3", workspaceDir: `${HOME}/workspace/zzz-project`, body: "" });
+    // Alphabetically "agent-triage" sorts first — the host flag must override that.
+    const { groups } = queue.grouped();
+    assert.deepEqual(groups.map((g) => g.title), ["~/workspace/middle", "~/workspace/zzz-project", "~/workspace/agent-triage"]);
+  });
+
+  it("does not demote a group that also holds real (non-host) activity, only the host card within it", () => {
+    // A real agent workspace can share the host's own repo (e.g. someone
+    // working on agent-triage itself, in the same checkout the dashboard
+    // runs from) — that group must stay findable in its normal alphabetical
+    // spot rather than getting buried just because the host also lives there.
+    queue.upsert({ id: "A1", category: "running", workspaceId: "W1", workspaceDir: `${HOME}/workspace/agent-triage`, isHost: true, body: "" });
+    queue.upsert({ id: "A2", category: "running", workspaceId: "W2", workspaceDir: `${HOME}/workspace/agent-triage`, body: "" });
+    queue.upsert({ id: "M1", category: "error", workspaceId: "W3", workspaceDir: `${HOME}/workspace/middle`, body: "boom" });
+    const { groups } = queue.grouped();
+    assert.deepEqual(groups.map((g) => g.title), ["~/workspace/agent-triage", "~/workspace/middle"]);
+    const hostGroup = groups.find((g) => g.title === "~/workspace/agent-triage");
+    assert.equal(hostGroup.items.length, 2);
+    assert.deepEqual(hostGroup.items.map((i) => i.workspaceId), ["W2", "W1"]);
   });
 
   it("tracks directories seen via grouped()", () => {
