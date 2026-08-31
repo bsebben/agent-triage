@@ -24,6 +24,7 @@ export async function enrichNotification(notification, workspaces, terminals, re
     workspaceDir: directory,
     workspaceSelected: workspace?.selected || false,
     gitBranch: terminal?.gitBranch || null,
+    isHost: workspace?.title === DASHBOARD_WS_NAME,
     ...worktreeFields(worktree),
   };
 }
@@ -43,6 +44,7 @@ export class Monitor {
   #isPolling = false;
   #pollPending = false;
   #windowCount = 1;
+  #hostWorkspaceId = null;
 
   constructor(queue, {
     pollIntervalMs = 5000,
@@ -65,6 +67,14 @@ export class Monitor {
   // can only see one of them (see cmux.getWindowCount's doc comment).
   get windowCount() {
     return this.#windowCount;
+  }
+
+  // The dashboard's own hosting workspace, as of the last poll — the one
+  // workspace no API endpoint should ever be allowed to close or rename,
+  // since that's the terminal running this server. null before the first
+  // poll or if cmux hasn't reported it (e.g. run outside cmux).
+  get hostWorkspaceId() {
+    return this.#hostWorkspaceId;
   }
 
   start() {
@@ -137,10 +147,13 @@ export class Monitor {
         if (!agentWsIds.has(id)) this.#knownAgentWorkspaces.delete(id);
       }
 
-      const currentIds = new Set();
+      // Computed once per poll and reused everywhere a "is this the host"
+      // check is needed (tagging items below, tab-order pinning, and the
+      // server's own close/rename guards), rather than re-deriving it
+      // independently at each call site.
+      this.#hostWorkspaceId = workspaces.find((w) => w.title === DASHBOARD_WS_NAME)?.id ?? null;
 
-      // Find the Dashboard workspace ID so we can exclude its notifications
-      const dashboardWsId = workspaces.find((w) => w.title === DASHBOARD_WS_NAME)?.id;
+      const currentIds = new Set();
 
       // workspace.list only ever returns our own window's workspaces, but
       // notification.list is global — if a second cmux window exists, its
@@ -153,9 +166,7 @@ export class Monitor {
       // (on a cold or expired worktree cache) — resolve all of a poll cycle's
       // items concurrently rather than serializing N round-trips through a
       // sequential await in the loop.
-      const relevantNotifications = notifications.filter(
-        (n) => n.workspaceId !== dashboardWsId && knownWorkspaceIds.has(n.workspaceId)
-      );
+      const relevantNotifications = notifications.filter((n) => knownWorkspaceIds.has(n.workspaceId));
       for (const n of relevantNotifications) currentIds.add(n.id);
       const enrichedNotifications = await Promise.all(
         relevantNotifications.map(async (n) => {
@@ -167,9 +178,7 @@ export class Monitor {
       for (const enriched of enrichedNotifications) this.#queue.upsert(enriched);
 
       const notifiedWorkspaceIds = new Set(notifications.map((n) => n.workspaceId));
-      const syntheticWorkspaces = workspaces.filter(
-        (ws) => ws.title !== DASHBOARD_WS_NAME && !notifiedWorkspaceIds.has(ws.id)
-      );
+      const syntheticWorkspaces = workspaces.filter((ws) => !notifiedWorkspaceIds.has(ws.id));
       for (const ws of syntheticWorkspaces) currentIds.add(`synthetic-${ws.id}`);
       const syntheticItems = await Promise.all(
         syntheticWorkspaces.map(async (ws) => {
@@ -187,6 +196,7 @@ export class Monitor {
             workspaceDir: directory,
             workspaceSelected: ws.selected || false,
             gitBranch: terminal?.gitBranch || null,
+            isHost: ws.id === this.#hostWorkspaceId,
             ...worktreeFields(worktree),
             bypassPermissions: bypassWsIds.has(ws.id),
           };
@@ -242,16 +252,37 @@ export class Monitor {
   }
 
   // Pushes Agent Triage's own display order (grouped/sorted, dismissed
-  // items last) into cmux's real per-window tab order, so cmux's native
-  // navigation (and the dashboard's own Cmd+↑/↓) walks the same order
-  // shown here. Agent Triage owns ordering — this always wins over a
-  // manual drag in cmux.
+  // items last, dashboard host last of all) into cmux's real per-window tab
+  // order, so cmux's native navigation (and the dashboard's own Cmd+↑/↓)
+  // walks the same order shown here. Agent Triage owns ordering — this
+  // always wins over a manual drag in cmux.
+  //
+  // cmux's ordering is group-scoped (see cmux.js#reorderWorkspaces): the
+  // pinned group always precedes the unpinned one and `--order` only sets the
+  // leading order *within* each group. So "last" here means last within the
+  // host's own pin group — if the user pins the host tab, it stays ahead of
+  // the unpinned agent workspaces no matter what we push. Comparisons below
+  // are likewise per pin group, otherwise a desired order that crosses groups
+  // could never match what cmux reports and we'd re-push on every poll.
   async #syncTabOrder(workspaces) {
     const windowIdByWorkspaceId = new Map(workspaces.map((w) => [w.id, w.windowId]));
+    const pinnedByWorkspaceId = new Map(workspaces.map((w) => [w.id, !!w.pinned]));
+    const dashboardWsId = this.#hostWorkspaceId;
 
+    // queue.js#grouped() already puts the host's own dedicated group last, so
+    // it's normally redundant to strip and re-append it here — but that's a
+    // display preference in a different method, not something this one
+    // should depend on for its own correctness. Strip the host out of both
+    // the grouped and dismissed lists and append it explicitly at the end
+    // regardless of where it landed above — dedupe via `Set` alone would
+    // keep its *first* occurrence, which can strand it mid-list instead of
+    // last (dismissedItems() sorts most-recently-dismissed first, so a host
+    // dismissed before some other item sorts ahead of it).
+    const withoutHost = (ids) => ids.filter((id) => id !== dashboardWsId);
     const desiredIds = [
-      ...this.#queue.grouped().groups.flatMap((g) => g.items.map((i) => i.workspaceId)),
-      ...this.#queue.dismissedItems().map((i) => i.workspaceId),
+      ...withoutHost(this.#queue.grouped().groups.flatMap((g) => g.items.map((i) => i.workspaceId))),
+      ...withoutHost(this.#queue.dismissedItems().map((i) => i.workspaceId)),
+      dashboardWsId,
     ].filter((id) => id && windowIdByWorkspaceId.has(id));
 
     const desiredByWindow = new Map();
@@ -271,7 +302,13 @@ export class Monitor {
 
     const changedWindows = [...desiredByWindow.entries()].filter(([windowId, order]) => {
       if (order.length < 2) return false;
-      return !arraysEqual(order, currentByWindow.get(windowId) || []);
+      const current = currentByWindow.get(windowId) || [];
+      // Only the within-group order is achievable, so only that is compared.
+      const inGroup = (ids, pinned) => ids.filter((id) => pinnedByWorkspaceId.get(id) === pinned);
+      return (
+        !arraysEqual(inGroup(order, true), inGroup(current, true)) ||
+        !arraysEqual(inGroup(order, false), inGroup(current, false))
+      );
     });
     if (changedWindows.length === 0) return;
 

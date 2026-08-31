@@ -35,6 +35,22 @@ describe("enrichNotification", () => {
     assert.equal(result.worktreeName, "wt-demo");
     assert.equal(result.repoRoot, "/home/user/my-project");
   });
+
+  it("flags a notification belonging to the dashboard host workspace", async () => {
+    const notification = { id: "A", category: "waiting", workspaceId: "HOST", surfaceId: "S1" };
+    const workspaces = [{ id: "HOST", title: "Agent Triage Dashboard Host", directory: "/home/user/agent-triage" }];
+
+    const result = await enrichNotification(notification, workspaces, []);
+    assert.equal(result.isHost, true);
+  });
+
+  it("does not flag a regular workspace's notification as the host", async () => {
+    const notification = { id: "A", category: "waiting", workspaceId: "W1", surfaceId: "S1" };
+    const workspaces = [{ id: "W1", title: "my-project", directory: "/home/user/my-project" }];
+
+    const result = await enrichNotification(notification, workspaces, []);
+    assert.equal(result.isHost, false);
+  });
 });
 
 describe("Monitor terminal detection", () => {
@@ -88,6 +104,58 @@ describe("Monitor terminal detection", () => {
     assert.equal(items.length, 1);
     assert.equal(items[0].category, "terminal");
     assert.equal(items[0].workspaceId, "W1");
+  });
+
+  it("exposes the dashboard host's workspace id for callers that need to guard against it", async () => {
+    const cmuxApi = makeCmux({
+      workspaces: [
+        { id: "HOST", title: "Agent Triage Dashboard Host", directory: "/home/user/agent-triage" },
+        { id: "W1", title: "my-project", directory: "/home/user/my-project" },
+      ],
+    });
+    const monitor = new Monitor(queue, { cmuxApi });
+    assert.equal(monitor.hostWorkspaceId, null, "unset before the first poll");
+
+    await monitor.poll();
+    assert.equal(monitor.hostWorkspaceId, "HOST");
+  });
+
+  it("clears the exposed host workspace id once cmux no longer reports it", async () => {
+    const state = { workspaces: [{ id: "HOST", title: "Agent Triage Dashboard Host", directory: "/home/user/agent-triage" }] };
+    const cmuxApi = makeCmux({ workspaces: state.workspaces });
+    cmuxApi.listWorkspaces = async () => state.workspaces;
+    const monitor = new Monitor(queue, { cmuxApi });
+
+    await monitor.poll();
+    assert.equal(monitor.hostWorkspaceId, "HOST");
+
+    state.workspaces = [];
+    await monitor.poll();
+    assert.equal(monitor.hostWorkspaceId, null);
+  });
+
+  it("gives the dashboard host workspace a real, flagged card", async () => {
+    const cmuxApi = makeCmux({
+      workspaces: [{ id: "HOST", title: "Agent Triage Dashboard Host", directory: "/home/user/agent-triage" }],
+    });
+    const monitor = new Monitor(queue, { cmuxApi });
+    await monitor.poll();
+
+    const items = queue.items();
+    assert.equal(items.length, 1);
+    assert.equal(items[0].workspaceId, "HOST");
+    assert.equal(items[0].category, "terminal");
+    assert.equal(items[0].isHost, true);
+  });
+
+  it("does not flag a regular workspace's card as the host", async () => {
+    const cmuxApi = makeCmux({
+      workspaces: [{ id: "W1", title: "my-terminal", directory: "/home/user" }],
+    });
+    const monitor = new Monitor(queue, { cmuxApi });
+    await monitor.poll();
+
+    assert.equal(queue.items()[0].isHost, false);
   });
 
   it("marks workspace with claude_code tag as running", async () => {
@@ -468,15 +536,42 @@ describe("Monitor terminal detection", () => {
 describe("Monitor tab order sync", () => {
   let queue;
 
+  // Mirrors `cmux reorder-workspaces`: the pinned group always precedes the
+  // unpinned group, and --order only sets the leading order *within* each
+  // group ("unmentioned workspaces keep their relative order after listed
+  // peers in the same group"). Applying it for real is what lets these tests
+  // check that a reorder converges instead of being re-pushed every poll.
+  function applyReorder(state, windowId, order) {
+    const indices = [];
+    state.forEach((w, i) => {
+      if (w.windowId === windowId) indices.push(i);
+    });
+    const group = (pinned) => {
+      const members = indices.map((i) => state[i]).filter((w) => !!w.pinned === pinned);
+      const listed = order.map((id) => members.find((w) => w.id === id)).filter(Boolean);
+      const rest = members.filter((w) => !listed.includes(w));
+      return [...listed, ...rest];
+    };
+    const reordered = [...group(true), ...group(false)];
+    indices.forEach((idx, n) => {
+      state[idx] = reordered[n];
+    });
+  }
+
   function makeCmux({ notifications = [], workspaces = [], terminals = [], agentWorkspaceIds = new Set(), bypassWorkspaceIds = new Set(), reorderWorkspaces = async () => {} }) {
+    const state = [...workspaces];
     return {
       listNotifications: async () => notifications,
-      listWorkspaces: async () => workspaces,
+      listWorkspaces: async () => state.map((w) => ({ ...w })),
       listTerminals: async () => terminals,
       listAgentWorkspaceIds: async () => agentWorkspaceIds,
       listBypassWorkspaceIds: async () => bypassWorkspaceIds,
       readScreen: async () => null,
-      reorderWorkspaces,
+      reorderWorkspaces: async (windowId, order) => {
+        await reorderWorkspaces(windowId, order);
+        applyReorder(state, windowId, order);
+      },
+      currentOrder: (windowId) => state.filter((w) => w.windowId === windowId).map((w) => w.id),
     };
   }
 
@@ -579,6 +674,112 @@ describe("Monitor tab order sync", () => {
 
     assert.equal(calls.length, 1);
     assert.deepEqual(calls[0].order, ["W2", "W1"]);
+  });
+
+  it("moves an unpinned dashboard host workspace to the end of the tab order", async () => {
+    const calls = [];
+    const cmuxApi = makeCmux({
+      workspaces: [
+        { id: "HOST", windowId: "WIN1", title: "Agent Triage Dashboard Host", directory: "/home/user/agent-triage" },
+        { id: "W1", windowId: "WIN1", title: "b-project", directory: "/home/user/b" },
+        { id: "W2", windowId: "WIN1", title: "a-project", directory: "/home/user/a" },
+      ],
+      agentWorkspaceIds: new Set(["W1", "W2"]),
+      reorderWorkspaces: async (windowId, order) => calls.push({ windowId, order }),
+    });
+    const monitor = new Monitor(queue, { cmuxApi, resolveWorktreeFn: async () => ({ isWorktree: false }) });
+
+    await monitor.poll();
+
+    assert.equal(calls.length, 1);
+    assert.deepEqual(calls[0].order, ["W2", "W1", "HOST"]);
+    assert.deepEqual(cmuxApi.currentOrder("WIN1"), ["W2", "W1", "HOST"]);
+
+    // Converged: repeated polls must not re-push the same order.
+    await monitor.poll();
+    await monitor.poll();
+    assert.equal(calls.length, 1);
+  });
+
+  it("converges without churn when the user has pinned the dashboard host tab", async () => {
+    const calls = [];
+    const cmuxApi = makeCmux({
+      workspaces: [
+        // cmux keeps pinned tabs ahead of unpinned ones, and reorder-workspaces
+        // can only order within a pin group — so a pinned host cannot be moved
+        // behind the agent workspaces. What matters is that the sync recognises
+        // this and stops, rather than re-pushing an unreachable order forever.
+        { id: "HOST", windowId: "WIN1", title: "Agent Triage Dashboard Host", directory: "/home/user/agent-triage", pinned: true },
+        { id: "W1", windowId: "WIN1", title: "b-project", directory: "/home/user/b" },
+        { id: "W2", windowId: "WIN1", title: "a-project", directory: "/home/user/a" },
+      ],
+      agentWorkspaceIds: new Set(["W1", "W2"]),
+      reorderWorkspaces: async (windowId, order) => calls.push({ windowId, order }),
+    });
+    const monitor = new Monitor(queue, { cmuxApi, resolveWorktreeFn: async () => ({ isWorktree: false }) });
+
+    await monitor.poll();
+    await monitor.poll();
+    await monitor.poll();
+    await monitor.poll();
+    await monitor.poll();
+
+    // One push to sort the unpinned group (W1 before W2 → W2 before W1), then
+    // silence. The pinned host stays first; that is cmux's constraint.
+    assert.equal(calls.length, 1, "must not re-push an order cmux cannot apply");
+    assert.deepEqual(cmuxApi.currentOrder("WIN1"), ["HOST", "W2", "W1"]);
+  });
+
+  it("does not re-push when the dashboard host is already last", async () => {
+    const calls = [];
+    const cmuxApi = makeCmux({
+      workspaces: [
+        { id: "W2", windowId: "WIN1", title: "a-project", directory: "/home/user/a" },
+        { id: "W1", windowId: "WIN1", title: "b-project", directory: "/home/user/b" },
+        { id: "HOST", windowId: "WIN1", title: "Agent Triage Dashboard Host", directory: "/home/user/agent-triage" },
+      ],
+      agentWorkspaceIds: new Set(["W1", "W2"]),
+      reorderWorkspaces: async (windowId, order) => calls.push({ windowId, order }),
+    });
+    const monitor = new Monitor(queue, { cmuxApi, resolveWorktreeFn: async () => ({ isWorktree: false }) });
+
+    await monitor.poll();
+
+    assert.equal(calls.length, 0);
+  });
+
+  it("does not re-push a duplicated host id when a dismissed card shares the host workspace", async () => {
+    const calls = [];
+    // The host workspace before cmux titled it: #doPoll's title-based
+    // exclusion misses it, so it gets carded and can then be dismissed.
+    // Dismissed items are only reaped once their workspace disappears, so the
+    // card outlives cmux finally naming the workspace — at which point the
+    // host id reaches desiredIds both as a dismissed item and as dashboardWsId.
+    const host = { id: "HOST", windowId: "WIN1", title: null, directory: "/home/user/agent-triage" };
+    const cmuxApi = makeCmux({
+      workspaces: [
+        host,
+        { id: "W1", windowId: "WIN1", title: "b-project", directory: "/home/user/b" },
+        { id: "W2", windowId: "WIN1", title: "a-project", directory: "/home/user/a" },
+      ],
+      agentWorkspaceIds: new Set(["HOST", "W1", "W2"]),
+      reorderWorkspaces: async (windowId, order) => calls.push({ windowId, order }),
+    });
+    const monitor = new Monitor(queue, { cmuxApi, resolveWorktreeFn: async () => ({ isWorktree: false }) });
+
+    await monitor.poll();
+    queue.dismiss("synthetic-HOST");
+    host.title = "Agent Triage Dashboard Host";
+    calls.length = 0;
+
+    await monitor.poll();
+    await monitor.poll();
+    await monitor.poll();
+
+    for (const call of calls) {
+      assert.equal(new Set(call.order).size, call.order.length, `pushed order has a duplicate id: ${call.order}`);
+    }
+    assert.ok(calls.length <= 1, `expected convergence, got ${calls.length} reorder calls`);
   });
 
   it("ignores its own workspace.reordered event instead of scheduling another poll", async () => {

@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.50.3] - 2026-08-31
+
+### Added
+
+- The dashboard's own host workspace now gets a real card in the workspace list (title and focus-to-select only — no dismiss/close/refresh/rename/new-session, since those don't make sense for the terminal running this server, and closing it would kill the server). Previously the host was excluded entirely, so cmux's native focus landing on its tab left every card in the dashboard unhighlighted with no way to tell where you were. The host gets its own dedicated group that always sorts last, regardless of its title — separate from its actual directory's group, so real agent activity sharing that same repo (e.g. someone working on this dashboard's own code) keeps its normal alphabetical spot instead of being pulled down with the host.
+- `/api/close` now rejects requests targeting the dashboard's own host workspace server-side, rather than relying solely on the UI hiding its close button — a stale page or a direct request could otherwise still kill the server's own terminal.
+
+### Fixed
+
+- Tab-order sync now lists the dashboard's own host workspace explicitly in the `reorder-workspaces` call, placing it last within its own pin group instead of relying on cmux's "unmentioned workspaces trail listed peers" default. Note that cmux always keeps pinned tabs ahead of unpinned ones and `--order` can only sort within a pin group, so a host tab the user has pinned still sits first — that is a cmux constraint, not something the dashboard can override.
+- Tab-order sync compares against cmux's reported order per pin group rather than as one flat list, so it no longer re-runs `reorder-workspaces` on every 5-second poll when any tab in the window is pinned. The desired flat order was unreachable in that case, so the comparison never matched and the CLI was re-invoked indefinitely.
+- Tab-order sync de-duplicates workspace IDs before pushing an order, so a dismissed card that happens to point at the host workspace can't emit a malformed order with a repeated ID on every poll.
+- The session count used for `config.maxSessions` no longer counts the dashboard's own host workspace, which would otherwise enforce the limit one real session early now that the host always has a card.
+
 ## [1.50.2] - 2026-08-27
 
 ### Fixed

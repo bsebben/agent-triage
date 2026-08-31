@@ -387,6 +387,7 @@ export async function listWorkspaces() {
     ref: w.ref,
     windowId,
     selected: w.selected || false,
+    pinned: w.pinned || false,
   }));
 }
 
@@ -410,10 +411,16 @@ export async function selectWorkspace(workspaceId) {
 
 /**
  * Reorders workspaces within one window to match `orderedWorkspaceIds`.
- * `reorder-workspaces` is CLI-only (not in the RPC method list) — per its
- * own docs, unmentioned workspaces (e.g. the dashboard's own host
- * workspace) simply keep their relative order after the listed ones, so
- * callers don't need to enumerate every workspace in the window.
+ * `reorder-workspaces` is CLI-only (not in the RPC method list). Per its own
+ * docs the ordering is **group-scoped**: "the comma-separated order is the
+ * final leading order inside the pinned and unpinned groups; unmentioned
+ * workspaces keep their relative order after listed peers in the same group."
+ *
+ * So a flat list can only ever order workspaces *within* their own pin group —
+ * the pinned group always precedes the unpinned one, and no `--order` can move
+ * a pinned workspace behind an unpinned one. Callers comparing a desired order
+ * against cmux's reported order must therefore compare per pin group, or the
+ * check will never converge (see monitor.js#syncTabOrder).
  */
 export async function reorderWorkspaces(windowId, orderedWorkspaceIds) {
   if (orderedWorkspaceIds.length < 2) return;
