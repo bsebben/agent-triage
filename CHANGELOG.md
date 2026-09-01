@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.50.4] - 2026-08-31
+
+### Changed
+
+- A collapsed group now expands automatically when the active cmux tab moves into it, so the highlighted card is always visible instead of hidden behind a collapsed header. Once the active tab moves elsewhere, only groups opened this way collapse back again — a group you expanded yourself stays open, and manually collapsing an auto-expanded group sticks until the active tab leaves it. The Dismissed drawer is never auto-expanded.
+
 ## [1.50.3] - 2026-08-31
 
 ### Added
