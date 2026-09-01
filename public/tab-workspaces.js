@@ -1,6 +1,13 @@
 // public/tab-workspaces.js
 
 const collapsedGroups = new Set(["Dismissed"]);
+// Groups we force-opened because they hold the active tab, so we know to
+// collapse them back once the active tab moves elsewhere. A group the user
+// expanded manually is never added here, so tabbing away leaves it alone.
+const autoExpandedGroups = new Set();
+// Groups the user collapsed after we auto-expanded them. Suppresses further
+// auto-expanding while they still hold the active tab, so the click sticks.
+const userCollapsedActiveGroups = new Set();
 const refreshingWorkspaces = new Set();
 let refreshAllInFlight = false;
 
@@ -17,11 +24,45 @@ function saveCollapseState() {
   });
 }
 
+// Expands the group containing the active tab if it's collapsed, and
+// collapses back any group we auto-expanded for a now-inactive tab.
+function expandActiveGroup() {
+  // The Dismissed drawer is collapsed by default and stays that way —
+  // dismissing the card you're focused on shouldn't pop it open.
+  const activeGroup = state.groups.find((g) => g.items.some((i) => i.workspaceSelected));
+  const activeTitle = activeGroup ? activeGroup.title || "Unknown" : null;
+
+  // A group we opened that now reads as collapsed was collapsed by the user:
+  // honor it and stop tracking it as ours.
+  for (const title of [...autoExpandedGroups]) {
+    if (collapsedGroups.has(title)) {
+      autoExpandedGroups.delete(title);
+      userCollapsedActiveGroups.add(title);
+    }
+  }
+
+  for (const title of [...userCollapsedActiveGroups]) {
+    if (title !== activeTitle) userCollapsedActiveGroups.delete(title);
+  }
+
+  for (const title of [...autoExpandedGroups]) {
+    if (title === activeTitle) continue;
+    collapsedGroups.add(title);
+    autoExpandedGroups.delete(title);
+  }
+
+  if (activeTitle && collapsedGroups.has(activeTitle) && !userCollapsedActiveGroups.has(activeTitle)) {
+    collapsedGroups.delete(activeTitle);
+    autoExpandedGroups.add(activeTitle);
+  }
+}
+
 function renderWorkspaces() {
   const { groups, dismissed, recentGroups } = state;
   const atLimit = isAtWorkspaceLimit();
 
   saveCollapseState();
+  expandActiveGroup();
 
   let html = workspaceLimitBanner();
 
