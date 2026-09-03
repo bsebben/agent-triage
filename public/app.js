@@ -142,7 +142,7 @@ async function refreshTab() {
 function updateTabBadges() {
   const { stats } = state;
   const loops = state.loops || [];
-  const pulls = state.pulls || { mine: [], reviews: [] };
+  const pulls = state.pulls || { mine: [], reviews: [], assigned: [] };
 
   // Workspaces: count items waiting on input (not running/completion)
   const waitingCount = stats.pending > 0 ? stats.pending : null;
@@ -157,10 +157,19 @@ function updateTabBadges() {
   else if (runningCount > 0) setBadge("loops", runningCount, "running");
   else setBadge("loops", null, null);
 
-  // PRs: count actionable across both sections
-  const allGroups = [...pulls.mine, ...pulls.reviews];
-  const actionable = allGroups.reduce((n, g) =>
-    n + g.prs.filter((p) => p.status === "approved" || p.status === "comments" || p.status === "queue_failed" || p.ci === "failing").length, 0);
+  // PRs: count actionable across every section. `assigned` is its own search rather than a
+  // subset of the row-capped `reviews` list, so a direct request can appear only there —
+  // but the two overlap heavily, hence the dedupe by url before counting.
+  const allGroups = [...pulls.mine, ...pulls.reviews, ...(pulls.assigned || [])];
+  const actionableUrls = new Set();
+  for (const g of allGroups) {
+    for (const p of g.prs) {
+      if (p.status === "approved" || p.status === "comments" || p.status === "queue_failed" || p.ci === "failing") {
+        actionableUrls.add(p.url);
+      }
+    }
+  }
+  const actionable = actionableUrls.size;
   setBadge("pulls", actionable || null, actionable > 0 ? "attention" : null);
 
   // Tickets: show total count

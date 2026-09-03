@@ -10,7 +10,22 @@ const MIME_TYPES = {
 };
 
 export function startPolling(name, pollFn, onUpdate, intervalMs) {
-  const refresh = async () => { await pollFn(); onUpdate(); };
+  // A single poll can outlast the interval (paged fetches with per-page retries), so guard
+  // against overlap in `refresh` itself, not just the interval tick — `refresh` is also
+  // returned as `tab.refresh` and invoked directly by the manual "/api/refresh/:name"
+  // endpoint. Guarding only the tick would still let a manual refresh race a slow scheduled
+  // poll (or two manual refreshes race each other), and whichever finishes last publishes
+  // its snapshot over the other regardless of which is actually newer.
+  let inFlight = false;
+  const refresh = async () => {
+    if (inFlight) {
+      console.log(`[${name.toLowerCase()}] previous poll still running, skipping`);
+      return;
+    }
+    inFlight = true;
+    try { await pollFn(); onUpdate(); }
+    finally { inFlight = false; }
+  };
   const doPoll = async () => {
     try { await refresh(); }
     catch (err) { console.error(`[${name.toLowerCase()}] poll error: ${err.message.split("\n")[0]}`); }

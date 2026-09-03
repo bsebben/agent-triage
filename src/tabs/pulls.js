@@ -52,8 +52,9 @@ const deployCache = new Map(); // sha -> { deploy, fetchedAt }
 const deployTrackedRepos = new Set();
 
 const PR_QUERY = `
-query($q: String!) {
-  search(query: $q, type: ISSUE, first: 100) {
+query($q: String!, $n: Int!, $after: String) {
+  search(query: $q, type: ISSUE, first: $n, after: $after) {
+    pageInfo { hasNextPage endCursor }
     nodes {
       ... on PullRequest {
         number
@@ -82,26 +83,15 @@ query($q: String!) {
             }
           }
         }
-        latestReviews(first: 10) {
-          nodes { state }
-        }
-        reviewRequests(first: 20) {
-          nodes {
-            requestedReviewer {
-              __typename
-              ... on User { login }
-            }
-          }
-        }
+        latestReviews { totalCount }
       }
     }
   }
 }`;
 
 let cfg;
-let currentUser = "";
 let onUpdateCb = () => {};
-let data = { mine: [], reviews: [], merged: [] };
+let data = { mine: [], reviews: [], merged: [], assigned: [] };
 
 async function init(tabConfig, onUpdate) {
   cfg = { ...defaults, ...tabConfig };
@@ -114,11 +104,6 @@ async function init(tabConfig, onUpdate) {
   console.log(`Config: pulls ${cfg.enabled ? "enabled" : "disabled"}${ghAvailable ? "" : " (gh CLI not found)"}`);
   if (!cfg.enabled || !ghAvailable) return;
 
-  try {
-    const { stdout } = await execFileAsync("gh", ["api", "user", "--jq", ".login"], { timeout: 10000 });
-    currentUser = stdout.trim();
-  } catch { /* non-fatal; directReview will always be false */ }
-
   onUpdateCb = onUpdate;
   tab.refresh = await startPolling("Pulls", poll, onUpdate, 2 * 60 * 1000);
 }
@@ -126,19 +111,25 @@ async function init(tabConfig, onUpdate) {
 async function poll() {
   const mergedSince = new Date(Date.now() - MERGED_WINDOW_DAYS * 24 * 60 * 60 * 1000)
     .toISOString().slice(0, 10);
-  // allSettled keeps the three queries independent: a single failing query (e.g. a
-  // GitHub 502) retains its last-known data while the others still update, instead of
-  // failing the whole poll and letting the display go stale.
-  const [mine, reviews, merged] = await Promise.allSettled([
+  // allSettled keeps the queries independent: a single failing query (e.g. a GitHub 502)
+  // retains its last-known data while the others still update, instead of failing the
+  // whole poll and letting the display go stale.
+  const [mine, reviews, merged, assigned] = await Promise.allSettled([
     searchPrs("is:pr is:open archived:false author:@me", () => true, prPriority),
-    searchPrs("is:pr is:open archived:false review-requested:@me draft:false", (pr) => !pr.isDraft, reviewPriority),
+    // `review-requested:@me` includes requests routed via a team, so this matches far more
+    // than fits in the row ceiling. `sort:updated-desc` makes the truncation deterministic
+    // (most recently updated first) instead of an arbitrary slice of a drifting result set —
+    // same rationale as the merged query below.
+    searchPrs("is:pr is:open archived:false review-requested:@me draft:false sort:updated-desc", (pr) => !pr.isDraft, reviewPriority),
     // GitHub search has no merged-date sort, so `sort:updated-desc` is the closest
-    // proxy to skew the first-100 window toward the most recent merges (see PR_QUERY's
-    // first:100 ceiling — a hard cap, documented as a known limitation).
+    // proxy to skew the returned window toward the most recent merges.
     searchMerged(`is:pr archived:false author:@me is:merged merged:>=${mergedSince} sort:updated-desc`),
+    // Requests addressed to me personally rather than to one of my teams. Every row is a
+    // direct request by construction, so no client-side filtering is needed.
+    searchPrs("is:pr is:open archived:false user-review-requested:@me draft:false", (pr) => !pr.isDraft, reviewPriority),
   ]);
 
-  data = settlePollResults({ mine, reviews, merged }, data);
+  data = settlePollResults({ mine, reviews, merged, assigned }, data);
   // Only re-enrich when the merged query actually refreshed; on failure the retained
   // groups were already enriched by an earlier poll. Deploy dots fill in via a follow-up
   // onUpdate from enrichInBackground so the deploy-status fetch never blocks the initial
@@ -359,30 +350,73 @@ export function parseDeployLinks(deployments) {
   return links;
 }
 
-// GitHub's search GraphQL endpoint intermittently 502/504s on this query — the nested
-// commits -> statusCheckRollup -> contexts resolvers fanned out over up to 100 search
-// results occasionally exceed GitHub's own backend budget, independent of anything on
-// our end (reproduces identically running `gh api graphql` by hand, outside this app).
-// Retry a couple of times before letting poll()'s allSettled fallback (see settlePollResults)
-// absorb it as stale data. Only the transient gateway errors are retried — anything else
-// (auth, malformed query) should surface immediately rather than being masked for 6+ seconds.
-const RETRYABLE_HTTP_ERROR = /HTTP 50[234]/;
+// GitHub caps the execution resources a single GraphQL request may consume, and the cost
+// tracks the nested per-PR fan-out (commits -> statusCheckRollup -> contexts) times the
+// number of rows *returned* — not how many results the search matched. Measured against
+// the broad review-requested search: 50 rows is reliable, the failure cliff starts around
+// 75, and 100 rows fails every time (reproduces identically running `gh api graphql` by
+// hand, outside this app). So every search pages at 50, regardless of expected size —
+// paging short-circuits on `hasNextPage: false`, so a small result set still costs one
+// request and no search is left sitting past the cliff.
+const SEARCH_PAGE_SIZE = 50;
+// Two pages preserves the 100-row ceiling the single-request version had.
+const MAX_SEARCH_PAGES = 2;
 
-async function fetchPrNodes(query, attempts = 3) {
+// Depending on which layer gives up first, an over-budget request comes back either as a
+// raw gateway error or as a structured resource-limit error in the GraphQL response body.
+// Retry a couple of times before letting poll()'s allSettled fallback (see settlePollResults)
+// absorb it as stale data. Only these are retried — anything else (auth, malformed query)
+// should surface immediately rather than being masked for 6+ seconds. Note that retrying is
+// insurance for a genuinely transient blip only: at an over-budget query shape the failure
+// is deterministic, so keeping every request under budget is what actually fixes it.
+export const RETRYABLE_ERROR = /HTTP 50[234]|Resource limits for this query exceeded/i;
+
+async function fetchPrSearchPage(query, { first, after = null }, attempts = 3) {
+  const args = ["api", "graphql", "-F", `query=${PR_QUERY}`, "-F", `q=${query}`, "-F", `n=${first}`];
+  if (after) args.push("-F", `after=${after}`);
+
   for (let attempt = 0; attempt < attempts; attempt++) {
     if (attempt > 0) await new Promise((r) => setTimeout(r, 3000));
     try {
-      const { stdout } = await execFileAsync(
-        "gh", ["api", "graphql", "-F", `query=${PR_QUERY}`, "-F", `q=${query}`],
-        { timeout: 30000 },
-      );
-      return JSON.parse(stdout).data.search.nodes;
+      const { stdout } = await execFileAsync("gh", args, { timeout: 30000 });
+      const search = JSON.parse(stdout).data.search;
+      return { nodes: search.nodes || [], pageInfo: search.pageInfo };
     } catch (err) {
-      const match = err.message.match(RETRYABLE_HTTP_ERROR);
+      const match = err.message.match(RETRYABLE_ERROR);
       if (!match || attempt === attempts - 1) throw err;
       console.error(`[pulls] graphql ${match[0]}, retrying (attempt ${attempt + 2}/${attempts})...`);
     }
   }
+}
+
+// Walks up to `maxPages` search pages via `fetchPage(after) -> { nodes, pageInfo }`,
+// stopping early once GitHub reports no next page. Dedupes by PR url: the underlying
+// result set shifts while we page through it (observed drifting 365 -> 362 mid-session),
+// and that cursor drift can hand back a PR that already appeared on an earlier page.
+export async function collectSearchPages(fetchPage, maxPages = MAX_SEARCH_PAGES) {
+  const nodes = [];
+  const seen = new Set();
+  let after = null;
+
+  for (let page = 0; page < maxPages; page++) {
+    const { nodes: pageNodes = [], pageInfo } = await fetchPage(after);
+    for (const node of pageNodes) {
+      const key = node?.url;
+      if (key) {
+        if (seen.has(key)) continue;
+        seen.add(key);
+      }
+      nodes.push(node);
+    }
+    if (!pageInfo?.hasNextPage || !pageInfo.endCursor) break;
+    after = pageInfo.endCursor;
+  }
+
+  return nodes;
+}
+
+function fetchPrNodes(query) {
+  return collectSearchPages((after) => fetchPrSearchPage(query, { first: SEARCH_PAGE_SIZE, after }));
 }
 
 async function searchPrs(query, filter, sortFn) {
@@ -428,9 +462,6 @@ function summarize(node) {
     author: node.author?.login || "",
     status: prStatus(node, trunk),
     ci: ciStatus(checks.filter((c) => !isTrunkQueueCheck(c))),
-    directReview: (node.reviewRequests?.nodes || []).some(
-      (r) => r.requestedReviewer?.__typename === "User" && r.requestedReviewer?.login === currentUser
-    ),
   };
 }
 
@@ -472,7 +503,7 @@ export function prStatus(node, trunk = null) {
   if (node.isInMergeQueue || trunk === "queued") return "queued";
   if (trunk === "failed") return "queue_failed";
   if (node.reviewDecision === "APPROVED") return "approved";
-  if ((node.latestReviews?.nodes || []).length > 0) return "comments";
+  if ((node.latestReviews?.totalCount || 0) > 0) return "comments";
   return "open";
 }
 
