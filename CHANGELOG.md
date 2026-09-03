@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.51.0] - 2026-09-03
+
+### Fixed
+
+- The Reviews tab's "Assigned to me" list now comes from its own search for review requests addressed to you personally, so it is complete instead of a filter over an arbitrary slice of the much larger team-inclusive list.
+- The Reviews poll no longer exceeds GitHub's per-request GraphQL execution budget. It had been failing on every poll, silently showing weeks-old data with no indication anything was wrong. Every PR search now pages through results in smaller requests (deduping PRs that repeat across pages when the result set shifts mid-fetch), the per-PR review lookup asks for a count rather than a list of reviews, and the per-PR review-request lookup is gone entirely.
+- The Pulls tab badge now counts the "Assigned to me" list too, deduped by PR. A review request addressed to you personally that fell outside the team-inclusive list's row ceiling was visible in the default list but contributed nothing to the badge.
+- Switching the Reviews tab's "Assigned to me" toggle now clears an author or status filter that the newly shown list doesn't contain, instead of leaving an empty list the filter dropdown couldn't clear.
+- A poll that outruns its own interval no longer overlaps with the next one, which could publish an older snapshot over a newer one.
+
+### Changed
+
+- The broad review-requested search is now sorted most-recently-updated first, so when it does hit the row ceiling the PRs that get dropped are the least recently touched rather than an arbitrary set.
+- GitHub's structured "resource limits exceeded" GraphQL error is now retried alongside the transient 502/503/504 gateway errors.
+
 ## [1.50.4] - 2026-08-31
 
 ### Changed

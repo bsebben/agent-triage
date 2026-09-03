@@ -41,12 +41,6 @@ function filterGroupsByStatus(groups, status) {
     .filter((g) => g.prs.length > 0);
 }
 
-function filterGroupsByDirect(groups) {
-  return groups
-    .map((g) => ({ ...g, prs: g.prs.filter((pr) => pr.directReview) }))
-    .filter((g) => g.prs.length > 0);
-}
-
 function renderPulls() {
   const pullsCfg = state.tabStatus?.pulls || appConfig.pulls || {};
   if (!pullsCfg.available) {
@@ -54,9 +48,12 @@ function renderPulls() {
     queue.innerHTML = `<div class="empty-state">${hint}</div>`;
     return;
   }
-  const pulls = state.pulls || { mine: [], reviews: [], merged: [] };
+  const pulls = state.pulls || { mine: [], reviews: [], merged: [], assigned: [] };
+  // "Assigned to me" is its own server-side search (requests addressed to me personally,
+  // complete), not a filter over the team-inclusive list — so the toggle picks a bucket.
+  const source = pullsDirectFilter ? (pulls.assigned || []) : pulls.reviews;
   const mineCount = pulls.mine.reduce((n, g) => n + g.prs.length, 0);
-  const reviewCount = pulls.reviews.reduce((n, g) => n + g.prs.length, 0);
+  const reviewCount = source.reduce((n, g) => n + g.prs.length, 0);
   const mergedCount = (pulls.merged || []).reduce((n, g) => n + g.prs.length, 0);
 
   const mineActive = pullsSubTab === "mine" ? " active" : "";
@@ -91,16 +88,20 @@ function renderPulls() {
       html += merged.map((g) => renderPullGroup(g, false, "merged")).join("");
     }
   } else {
-    const authors = collectAuthors(pulls.reviews);
-    const statuses = collectStatuses(pulls.reviews);
+    const authors = collectAuthors(source);
+    const statuses = collectStatuses(source);
+    // The toggle swaps which bucket feeds the list, so the options change with it. Drop a
+    // selected author/status that the new bucket doesn't contain — otherwise the dropdown
+    // renders without it and the user is stuck on an empty list they can't clear.
+    if (pullsAuthorFilter && !authors.includes(pullsAuthorFilter)) pullsAuthorFilter = "";
+    if (pullsStatusFilter && !statuses.includes(pullsStatusFilter)) pullsStatusFilter = "";
     html += `<div class="pulls-filter-bar">`;
     if (authors.length > 1) html += renderAuthorFilter(authors);
     if (statuses.length > 1) html += renderStatusFilter(statuses);
     html += `<button class="pulls-filter-btn${pullsDirectFilter ? " active" : ""}" onclick="togglePullsDirectFilter()">Assigned to me</button>`;
     html += `</div>`;
-    let filtered = filterGroupsByAuthor(pulls.reviews, pullsAuthorFilter);
+    let filtered = filterGroupsByAuthor(source, pullsAuthorFilter);
     filtered = filterGroupsByStatus(filtered, pullsStatusFilter);
-    if (pullsDirectFilter) filtered = filterGroupsByDirect(filtered);
     const filteredCount = filtered.reduce((n, g) => n + g.prs.length, 0);
     if (filteredCount === 0) {
       html += `<div class="empty-state">No review requests</div>`;

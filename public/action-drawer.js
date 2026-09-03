@@ -4,8 +4,10 @@ let drawerEl = null;
 let closeDrawer = null;
 
 function findPrByUrl(url) {
-  const pulls = state.pulls || { mine: [], reviews: [], merged: [] };
-  for (const list of [pulls.mine, pulls.reviews, pulls.merged]) {
+  const pulls = state.pulls || { mine: [], reviews: [], merged: [], assigned: [] };
+  // `assigned` is searched separately and isn't a subset of the truncated `reviews` list,
+  // so a directly-requested PR can be rendered without appearing in any other bucket.
+  for (const list of [pulls.mine, pulls.reviews, pulls.merged, pulls.assigned || []]) {
     for (const group of list) {
       for (const pr of group.prs) {
         if (pr.url === url) return { item: pr, repo: group.repo };

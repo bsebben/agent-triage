@@ -15,6 +15,8 @@ import {
   settlePollResults,
   deployStateIsTracked,
   shouldShowDeployDots,
+  collectSearchPages,
+  RETRYABLE_ERROR,
 } from "../src/tabs/pulls.js";
 
 const fulfilled = (value) => ({ status: "fulfilled", value });
@@ -45,11 +47,15 @@ describe("prStatus", () => {
   });
 
   it("returns 'comments' when there are reviews but no approval", () => {
-    assert.equal(prStatus({ reviewDecision: "REVIEW_REQUIRED", latestReviews: { nodes: [{ state: "COMMENTED" }] } }), "comments");
+    assert.equal(prStatus({ reviewDecision: "REVIEW_REQUIRED", latestReviews: { totalCount: 1 } }), "comments");
   });
 
   it("returns 'open' when there are no reviews", () => {
-    assert.equal(prStatus({ reviewDecision: "REVIEW_REQUIRED", latestReviews: { nodes: [] } }), "open");
+    assert.equal(prStatus({ reviewDecision: "REVIEW_REQUIRED", latestReviews: { totalCount: 0 } }), "open");
+  });
+
+  it("returns 'open' when latestReviews is absent entirely", () => {
+    assert.equal(prStatus({ reviewDecision: "REVIEW_REQUIRED" }), "open");
   });
 
   it("returns 'merged' when the PR has a mergedAt timestamp", () => {
@@ -283,6 +289,122 @@ describe("settlePollResults", () => {
       prev,
     );
     assert.deepEqual(next, prev);
+  });
+
+  it("carries the 'assigned' bucket through with no per-key handling", () => {
+    const withAssigned = { ...prev, assigned: ["a0"] };
+    const next = settlePollResults(
+      {
+        mine: fulfilled(["m1"]),
+        reviews: fulfilled(["r1"]),
+        merged: fulfilled(["g1"]),
+        assigned: fulfilled(["a1"]),
+      },
+      withAssigned,
+    );
+    assert.deepEqual(next, { mine: ["m1"], reviews: ["r1"], merged: ["g1"], assigned: ["a1"] });
+  });
+
+  it("retains the last-known 'assigned' value when only that query fails", () => {
+    const withAssigned = { ...prev, assigned: ["a0"] };
+    const next = settlePollResults(
+      {
+        mine: fulfilled(["m1"]),
+        reviews: fulfilled(["r1"]),
+        merged: fulfilled(["g1"]),
+        assigned: rejected(new Error("Resource limits for this query exceeded")),
+      },
+      withAssigned,
+    );
+    assert.deepEqual(next.assigned, ["a0"]);
+  });
+});
+
+describe("collectSearchPages", () => {
+  const node = (n) => ({ number: n, url: `https://github.com/o/r/pull/${n}` });
+  const page = (numbers, hasNextPage, endCursor = "cursor") => ({
+    nodes: numbers.map(node),
+    pageInfo: { hasNextPage, endCursor: hasNextPage ? endCursor : null },
+  });
+
+  it("concatenates pages in order, following endCursor", async () => {
+    const pages = [page([1, 2], true, "c1"), page([3, 4], false)];
+    const seenCursors = [];
+    const nodes = await collectSearchPages(async (after) => {
+      seenCursors.push(after);
+      return pages.shift();
+    });
+    assert.deepEqual(nodes.map((n) => n.number), [1, 2, 3, 4]);
+    assert.deepEqual(seenCursors, [null, "c1"]);
+  });
+
+  it("dedupes by url when cursor drift repeats a PR across pages", async () => {
+    const pages = [page([1, 2], true, "c1"), page([2, 3], false)];
+    const nodes = await collectSearchPages(async () => pages.shift());
+    assert.deepEqual(nodes.map((n) => n.number), [1, 2, 3]);
+  });
+
+  it("short-circuits after one page when hasNextPage is false", async () => {
+    let calls = 0;
+    const nodes = await collectSearchPages(async () => {
+      calls++;
+      return page([1], false);
+    });
+    assert.equal(calls, 1);
+    assert.equal(nodes.length, 1);
+  });
+
+  it("stops at the page cap even while GitHub still reports a next page", async () => {
+    let calls = 0;
+    const nodes = await collectSearchPages(async () => {
+      calls++;
+      return page([calls], true, `c${calls}`);
+    }, 2);
+    assert.equal(calls, 2);
+    assert.deepEqual(nodes.map((n) => n.number), [1, 2]);
+  });
+
+  it("defaults to a two-page cap", async () => {
+    let calls = 0;
+    await collectSearchPages(async () => {
+      calls++;
+      return page([calls], true, `c${calls}`);
+    });
+    assert.equal(calls, 2);
+  });
+
+  it("stops when hasNextPage is true but no cursor came back", async () => {
+    let calls = 0;
+    const nodes = await collectSearchPages(async () => {
+      calls++;
+      return { nodes: [node(1)], pageInfo: { hasNextPage: true, endCursor: null } };
+    });
+    assert.equal(calls, 1);
+    assert.equal(nodes.length, 1);
+  });
+
+  it("tolerates a page with no nodes or pageInfo", async () => {
+    const nodes = await collectSearchPages(async () => ({}));
+    assert.deepEqual(nodes, []);
+  });
+});
+
+describe("RETRYABLE_ERROR", () => {
+  it("matches the GraphQL resource-limit error, whatever its casing", () => {
+    assert.match("Resource limits for this query exceeded", RETRYABLE_ERROR);
+    assert.match("gh: resource limits for this query exceeded (see docs)", RETRYABLE_ERROR);
+  });
+
+  it("still matches the transient gateway errors", () => {
+    assert.match("gh: HTTP 502 Bad Gateway", RETRYABLE_ERROR);
+    assert.match("gh: HTTP 503 Service Unavailable", RETRYABLE_ERROR);
+    assert.match("gh: HTTP 504 Gateway Timeout", RETRYABLE_ERROR);
+  });
+
+  it("does not match errors that should surface immediately", () => {
+    assert.doesNotMatch("gh: HTTP 401 Unauthorized", RETRYABLE_ERROR);
+    assert.doesNotMatch("gh: HTTP 500 Internal Server Error", RETRYABLE_ERROR);
+    assert.doesNotMatch("Field 'bogus' doesn't exist on type 'PullRequest'", RETRYABLE_ERROR);
   });
 });
 
