@@ -10,6 +10,8 @@ const SOCKET_PATH = config.cmux.socket;
 
 // --- Persistent socket RPC ---
 
+const RPC_TIMEOUT_MS = 10000;
+
 let sock = null;
 let buffer = "";
 let currentRequest = null;
@@ -50,6 +52,7 @@ function getSocket() {
         try {
           const parsed = JSON.parse(line);
           if (currentRequest) {
+            clearTimeout(currentRequest.timer);
             if (parsed.ok === false) {
               currentRequest.reject(new Error(parsed.error?.message || "RPC error"));
             } else {
@@ -68,6 +71,7 @@ function getSocket() {
     s.on("close", () => {
       resetSocket();
       if (currentRequest) {
+        clearTimeout(currentRequest.timer);
         currentRequest.reject(new Error("cmux socket closed"));
         currentRequest = null;
       }
@@ -80,11 +84,29 @@ function getSocket() {
   return connecting;
 }
 
+// Requests are serialized on currentRequest and replies carry no id to match
+// against, so a reply that never arrives — or one that arrives unparseable and
+// leaves the buffer wedged — pins currentRequest forever. Every later call then
+// waits behind it indefinitely, including the workspace.select behind a card
+// click, and because nothing rejects there is no error to log.
+function onRequestTimeout(req) {
+  if (currentRequest !== req) return;
+  currentRequest = null;
+  req.reject(new Error(`cmux ${req.method} timed out after ${RPC_TIMEOUT_MS}ms`));
+  // Drop the connection instead of reading on: a late reply would be handed to
+  // whichever request ran next, answering it with another call's data.
+  resetSocket();
+  while (requestQueue.length > 0) {
+    requestQueue.shift().reject(new Error("cmux socket reset after timeout"));
+  }
+}
+
 function drainQueue() {
   if (currentRequest || requestQueue.length === 0) return;
   if (!sock || sock.destroyed) return;
   const next = requestQueue.shift();
   currentRequest = next;
+  next.timer = setTimeout(() => onRequestTimeout(next), RPC_TIMEOUT_MS);
   sock.write(JSON.stringify({ method: next.method, params: next.params }) + "\n");
 }
 

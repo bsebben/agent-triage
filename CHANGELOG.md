@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- Clicking a workspace card no longer hangs indefinitely when a cmux reply goes missing — RPC requests time out instead of pinning the queue, and the connection resets so later calls aren't stranded behind the lost one
 - Dashboard notices a websocket that has gone silent (laptop sleep, VPN drop, network change) and reconnects instead of sitting on stale data forever — checked on a timer, on window focus, and when the network comes back
 - Server pings websocket clients and terminates half-open ones so dead connections release their slot
 
