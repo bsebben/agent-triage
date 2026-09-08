@@ -3,7 +3,16 @@ const queue = document.getElementById("queue");
 let activeTab = "workspaces";
 let appConfig = {};
 
-let ws;
+let ws = null;
+let reconnectTimer = null;
+let livenessTimer = null;
+let lastMessageAt = 0;
+const RECONNECT_DELAY_MS = 2000;
+// The server broadcasts an update every poll cycle (5s) and pings every
+// heartbeat period (30s), so silence this long means the connection is gone
+// even if the browser hasn't noticed.
+const STALE_AFTER_MS = 60000;
+const LIVENESS_CHECK_MS = 10000;
 let state = { groups: [], recentGroups: [], dismissed: [], stats: { total: 0, pending: 0, completed: 0, dismissed: 0 } };
 let renaming = false;
 let pendingReload = false;
@@ -27,10 +36,37 @@ async function loadAppConfig() {
   } catch {}
 }
 
+function scheduleReconnect() {
+  if (reconnectTimer !== null) return;
+  reconnectTimer = setTimeout(() => {
+    reconnectTimer = null;
+    connect();
+  }, RECONNECT_DELAY_MS);
+}
+
 function connect() {
+  if (reconnectTimer !== null) {
+    clearTimeout(reconnectTimer);
+    reconnectTimer = null;
+  }
+
+  // Detach and close whatever socket this call replaces. checkLiveness() can
+  // call in while the old socket is still CONNECTING or OPEN (that is the
+  // whole point — a half-open socket never fires onclose), and leaving it
+  // attached would hold a per-host connection slot for a socket nothing reads
+  // from, plus let its eventual close schedule a competing reconnect.
+  if (ws) {
+    ws.onopen = ws.onmessage = ws.onclose = ws.onerror = null;
+    if (ws.readyState === WebSocket.CONNECTING || ws.readyState === WebSocket.OPEN) ws.close();
+  }
+
   const protocol = location.protocol === "https:" ? "wss:" : "ws:";
-  ws = new WebSocket(`${protocol}//${location.host}`);
-  ws.onmessage = (e) => {
+  const socket = new WebSocket(`${protocol}//${location.host}`);
+  ws = socket;
+  lastMessageAt = Date.now();
+  startLivenessWatchdog();
+  socket.onmessage = (e) => {
+    lastMessageAt = Date.now();
     const msg = JSON.parse(e.data);
     if (msg.type === "update") {
       // The websocket reconnects transparently across a plain server
@@ -52,7 +88,7 @@ function connect() {
       if (typeof handleLogMessage === "function") handleLogMessage(msg);
     }
   };
-  ws.onopen = () => {
+  socket.onopen = () => {
     if (pendingReload) return location.reload();
     loadAppConfig();
     if (typeof initIntegrationNudge === "function") initIntegrationNudge();
@@ -61,8 +97,37 @@ function connect() {
       showToast("Configuration updated");
     }
   };
-  ws.onclose = () => setTimeout(connect, 2000);
+  // Only the socket that is still the live one may drive a reconnect.
+  socket.onclose = () => {
+    if (ws === socket) scheduleReconnect();
+  };
 }
+
+// A socket whose network path dies without a TCP close (laptop sleep, VPN
+// drop, partition) never fires onclose, so onclose alone can leave the tab
+// sitting on stale data forever. The server's own heartbeat can't rescue it
+// either: it terminates the half-open socket without a close frame the client
+// will ever see, and its pings are answered by the browser's network stack
+// rather than by this page. So detect the silence here instead.
+function checkLiveness() {
+  if (!ws) return;
+  if (Date.now() - lastMessageAt < STALE_AFTER_MS) return;
+  connect();
+}
+
+function startLivenessWatchdog() {
+  if (livenessTimer !== null) return;
+  livenessTimer = setInterval(checkLiveness, LIVENESS_CHECK_MS);
+}
+
+// A backgrounded tab's timers are throttled, and a machine that just woke or
+// rejoined the network won't have run the interval at all — so re-check at the
+// moments the user is about to look at the data.
+window.addEventListener("focus", checkLiveness);
+window.addEventListener("online", checkLiveness);
+document.addEventListener("visibilitychange", () => {
+  if (!document.hidden) checkLiveness();
+});
 
 function applyCloses() {
   const now = Date.now();
