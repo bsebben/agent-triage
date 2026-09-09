@@ -12,7 +12,7 @@ const HOME = homedir();
 const DEFAULT_JQL = "assignee = currentUser() AND statusCategory != Done ORDER BY status ASC";
 const FIELDS = ["summary", "status", "issuetype", "parent"];
 const PAGE_LIMIT = 100;
-const PAGE_ATTEMPTS = 3;
+const RETRY_ATTEMPTS = 3;
 const RETRY_DELAY_MS = 5000;
 // Ceiling on what one poll may spend retrying, across every page. Without it a 20-page
 // walk could burn 20 x (3 x 30s transport timeout + 2 x 5s wait) and outlast several
@@ -134,7 +134,7 @@ export function applyExcludeProjects(jql, excludeProjects) {
 // next (e.g. "PO-1773" -> "USPGIA-1169", alphabetically later but a lower internal ID)
 // silently matched zero issues and pagination reported isLast, permanently truncating any
 // JQL that spans more than one project. The API-issued token has no such assumption.
-export async function paginateIssues(cloudId, jql, transport, { attempts = PAGE_ATTEMPTS, retryDelayMs = RETRY_DELAY_MS, budgetMs = RETRY_BUDGET_MS } = {}) {
+export async function paginateIssues(cloudId, jql, transport, { attempts = RETRY_ATTEMPTS, retryDelayMs = RETRY_DELAY_MS, budgetMs = RETRY_BUDGET_MS } = {}) {
   const pagedJql = `${stripOrderBy(jql)} ORDER BY key ASC`;
   const allIssues = [];
   let pageToken = null;
@@ -157,20 +157,24 @@ export async function paginateIssues(cloudId, jql, transport, { attempts = PAGE_
 // the transport errors (missing binary, refused connection, 401/403) that poll() needs in
 // order to null out detected.transport and re-detect — surfaces on the first attempt.
 async function fetchPage(transport, cloudId, jql, pageSize, pageToken, { attempts, retryDelayMs, retryDeadline }) {
-  for (let attempt = 0; attempt < attempts; attempt++) {
+  // Always make at least one attempt: a non-positive `attempts` would otherwise skip the
+  // loop entirely and resolve undefined, which surfaces at the caller's destructure as a
+  // TypeError instead of the transport's own error.
+  const maxAttempts = Math.max(1, attempts);
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
     if (attempt > 0 && retryDelayMs > 0) await new Promise((r) => setTimeout(r, retryDelayMs));
     try {
       return await transport.searchIssues(cloudId, jql, FIELDS, pageSize, pageToken);
     } catch (err) {
       const match = String(err?.message ?? err).match(RETRYABLE_ERROR);
-      if (!match || attempt === attempts - 1) throw err;
+      if (!match || attempt === maxAttempts - 1) throw err;
       if (Date.now() >= retryDeadline) {
         console.warn(`[tickets] retry budget spent, giving up on this poll: ${rawErrorDetail(err)}`);
         throw err;
       }
       // Log recovered attempts too — a silent retry would erase the only evidence of
       // what is actually timing out, which is the whole point of capturing the raw error.
-      console.warn(`[tickets] page fetch failed (attempt ${attempt + 1}/${attempts}), retrying: ${rawErrorDetail(err)}`);
+      console.warn(`[tickets] page fetch failed (attempt ${attempt + 1}/${maxAttempts}), retrying: ${rawErrorDetail(err)}`);
     }
   }
 }
@@ -226,8 +230,8 @@ async function findMcpProxyJiraServer() {
 async function fetchCloudInfoViaMcpProxy(serverName) {
   const tool = `${serverName}:getAccessibleAtlassianResources`;
   let lastErr;
-  for (let attempt = 0; attempt < 3; attempt++) {
-    if (attempt > 0) await new Promise((r) => setTimeout(r, 5000));
+  for (let attempt = 0; attempt < RETRY_ATTEMPTS; attempt++) {
+    if (attempt > 0) await new Promise((r) => setTimeout(r, RETRY_DELAY_MS));
     try {
       const { stdout } = await execFileAsync(
         "mcpproxy",

@@ -221,6 +221,28 @@ describe("paginateIssues", () => {
       assert.equal(calls, 3);
     });
 
+    it("still makes one attempt when attempts is non-positive, surfacing the transport's own error", async () => {
+      let calls = 0;
+      const transport = {
+        pageSize: 2,
+        async searchIssues() {
+          calls++;
+          throw new Error("Connection timeout");
+        },
+      };
+
+      const { restore } = captureWarnings();
+      try {
+        await assert.rejects(
+          paginateIssues("cloud1", "ORDER BY key ASC", transport, { attempts: 0, retryDelayMs: 0 }),
+          /Connection timeout/,
+        );
+      } finally {
+        restore();
+      }
+      assert.equal(calls, 1);
+    });
+
     it("fails fast on transport errors so poll() can re-detect the transport", async () => {
       for (const message of ["HTTP 403 Forbidden", "connect ECONNREFUSED 127.0.0.1:8080", "spawn mcpproxy ENOENT"]) {
         let calls = 0;
