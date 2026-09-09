@@ -66,6 +66,26 @@ All tabs live under the `tabs` key and are enabled by default. Each tab auto-det
 
 Each tab module defines its own defaults. See the `defaults` export in each `src/tabs/*.js` file for available options.
 
+### Pulls Tab
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `badgeCount` | string | `"actionable"` | What the tab's nav badge counts: `"actionable"` or `"reviews"` |
+
+`"actionable"` counts PRs needing your action across every section — yours that are approved, have review comments, failed the merge queue, or have failing CI, plus any review request in the same state. `"reviews"` instead counts open review requests addressed to you personally and still waiting on your review — the same set the Reviews sub-tab shows with "Assigned to me" on, so the badge and that list always agree. Review requests routed to you only via a team are not counted.
+
+```json
+{
+  "tabs": {
+    "pulls": {
+      "badgeCount": "reviews"
+    }
+  }
+}
+```
+
+Editable in the settings UI.
+
 ### Tickets Tab
 
 The tickets tab is optional. Without a Jira connection it shows a setup hint and the rest of the dashboard works normally.

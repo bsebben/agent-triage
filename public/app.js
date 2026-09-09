@@ -222,20 +222,31 @@ function updateTabBadges() {
   else if (runningCount > 0) setBadge("loops", runningCount, "running");
   else setBadge("loops", null, null);
 
-  // PRs: count actionable across every section. `assigned` is its own search rather than a
-  // subset of the row-capped `reviews` list, so a direct request can appear only there —
-  // but the two overlap heavily, hence the dedupe by url before counting.
-  const allGroups = [...pulls.mine, ...pulls.reviews, ...(pulls.assigned || [])];
-  const actionableUrls = new Set();
-  for (const g of allGroups) {
+  // PRs: what the badge counts is configurable (tabs.pulls.badgeCount).
+  const pullsCfg = state.tabStatus?.pulls || appConfig.pulls || {};
+  const countReviews = pullsCfg.badgeCount === "reviews";
+  // "reviews" mode counts only the `assigned` search (requests addressed to the user
+  // personally). That is the bucket the Reviews sub-tab shows by default, so badge and
+  // list agree, and unlike the team-inclusive `reviews` list it fits well inside the
+  // fetch row ceiling — so the number is exact rather than silently truncated at the cap.
+  // Every row of it is a request still waiting on the user: GitHub drops a PR from a
+  // review-requested search once a review is submitted.
+  // In "actionable" mode `assigned` is its own search rather than a subset of the
+  // row-capped `reviews` list, so a direct request can appear only there — but the two
+  // overlap heavily, hence the dedupe by url before counting.
+  const pullGroups = countReviews
+    ? [...(pulls.assigned || [])]
+    : [...pulls.mine, ...pulls.reviews, ...(pulls.assigned || [])];
+  const pullUrls = new Set();
+  for (const g of pullGroups) {
     for (const p of g.prs) {
-      if (p.status === "approved" || p.status === "comments" || p.status === "queue_failed" || p.ci === "failing") {
-        actionableUrls.add(p.url);
+      if (countReviews || p.status === "approved" || p.status === "comments" || p.status === "queue_failed" || p.ci === "failing") {
+        pullUrls.add(p.url);
       }
     }
   }
-  const actionable = actionableUrls.size;
-  setBadge("pulls", actionable || null, actionable > 0 ? "attention" : null);
+  const pullCount = pullUrls.size;
+  setBadge("pulls", pullCount || null, pullCount > 0 ? "attention" : null);
 
   // Tickets: show total count
   const ticketGroups = state.tickets || [];

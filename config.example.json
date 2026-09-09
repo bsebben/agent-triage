@@ -1,5 +1,5 @@
 {
-  "configVersion": 1,
+  "configVersion": 2,
   "port": 7777,
   "defaultDirectory": "~/workspace",
   "maxSessions": null,
@@ -17,7 +17,8 @@
     },
     "pulls": {
       "deployStatus": true,
-      "deployStatusUrl": null
+      "deployStatusUrl": null,
+      "badgeCount": "actionable"
     },
     "tasks": {}
   }

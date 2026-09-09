@@ -1,5 +1,5 @@
 {
-  "configVersion": 1,
+  "configVersion": 2,
   "keys": {
     "cmux.binary": {
       "type": "string",
@@ -36,6 +36,13 @@
     "tabs.loops.installUrl": {
       "type": "string",
       "nullable": true
+    },
+    "tabs.pulls.badgeCount": {
+      "type": "string",
+      "enum": [
+        "actionable",
+        "reviews"
+      ]
     },
     "tabs.pulls.deployStatus": {
       "type": "boolean"

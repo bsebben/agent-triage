@@ -17,6 +17,9 @@ export const defaults = {
   // Off unless a base URL is configured (deployStatusUrl or DEPLOY_STATUS_API_URL).
   deployStatus: true,
   deployStatusUrl: null,
+  // What the nav badge counts: "actionable" (PRs needing action in any section)
+  // or "reviews" (open review requests addressed to the user personally).
+  badgeCount: "actionable",
 };
 
 // Base URL of the deploy-status API, resolved at init() from config or the
@@ -99,6 +102,7 @@ async function init(tabConfig, onUpdate) {
 
   tab.enabled = cfg.enabled;
   tab.available = ghAvailable;
+  tab.badgeCount = cfg.badgeCount;
   tab.hint = ghAvailable ? null : "GitHub CLI (gh) not found. Install it with: brew install gh";
 
   console.log(`Config: pulls ${cfg.enabled ? "enabled" : "disabled"}${ghAvailable ? "" : " (gh CLI not found)"}`);
@@ -526,6 +530,7 @@ const tab = {
   enabled: false,
   available: false,
   hint: null,
+  badgeCount: defaults.badgeCount,
   get data() { return data; },
   init,
 };

@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.52.0] - 2026-09-09
+
+### Added
+
+- The Pulls tab badge can now count open review requests waiting on you instead of PRs needing your action, via the new `tabs.pulls.badgeCount` setting (`"actionable"` — the existing behavior and still the default — or `"reviews"`). In "reviews" mode it counts requests addressed to you personally, matching the Reviews sub-tab with "Assigned to me" on.
+
 ## [1.51.1] - 2026-09-08
 
 ### Fixed
