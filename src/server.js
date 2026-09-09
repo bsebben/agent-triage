@@ -19,6 +19,7 @@ import { detectCmuxVersion } from "./cmux-version.js";
 import * as plugins from "./plugins.js";
 import { INTEGRATIONS, status as integrationStatus, enable as enableIntegration, disable as disableIntegration, isDecided as integrationIsDecided, dismiss as dismissIntegration } from "./integrations.js";
 import { refreshSession, refreshAll, refreshingIds } from "./refresh.js";
+import { startHeartbeat } from "./heartbeat.js";
 import loops from "./tabs/loops.js";
 import pulls from "./tabs/pulls.js";
 import tickets from "./tabs/tickets.js";
@@ -662,6 +663,8 @@ const server = createServer(async (req, res) => {
 });
 
 const wss = new WebSocketServer({ server });
+
+startHeartbeat(wss);
 
 initLogs(sendToAll);
 

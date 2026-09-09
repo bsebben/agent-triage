@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.51.1] - 2026-09-08
+
+### Fixed
+
+- Clicking a workspace card no longer hangs indefinitely when a cmux reply goes missing — RPC requests time out instead of pinning the queue, and the connection resets so later calls aren't stranded behind the lost one
+- Dashboard notices a websocket that has gone silent (laptop sleep, VPN drop, network change) and reconnects instead of sitting on stale data forever — checked on a timer, on window focus, and when the network comes back
+- Server pings websocket clients and terminates half-open ones so dead connections release their slot
+
+### Changed
+
+- A reconnect now detaches and closes the websocket it replaces, so a forced reconnect can't leave an orphaned socket holding a browser connection slot
+
 ## [1.51.0] - 2026-09-03
 
 ### Fixed
