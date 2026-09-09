@@ -274,6 +274,26 @@ body.shift-held [data-tip-dangerous]:hover::after {
   content: attr(data-tip-dangerous);
 }
 
+/* Tab and tab-badge tooltips open downward — the tabs sit at the top of a sticky
+   header, so the default upward tooltip would land off-screen. Their copy is a
+   sentence rather than a label, so it wraps instead of running off at nowrap; body
+   has overflow-x:hidden, which would clip a wide one. */
+.tab[data-tip]::after,
+.tab-badge[data-tip]::after {
+  bottom: auto;
+  top: calc(100% + 6px);
+  white-space: normal;
+  width: max-content;
+  max-width: 200px;
+  text-align: left;
+  line-height: 1.35;
+  font-weight: 400;
+}
+
+/* A badge lives inside the tab button, so hovering one hovers both. Suppress the
+   tab's own tooltip in that case, or the two would stack on top of each other. */
+.tab[data-tip]:has(.tab-badge:hover)::after { opacity: 0; }
+
 .tabs {
   display: flex;
   gap: 2px;
@@ -324,6 +344,18 @@ body.shift-held [data-tip-dangerous]:hover::after {
 .tab-badge-error { background: var(--clr-error); }
 .tab-badge-running { background: var(--clr-completion); }
 .tab-badge-attention { background: var(--clr-question); color: #1a1a2e; }
+
+/* The Pulls tab's split badge: two pills side by side, your own PRs then review
+   requests. The blue/yellow pairing is the widest-separated pair available from the
+   existing tokens (ΔE 33 normal vision, 30 under simulated CVD against --bg), which
+   matters because the pills are adjacent and carry different meanings. Colour is a
+   reinforcement, not the only cue — each pill also has its own title tooltip. */
+.tab-badge-mine { background: var(--clr-running); color: #fff; }
+.tab-badge-reviews { background: var(--clr-question); color: #1a1a2e; }
+
+/* Tighter than the 4px that separates a pill from the tab label, so the pair reads as
+   one unit belonging to the tab rather than two unrelated badges. */
+.tab-badge + .tab-badge { margin-left: 2px; }
 
 main { padding: 8px; position: relative; }
 
@@ -1950,6 +1982,34 @@ body.shift-held .drawer-action-btn .btn-label-dangerous { display: inline; }
   border-color: var(--text-dim);
   outline: none;
 }
+
+/* appearance:none is load-bearing: with the native menulist appearance WebKit ignores
+   author width and border-radius, leaving the control content-sized and visibly
+   mismatched against the text inputs above it. Resetting it means supplying our own
+   caret, hence the background-image. */
+.config-field-select {
+  grid-row: 1;
+  grid-column: 2;
+  appearance: none;
+  background: var(--bg) no-repeat right 8px center;
+  background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='5'%3E%3Cpath d='M0 0h8L4 5z' fill='%23888'/%3E%3C/svg%3E");
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text);
+  font-family: inherit;
+  font-size: 13px;
+  padding: 4px 22px 4px 8px;
+  width: 100%;
+  box-sizing: border-box;
+  cursor: pointer;
+}
+
+.config-field-select:focus {
+  border-color: var(--text-dim);
+  outline: none;
+}
+
+.config-field-select:hover { border-color: var(--text-dim); }
 
 .config-field input[type="text"]::placeholder,
 .config-field input[type="number"]::placeholder {

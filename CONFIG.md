@@ -70,21 +70,24 @@ Each tab module defines its own defaults. See the `defaults` export in each `src
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `badgeCount` | string | `"actionable"` | What the tab's nav badge counts: `"actionable"` or `"reviews"` |
+| `orgFilter` | string | `null` | GitHub org to filter PRs by. `null` shows every org |
+| `deployStatus` | boolean | `true` | Show deploy-status dots on merged PRs. Inert unless a deploy-status API URL is set |
+| `deployStatusUrl` | string | `null` | Base URL of the deploy-status API backing those dots, or set `DEPLOY_STATUS_API_URL`. `null` disables the feature |
 
-`"actionable"` counts PRs needing your action across every section — yours that are approved, have review comments, failed the merge queue, or have failing CI, plus any review request in the same state. `"reviews"` instead counts open review requests addressed to you personally and still waiting on your review — the same set the Reviews sub-tab shows with "Assigned to me" on, so the badge and that list always agree. Review requests routed to you only via a team are not counted.
+#### Nav badge
 
-```json
-{
-  "tabs": {
-    "pulls": {
-      "badgeCount": "reviews"
-    }
-  }
-}
-```
+The tab's badge shows up to two pills, each omitted when its count is zero:
 
-Editable in the settings UI.
+| Pill | Colour | Counts |
+|------|--------|--------|
+| yours | blue | your own open PRs that are approved, have review comments, failed the merge queue, or have failing CI |
+| reviews | yellow | PRs where you are assigned directly as a reviewer — the same set the Reviews sub-tab shows with "Assigned to me" on |
+
+Two separate pills rather than one `a / b` figure: a single pill reads as a ratio. The blue/yellow pairing is the widest-separated pair among the existing colour tokens, and each pill has its own tooltip, so the distinction never rests on colour alone.
+
+GitHub drops a PR from the direct-review search once you submit a review, and re-adds it if your review is later dismissed, so that pill tracks what's genuinely outstanding without extra filtering.
+
+**Review requests routed to you only via a team are not counted.** That search matches several hundred PRs against a 100-row fetch ceiling, so any count drawn from it is silently truncated — and it is dominated by PRs a teammate will pick up instead. Both pills come from searches that fit well inside the ceiling, so both are exact.
 
 ### Tickets Tab
 

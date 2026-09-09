@@ -23,24 +23,6 @@ describe("migrations array", () => {
   });
 });
 
-describe("tabs.pulls.badgeCount backfill", () => {
-  it("defaults an existing config to the actionable count", () => {
-    const result = runMigrations({ tabs: { pulls: { enabled: true } } }, 1);
-    assert.equal(result.tabs.pulls.badgeCount, "actionable");
-    assert.equal(result.tabs.pulls.enabled, true);
-  });
-
-  it("keeps a value the user already set", () => {
-    const result = runMigrations({ tabs: { pulls: { badgeCount: "reviews" } } }, 1);
-    assert.equal(result.tabs.pulls.badgeCount, "reviews");
-  });
-
-  it("works when the config has no tabs at all", () => {
-    const result = runMigrations({ port: 7777 }, 1);
-    assert.equal(result.tabs.pulls.badgeCount, "actionable");
-  });
-});
-
 describe("runMigrations", () => {
   it("returns an equivalent object when there is nothing to run", () => {
     const cfg = { port: 7777, tabs: {} };

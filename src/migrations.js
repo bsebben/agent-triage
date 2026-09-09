@@ -30,19 +30,6 @@ export const migrations = [
       };
     },
   },
-  {
-    version: 2,
-    describe: "add tabs.pulls.badgeCount (default \"actionable\", preserving the existing badge behavior)",
-    migrate(cfg) {
-      return {
-        ...cfg,
-        tabs: {
-          ...cfg.tabs,
-          pulls: { badgeCount: "actionable", ...cfg.tabs?.pulls },
-        },
-      };
-    },
-  },
 ];
 
 export const CURRENT_CONFIG_VERSION = migrations.length;
