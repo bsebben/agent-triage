@@ -12,6 +12,18 @@ const HOME = homedir();
 const DEFAULT_JQL = "assignee = currentUser() AND statusCategory != Done ORDER BY status ASC";
 const FIELDS = ["summary", "status", "issuetype", "parent"];
 const PAGE_LIMIT = 100;
+const PAGE_ATTEMPTS = 3;
+const RETRY_DELAY_MS = 5000;
+// Ceiling on what one poll may spend retrying, across every page. Without it a 20-page
+// walk could burn 20 x (3 x 30s transport timeout + 2 x 5s wait) and outlast several
+// poll intervals, and startPolling()'s inFlight guard turns that into a frozen tab —
+// every scheduled tick *and* every manual refresh no-ops until the walk finishes.
+const RETRY_BUDGET_MS = 90000;
+const RAW_ERROR_MAX = 300;
+// Retry only genuinely transient failures, mirroring pulls.js. Rate limits, malformed JQL
+// and a missing tool are deterministic: retrying wastes a poll, and retrying a rate-limited
+// call actively makes that condition worse.
+export const RETRYABLE_ERROR = /timeout|ETIMEDOUT|ESOCKETTIMEDOUT|ECONNRESET|EPIPE|context deadline exceeded|HTTP 50[0-9]/i;
 const MCPPROXY_PAGE_SIZE = 3; // small enough to stay under mcpproxy's ~19KB truncation limit
 
 export const defaults = {
@@ -61,7 +73,9 @@ async function poll() {
   } catch (err) {
     const friendly = friendlyError(err.message);
     tab.hint = friendly;
-    console.error(`[tickets] fetch error: ${friendly}`);
+    // friendlyError() collapses everything timeout-ish into one string; the raw detail is
+    // what distinguishes an mcpproxy CLI timeout from an upstream Jira/transport one.
+    console.error(`[tickets] fetch error: ${friendly} (raw: ${rawErrorDetail(err)})`);
     if (isTransportError(err.message)) detected.transport = null;
     throw err;
   }
@@ -120,19 +134,45 @@ export function applyExcludeProjects(jql, excludeProjects) {
 // next (e.g. "PO-1773" -> "USPGIA-1169", alphabetically later but a lower internal ID)
 // silently matched zero issues and pagination reported isLast, permanently truncating any
 // JQL that spans more than one project. The API-issued token has no such assumption.
-export async function paginateIssues(cloudId, jql, transport) {
+export async function paginateIssues(cloudId, jql, transport, { attempts = PAGE_ATTEMPTS, retryDelayMs = RETRY_DELAY_MS, budgetMs = RETRY_BUDGET_MS } = {}) {
   const pagedJql = `${stripOrderBy(jql)} ORDER BY key ASC`;
   const allIssues = [];
   let pageToken = null;
   const pageSize = transport.pageSize ?? 50;
+  const retryDeadline = Date.now() + budgetMs;
 
   for (let page = 0; page < 20 && allIssues.length < PAGE_LIMIT; page++) {
-    const { issues, isLast, nextPageToken } = await transport.searchIssues(cloudId, pagedJql, FIELDS, pageSize, pageToken);
+    const { issues, isLast, nextPageToken } = await fetchPage(
+      transport, cloudId, pagedJql, pageSize, pageToken, { attempts, retryDelayMs, retryDeadline },
+    );
     allIssues.push(...issues);
     if (isLast || issues.length === 0 || !nextPageToken) break;
     pageToken = nextPageToken;
   }
   return allIssues;
+}
+
+// Retries the same pageToken so a recovered attempt resumes exactly where it left off,
+// keeping already-collected issues intact. Anything outside RETRYABLE_ERROR — including
+// the transport errors (missing binary, refused connection, 401/403) that poll() needs in
+// order to null out detected.transport and re-detect — surfaces on the first attempt.
+async function fetchPage(transport, cloudId, jql, pageSize, pageToken, { attempts, retryDelayMs, retryDeadline }) {
+  for (let attempt = 0; attempt < attempts; attempt++) {
+    if (attempt > 0 && retryDelayMs > 0) await new Promise((r) => setTimeout(r, retryDelayMs));
+    try {
+      return await transport.searchIssues(cloudId, jql, FIELDS, pageSize, pageToken);
+    } catch (err) {
+      const match = String(err?.message ?? err).match(RETRYABLE_ERROR);
+      if (!match || attempt === attempts - 1) throw err;
+      if (Date.now() >= retryDeadline) {
+        console.warn(`[tickets] retry budget spent, giving up on this poll: ${rawErrorDetail(err)}`);
+        throw err;
+      }
+      // Log recovered attempts too — a silent retry would erase the only evidence of
+      // what is actually timing out, which is the whole point of capturing the raw error.
+      console.warn(`[tickets] page fetch failed (attempt ${attempt + 1}/${attempts}), retrying: ${rawErrorDetail(err)}`);
+    }
+  }
 }
 
 // --- mcpproxy transport ---
@@ -289,6 +329,23 @@ function findRunlayerJiraUrl() {
 function isTransportError(msg) {
   return msg.includes("ENOENT") || msg.includes("ECONNREFUSED")
     || msg.includes("HTTP 401") || msg.includes("HTTP 403");
+}
+
+// Both execFile-based transports reject with Node's `Command failed: <argv>\n<stderr>`
+// shape, where the argv echo alone can exceed the cap and the cause is entirely in the
+// stderr below it — so drop that line and keep the rest, collapsed onto one log line.
+// code/killed/signal come along because they are what separates our own execFile timeout
+// (killed=true signal=SIGTERM) from an upstream one, which is the whole ambiguity here.
+function rawErrorDetail(err) {
+  const message = String(err?.message ?? err ?? "");
+  const body = message.replace(/^Command failed:.*(?:\n|$)/, "") || message;
+  const detail = body.replace(/\s*\n\s*/g, " | ").trim() || "no detail";
+  const capped = detail.length > RAW_ERROR_MAX ? `${detail.slice(0, RAW_ERROR_MAX)}…` : detail;
+  const flags = [];
+  if (err?.code !== undefined && err?.code !== null) flags.push(`code=${err.code}`);
+  if (err?.killed) flags.push("killed=true");
+  if (err?.signal) flags.push(`signal=${err.signal}`);
+  return flags.length ? `${capped} ${flags.join(" ")}` : capped;
 }
 
 function friendlyError(raw) {

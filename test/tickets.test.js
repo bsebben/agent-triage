@@ -149,4 +149,135 @@ describe("paginateIssues", () => {
     assert.equal(calls, 20);
     assert.equal(result.length, 20);
   });
+
+  // retryDelayMs: 0 keeps these off the wall clock — the production delay is 5s per attempt.
+  describe("transient failure retry", () => {
+    const captureWarnings = () => {
+      const warnings = [];
+      const original = console.warn;
+      console.warn = (msg) => warnings.push(msg);
+      return { warnings, restore: () => { console.warn = original; } };
+    };
+
+    it("retries a failing page from the same pageToken without dropping or duplicating issues", async () => {
+      const pages = {
+        null: { issues: [issue("AAA-1"), issue("AAA-2")], isLast: false, nextPageToken: "tok1" },
+        tok1: { issues: [issue("AAA-3")], isLast: true },
+      };
+      const calls = [];
+      let failuresLeft = 2;
+      const transport = {
+        pageSize: 2,
+        async searchIssues(cloudId, jql, fields, maxResults, pageToken) {
+          calls.push(pageToken);
+          if (pageToken === "tok1" && failuresLeft > 0) {
+            failuresLeft--;
+            const err = new Error("Command failed: mcpproxy call tool-read -t jira:searchJiraIssuesUsingJql\ni/o timeout talking to upstream");
+            err.killed = true;
+            err.signal = "SIGTERM";
+            throw err;
+          }
+          return pages[pageToken ?? "null"];
+        },
+      };
+
+      const { warnings, restore } = captureWarnings();
+      try {
+        const result = await paginateIssues("cloud1", "ORDER BY key ASC", transport, { retryDelayMs: 0 });
+        assert.deepEqual(result.map((i) => i.key), ["AAA-1", "AAA-2", "AAA-3"]);
+        assert.deepEqual(calls, [null, "tok1", "tok1", "tok1"]);
+        // A recovered retry must still leave usable evidence: the stderr that names the
+        // cause, plus the killed/signal pair that identifies our own execFile ceiling.
+        assert.equal(warnings.length, 2);
+        assert.ok(warnings[0].includes("i/o timeout talking to upstream"));
+        assert.ok(warnings[0].includes("killed=true"));
+        assert.ok(warnings[0].includes("signal=SIGTERM"));
+        // The argv echo is pure noise and would eat the whole 300-char cap by itself.
+        assert.ok(!warnings[0].includes("Command failed:"));
+      } finally {
+        restore();
+      }
+    });
+
+    it("propagates the error once attempts are exhausted", async () => {
+      let calls = 0;
+      const transport = {
+        pageSize: 2,
+        async searchIssues() {
+          calls++;
+          throw new Error("Connection timeout");
+        },
+      };
+
+      const { restore } = captureWarnings();
+      try {
+        await assert.rejects(
+          paginateIssues("cloud1", "ORDER BY key ASC", transport, { retryDelayMs: 0 }),
+          /Connection timeout/,
+        );
+      } finally {
+        restore();
+      }
+      assert.equal(calls, 3);
+    });
+
+    it("fails fast on transport errors so poll() can re-detect the transport", async () => {
+      for (const message of ["HTTP 403 Forbidden", "connect ECONNREFUSED 127.0.0.1:8080", "spawn mcpproxy ENOENT"]) {
+        let calls = 0;
+        const transport = {
+          pageSize: 2,
+          async searchIssues() {
+            calls++;
+            throw new Error(message);
+          },
+        };
+        await assert.rejects(
+          paginateIssues("cloud1", "ORDER BY key ASC", transport, { retryDelayMs: 0 }),
+          new RegExp(message.split(" ")[0]),
+        );
+        assert.equal(calls, 1, `${message} should not be retried`);
+      }
+    });
+
+    it("does not retry deterministic failures like rate limits or a missing tool", async () => {
+      for (const message of ["API rate limit exceeded", "tool not found on this MCP server", "HTTP 400 malformed JQL"]) {
+        let calls = 0;
+        const transport = {
+          pageSize: 2,
+          async searchIssues() {
+            calls++;
+            throw new Error(message);
+          },
+        };
+        await assert.rejects(
+          paginateIssues("cloud1", "ORDER BY key ASC", transport, { retryDelayMs: 0 }),
+          new RegExp(message.split(" ")[0]),
+        );
+        assert.equal(calls, 1, `${message} should not be retried`);
+      }
+    });
+
+    it("stops retrying once the poll's retry budget is spent", async () => {
+      let calls = 0;
+      const transport = {
+        pageSize: 1,
+        async searchIssues() {
+          calls++;
+          throw new Error("ETIMEDOUT");
+        },
+      };
+
+      const { warnings, restore } = captureWarnings();
+      try {
+        await assert.rejects(
+          paginateIssues("cloud1", "ORDER BY key ASC", transport, { retryDelayMs: 0, budgetMs: -1 }),
+          /ETIMEDOUT/,
+        );
+      } finally {
+        restore();
+      }
+      assert.equal(calls, 1);
+      assert.ok(warnings.some((w) => w.includes("retry budget spent")));
+    });
+  });
 });
