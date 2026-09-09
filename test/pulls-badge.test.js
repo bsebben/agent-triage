@@ -12,7 +12,7 @@ runInContext(
   readFileSync(new URL("../src/tabs/pulls.client.js", import.meta.url), "utf-8"),
   sandbox,
 );
-const { pullsBadge, getPullsConfig, prNeedsAction } = sandbox;
+const { pullsBadge, prNeedsAction } = sandbox;
 
 const pr = (url, extra = {}) => ({ url, status: "open", ci: "passing", ...extra });
 const group = (repo, prs) => ({ repo, prs });
@@ -131,27 +131,5 @@ describe("prNeedsAction", () => {
   it("ignores plain open and draft PRs with healthy CI", () => {
     assert.equal(prNeedsAction({ status: "open", ci: "passing" }), false);
     assert.equal(prNeedsAction({ status: "draft", ci: "none" }), false);
-  });
-});
-
-describe("getPullsConfig", () => {
-  it("prefers the live tabStatus payload over the load-time config", () => {
-    sandbox.state = { tabStatus: { pulls: { badgeCount: "reviews" } } };
-    sandbox.appConfig = { pulls: { badgeCount: "actionable" } };
-    assert.equal(getPullsConfig().badgeCount, "reviews");
-  });
-
-  it("falls back to appConfig before tabStatus arrives", () => {
-    sandbox.state = {};
-    sandbox.appConfig = { pulls: { badgeCount: "reviews" } };
-    assert.equal(getPullsConfig().badgeCount, "reviews");
-  });
-
-  it("returns an empty object when neither source has pulls config", () => {
-    sandbox.state = {};
-    sandbox.appConfig = {};
-    // Objects built inside the sandbox carry that realm's prototype, so deepStrictEqual
-    // against a literal here fails on cross-realm identity. Assert on shape instead.
-    assert.equal(Object.keys(getPullsConfig()).length, 0);
   });
 });

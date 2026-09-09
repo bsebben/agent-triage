@@ -31,25 +31,6 @@ function renderField(key, entry, rawValue, resolvedValue) {
       </div>`;
   }
 
-  if (Array.isArray(entry.enum)) {
-    const selected = rawValue !== null && rawValue !== undefined ? String(rawValue) : String(entry.default);
-    // A free-text input would accept any typo and silently fall back to the default at
-    // read time, with nothing surfacing the mistake — so constrain the choice up front.
-    const options = entry.enum
-      .map((v) => `<option value="${escapeHtml(String(v))}"${String(v) === selected ? " selected" : ""}>${escapeHtml(String(v))}</option>`)
-      .join("");
-    return `
-      <div class="config-field">
-        <label class="config-field-label" for="${id}">${escapeHtml(label)}</label>
-        <select class="config-field-select" id="${id}" data-key="${key}" data-type="${entry.type}"
-          data-nullable="${!!entry.nullable}">
-          ${entry.nullable ? `<option value=""${selected === "null" ? " selected" : ""}>(none)</option>` : ""}
-          ${options}
-        </select>
-        ${entry.description ? `<span class="config-field-desc">${entry.description}</span>` : ""}
-      </div>`;
-  }
-
   const inputType = entry.type === "number" ? "number" : "text";
   const value = rawValue !== null && rawValue !== undefined ? rawValue : "";
   const placeholder = resolvedValue !== null && resolvedValue !== undefined

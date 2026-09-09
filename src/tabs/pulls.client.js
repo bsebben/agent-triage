@@ -41,10 +41,6 @@ function filterGroupsByStatus(groups, status) {
     .filter((g) => g.prs.length > 0);
 }
 
-function getPullsConfig() {
-  return state.tabStatus?.pulls || appConfig.pulls || {};
-}
-
 function prNeedsAction(pr) {
   return pr.status === "approved" || pr.status === "comments"
     || pr.status === "queue_failed" || pr.ci === "failing";
@@ -99,7 +95,7 @@ function pullsBadge(pulls) {
 }
 
 function renderPulls() {
-  const pullsCfg = getPullsConfig();
+  const pullsCfg = state.tabStatus?.pulls || appConfig.pulls || {};
   if (!pullsCfg.available) {
     const hint = escapeHtml(pullsCfg.hint || "GitHub CLI (gh) not found.");
     queue.innerHTML = `<div class="empty-state">${hint}</div>`;
