@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.52.1] - 2026-09-09
+
+### Fixed
+
+- Tickets tab retries a transient page fetch (timeouts, HTTP 5xx) up to three times before failing the poll, absorbing the occasional blip that used to drop a whole 3-minute refresh. Deterministic failures — rate limits, malformed JQL, auth and setup errors — still fail immediately, and a 90-second budget across the whole poll keeps a retry storm from freezing the tab.
+- Tickets fetch errors now log the underlying stderr and exit/signal detail alongside the friendly summary — including attempts that a retry recovers from — so an intermittent timeout can actually be traced to its source.
+
 ## [1.52.0] - 2026-09-09
 
 ### Changed
