@@ -223,7 +223,7 @@ function updateTabBadges() {
   else setBadge("loops", null, null);
 
   // PRs: what the badge counts is configurable (tabs.pulls.badgeCount).
-  const pullsCfg = state.tabStatus?.pulls || appConfig.pulls || {};
+  const pullsCfg = getPullsConfig();
   const countReviews = pullsCfg.badgeCount === "reviews";
   // "reviews" mode counts only the `assigned` search (requests addressed to the user
   // personally). That is the bucket the Reviews sub-tab shows by default, so badge and
