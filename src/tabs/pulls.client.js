@@ -41,6 +41,59 @@ function filterGroupsByStatus(groups, status) {
     .filter((g) => g.prs.length > 0);
 }
 
+function prNeedsAction(pr) {
+  return pr.status === "approved" || pr.status === "comments"
+    || pr.status === "queue_failed" || pr.ci === "failing";
+}
+
+function countUrls(groups, predicate) {
+  const urls = new Set();
+  for (const g of groups || []) {
+    for (const pr of g.prs) if (predicate(pr)) urls.add(pr.url);
+  }
+  return urls.size;
+}
+
+// The nav badge: up to two pills, your own PRs needing action then review requests
+// addressed to you personally. A pill is omitted entirely when its count is zero.
+//
+// Both counts come from searches that fit inside the fetch row ceiling, so both are
+// exact. The team-inclusive `reviews` search is deliberately excluded: it matches
+// several hundred PRs against a 100-row ceiling, so any count drawn from it is
+// silently truncated, and it is dominated by PRs a teammate will pick up instead.
+//
+// GitHub drops a PR from the direct-review search once a review is submitted, and
+// re-adds it if that review is later dismissed, so that pill tracks what is genuinely
+// outstanding without extra filtering.
+function pullsBadge(pulls) {
+  const mine = countUrls(pulls.mine, prNeedsAction);
+  const reviews = countUrls(pulls.assigned, () => true);
+  const parts = [];
+
+  if (mine) {
+    parts.push({
+      text: String(mine),
+      variant: "mine",
+      title: mine === 1 ? "1 of your PRs needs action" : `${mine} of your PRs need action`,
+    });
+  }
+  if (reviews) {
+    parts.push({
+      text: String(reviews),
+      variant: "reviews",
+      title: reviews === 1
+        ? "1 PR where you're assigned directly as a reviewer"
+        : `${reviews} PRs where you're assigned directly as a reviewer`,
+    });
+  }
+
+  return {
+    total: mine + reviews,
+    title: parts.map((part) => part.title).join(" \u00b7 "),
+    parts,
+  };
+}
+
 function renderPulls() {
   const pullsCfg = state.tabStatus?.pulls || appConfig.pulls || {};
   if (!pullsCfg.available) {

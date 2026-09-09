@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.52.0] - 2026-09-09
+
+### Changed
+
+- Pulls tab badge now shows two colour-coded pills instead of one number — your own PRs needing action (blue) and PRs where you're assigned directly as a reviewer (yellow). Each pill has its own tooltip, and a pill is hidden entirely when its count is zero.
+- The badge no longer counts review requests routed to you only via a team. That search matches several hundred PRs against a 100-row fetch ceiling, so the old count was silently truncated and was dominated by PRs a teammate would pick up — it read as precise while being neither stable nor meaningful. Both pills are now exact.
+
+### Fixed
+
+- Tab tooltips open immediately instead of waiting on the browser's native `title` delay — and no longer fail to appear at all when a websocket update lands during the hover
+- Pulls Tab section of CONFIG.md documents `orgFilter`, `deployStatus`, and `deployStatusUrl`, which were missing from its field table
+
 ## [1.51.1] - 2026-09-08
 
 ### Fixed

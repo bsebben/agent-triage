@@ -222,20 +222,11 @@ function updateTabBadges() {
   else if (runningCount > 0) setBadge("loops", runningCount, "running");
   else setBadge("loops", null, null);
 
-  // PRs: count actionable across every section. `assigned` is its own search rather than a
-  // subset of the row-capped `reviews` list, so a direct request can appear only there —
-  // but the two overlap heavily, hence the dedupe by url before counting.
-  const allGroups = [...pulls.mine, ...pulls.reviews, ...(pulls.assigned || [])];
-  const actionableUrls = new Set();
-  for (const g of allGroups) {
-    for (const p of g.prs) {
-      if (p.status === "approved" || p.status === "comments" || p.status === "queue_failed" || p.ci === "failing") {
-        actionableUrls.add(p.url);
-      }
-    }
-  }
-  const actionable = actionableUrls.size;
-  setBadge("pulls", actionable || null, actionable > 0 ? "attention" : null);
+  // PRs: two pills — your own PRs needing action, then direct review requests. See
+  // pullsBadge in pulls.client.js for which buckets feed them and why.
+  const pullsBadgeState = pullsBadge(pulls);
+  setTabTitle("pulls", pullsBadgeState.title);
+  setBadges("pulls", pullsBadgeState.parts);
 
   // Tickets: show total count
   const ticketGroups = state.tickets || [];
@@ -248,23 +239,53 @@ function updateTabBadges() {
   setBadge("tasks", incompleteTasks || null, null);
 }
 
-function setBadge(tab, count, variant) {
-  const btn = document.querySelector(`.tab[data-tab="${tab}"]`);
-  if (!btn) return;
-  let badge = btn.querySelector(".tab-badge");
-  if (count === null) {
-    if (badge) badge.remove();
-    return;
+// data-tip drives the CSS tooltip, not the native `title` one. `title` waits on a
+// browser-controlled delay that resets every time the attribute is reassigned — and
+// this runs on every websocket push, so a native tooltip often never got to open at
+// all. aria-label carries the same text for screen readers, which a CSS-only
+// tooltip cannot reach.
+function setTip(el, text) {
+  if (!el) return;
+  if (text) {
+    if (el.dataset.tip !== text) el.dataset.tip = text;
+    if (el.getAttribute("aria-label") !== text) el.setAttribute("aria-label", text);
+  } else if (el.dataset.tip !== undefined) {
+    delete el.dataset.tip;
+    el.removeAttribute("aria-label");
   }
-  if (!badge) {
-    badge = document.createElement("span");
-    badge.className = "tab-badge";
-    btn.appendChild(badge);
-  }
-  badge.textContent = count;
-  badge.className = "tab-badge" + (variant ? ` tab-badge-${variant}` : "");
 }
 
+function setTabTitle(tab, text) {
+  setTip(document.querySelector(`.tab[data-tab="${tab}"]`), text);
+}
+
+function setBadge(tab, count, variant) {
+  setBadges(tab, count === null ? [] : [{ text: String(count), variant }]);
+}
+
+function setBadges(tab, parts) {
+  const btn = document.querySelector(`.tab[data-tab="${tab}"]`);
+  if (!btn) return;
+  const existing = [...btn.querySelectorAll(".tab-badge")];
+
+  // Update the existing spans in place rather than replacing them. Renders land on
+  // every websocket push, and a replaced element loses :hover until the pointer moves
+  // again — so a hovered tooltip would flicker out mid-read, and the fade-in would
+  // restart from zero each push.
+  while (existing.length > parts.length) existing.pop().remove();
+
+  parts.forEach((part, i) => {
+    let el = existing[i];
+    if (!el) {
+      el = document.createElement("span");
+      btn.appendChild(el);
+    }
+    const className = "tab-badge" + (part.variant ? ` tab-badge-${part.variant}` : "");
+    if (el.className !== className) el.className = className;
+    if (el.textContent !== part.text) el.textContent = part.text;
+    setTip(el, part.title || "");
+  });
+}
 
 // --- Shared utilities ---
 
