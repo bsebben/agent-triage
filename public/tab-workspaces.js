@@ -186,7 +186,7 @@ function renderCard(item, { isDismissed = false } = {}) {
   const isRefreshable = !item.isHost && !isDismissed && item.category !== "terminal";
   const refreshing = refreshingWorkspaces.has(item.workspaceId) || refreshAllInFlight || serverRefreshing;
   const refreshBtn = isRefreshable
-    ? `<a class="card-refresh${refreshing ? " refreshing" : ""}" data-tip="Refresh session" data-tip-dangerous="Refresh session (dangerously)" onclick="event.stopPropagation();refreshOneSession('${item.workspaceId}', event.shiftKey)"${refreshing ? " style=\"pointer-events:none\"" : ""}>&#x21bb;</a>`
+    ? `<a class="card-refresh${refreshing ? " refreshing" : ""}" data-tip="Refresh session" data-tip-dangerous="Refresh session (convert to dangerous)" onclick="event.stopPropagation();refreshOneSession('${item.workspaceId}', event.shiftKey)"${refreshing ? " style=\"pointer-events:none\"" : ""}>&#x21bb;</a>`
     : "";
 
   const displayCategory = refreshing ? "refreshing" : item.category;
