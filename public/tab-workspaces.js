@@ -72,7 +72,7 @@ function renderWorkspaces() {
   html += `<div class="tab-toolbar">
     <button class="btn-new-workspace btn-new-session" onclick="newSession(undefined, event.shiftKey)" data-tip="New Session" data-tip-dangerous="New Session (dangerously)"${disabledAttr}>${claudeIcon()}</button>
     <button class="btn-new-workspace" onclick="newWorkspace()" data-tip="New Terminal"${disabledAttr}>&gt;_</button>
-    <button class="btn-new-workspace btn-refresh-all" onclick="refreshAllSessions(event.shiftKey)" data-tip="Refresh All Sessions" data-tip-dangerous="Refresh All Sessions (dangerously)"${refreshAllDisabled}>${refreshAllLabel}</button>
+    <button class="btn-new-workspace btn-refresh-all" onclick="refreshAllSessions(event.shiftKey)" data-tip="Refresh All Sessions" data-tip-dangerous="Refresh All (convert all to dangerous)"${refreshAllDisabled}>${refreshAllLabel}</button>
   </div>`;
 
   if (groups.length === 0 && (!recentGroups || recentGroups.length === 0) && (!dismissed || dismissed.length === 0)) {
@@ -186,7 +186,7 @@ function renderCard(item, { isDismissed = false } = {}) {
   const isRefreshable = !item.isHost && !isDismissed && item.category !== "terminal";
   const refreshing = refreshingWorkspaces.has(item.workspaceId) || refreshAllInFlight || serverRefreshing;
   const refreshBtn = isRefreshable
-    ? `<a class="card-refresh${refreshing ? " refreshing" : ""}" data-tip="Refresh session" data-tip-dangerous="Refresh session (dangerously)" onclick="event.stopPropagation();refreshOneSession('${item.workspaceId}', event.shiftKey)"${refreshing ? " style=\"pointer-events:none\"" : ""}>&#x21bb;</a>`
+    ? `<a class="card-refresh${refreshing ? " refreshing" : ""}" data-tip="Refresh session" data-tip-dangerous="Refresh session (convert to dangerous)" onclick="event.stopPropagation();refreshOneSession('${item.workspaceId}', event.shiftKey)"${refreshing ? " style=\"pointer-events:none\"" : ""}>&#x21bb;</a>`
     : "";
 
   const displayCategory = refreshing ? "refreshing" : item.category;

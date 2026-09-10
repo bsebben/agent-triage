@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.53.0] - 2026-09-10
+
+### Fixed
+
+- Refreshing a session now replays the permission flags it was launched with (`--dangerously-skip-permissions`, `--permission-mode <mode>`), so a bypass session no longer comes back silently in default mode — and Refresh All keeps each session in its own mode instead of levelling them all.
+- The bypass pill on a workspace card no longer lights up for a session whose *prompt* happens to mention `--dangerously-skip-permissions`; flag detection now reads only the launch flags of the Claude process itself, and the pill and the refresh replay share one parser so they can't disagree.
+
+### Changed
+
+- Shift-click on a refresh is now an escalation on top of the session's own permission mode rather than the only way to keep bypass mode; a plain click never escalates a session that wasn't already bypassing.
+
 ## [1.52.1] - 2026-09-09
 
 ### Fixed
