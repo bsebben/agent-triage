@@ -39,9 +39,6 @@ describe("pullsBadge", () => {
   // Array.from runs in the host realm, so the result has the host's Array.prototype.
   // b.parts.map() would return a sandbox-realm array, which deepStrictEqual rejects on
   // prototype identity even when the contents match — same cross-realm trap as below.
-  // Array.from runs in the host realm, so the result has the host's Array.prototype.
-  // b.parts.map() would return a sandbox-realm array, which deepStrictEqual rejects on
-  // prototype identity even when the contents match — same cross-realm trap as below.
   const texts = (b) => Array.from(b.parts, (p) => p.text);
   const variants = (b) => Array.from(b.parts, (p) => p.variant);
 
