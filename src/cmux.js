@@ -3,6 +3,7 @@ import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 
 import config from "./config.js";
+import { permissionFlags } from "./utils.js";
 
 const execFileAsync = promisify(execFile);
 const CMUX = config.cmux.binary;
@@ -346,7 +347,9 @@ export async function listAgentWorkspaceIds() {
  *
  * Calls system.top to resolve each agent workspace's TTY, then inspects the
  * process args via `ps -ww`. The -ww flag is required because Claude's
- * --settings JSON is very long and macOS ps truncates without it.
+ * --settings JSON is very long and macOS ps truncates without it. Parsing goes
+ * through the shared permissionFlags so this pill and the flags a refresh
+ * replays are decided by the same rules.
  *
  * @returns {Promise<Set<string>>} Workspace IDs running in bypass mode.
  */
@@ -377,12 +380,8 @@ export async function listBypassWorkspaceIds() {
     const checks = [...ttyByWsId.entries()].map(async ([wsId, tty]) => {
       try {
         const { stdout } = await execFileAsync("ps", ["-ww", "-t", tty, "-o", "args="]);
-        for (const line of stdout.split("\n")) {
-          if ((line.includes("/claude") || /\bclaude\b/.test(line)) &&
-              line.includes("--dangerously-skip-permissions")) {
-            bypassIds.add(wsId);
-            break;
-          }
+        if (permissionFlags(stdout).includes("--dangerously-skip-permissions")) {
+          bypassIds.add(wsId);
         }
       } catch {}
     });

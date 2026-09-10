@@ -72,7 +72,7 @@ function renderWorkspaces() {
   html += `<div class="tab-toolbar">
     <button class="btn-new-workspace btn-new-session" onclick="newSession(undefined, event.shiftKey)" data-tip="New Session" data-tip-dangerous="New Session (dangerously)"${disabledAttr}>${claudeIcon()}</button>
     <button class="btn-new-workspace" onclick="newWorkspace()" data-tip="New Terminal"${disabledAttr}>&gt;_</button>
-    <button class="btn-new-workspace btn-refresh-all" onclick="refreshAllSessions(event.shiftKey)" data-tip="Refresh All Sessions" data-tip-dangerous="Refresh All Sessions (dangerously)"${refreshAllDisabled}>${refreshAllLabel}</button>
+    <button class="btn-new-workspace btn-refresh-all" onclick="refreshAllSessions(event.shiftKey)" data-tip="Refresh All Sessions" data-tip-dangerous="Refresh All (convert all to dangerous)"${refreshAllDisabled}>${refreshAllLabel}</button>
   </div>`;
 
   if (groups.length === 0 && (!recentGroups || recentGroups.length === 0) && (!dismissed || dismissed.length === 0)) {

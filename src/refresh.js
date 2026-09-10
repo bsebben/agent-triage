@@ -1,6 +1,7 @@
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import * as cmux from "./cmux.js";
+import { permissionFlags } from "./utils.js";
 
 const execFileAsync = promisify(execFile);
 const SESSION_ID_PATTERN = /claude --resume\s+([0-9a-f-]{36})/i;
@@ -49,13 +50,21 @@ function describeBox(value) {
 export class Refresher {
   #cmux;
   #execFileAsync;
+  #kill;
   #inFlight = new Set();
   #pollIntervalMs;
   #timeoutMs;
 
-  constructor({ cmuxApi = null, execFileFn = null, pollIntervalMs = POLL_INTERVAL_MS, timeoutMs = TIMEOUT_MS } = {}) {
+  constructor({
+    cmuxApi = null,
+    execFileFn = null,
+    killFn = null,
+    pollIntervalMs = POLL_INTERVAL_MS,
+    timeoutMs = TIMEOUT_MS,
+  } = {}) {
     this.#cmux = cmuxApi || cmux;
     this.#execFileAsync = execFileFn ? promisify(execFileFn) : execFileAsync;
+    this.#kill = killFn || ((pid, signal) => process.kill(pid, signal));
     this.#pollIntervalMs = pollIntervalMs;
     this.#timeoutMs = timeoutMs;
   }
@@ -99,6 +108,27 @@ export class Refresher {
       }
     } catch {}
     return null;
+  }
+
+  /**
+   * The permission flags to replay on relaunch, read from the live process's
+   * argv (see {@link permissionFlags}). Pinned to `pid` so no other process
+   * sharing the tty can be mistaken for the session.
+   *
+   * argv is the only source, so a session whose Claude Code already exited has
+   * no flags to replay and comes back in default mode.
+   *
+   * `-ww` is required because Claude's `--settings` JSON is long and macOS ps
+   * truncates the args column without it.
+   */
+  async #readPermissionFlags(pid) {
+    if (!pid) return [];
+    try {
+      const { stdout } = await this.#execFileAsync("ps", ["-ww", "-p", String(pid), "-o", "args="]);
+      return permissionFlags(stdout);
+    } catch {
+      return [];
+    }
   }
 
   async #isClaudeRunning(tty) {
@@ -201,6 +231,14 @@ export class Refresher {
     return { ok: false, error: `${text} is still sitting in the input box after ${attempts} attempts` };
   }
 
+  /**
+   * Restarts the session in `workspaceId`, resuming it and replaying the
+   * permission flags it was launched with (see {@link permissionFlags}).
+   *
+   * @param {object} [options]
+   * @param {boolean} [options.dangerous] Force `--dangerously-skip-permissions`
+   *   on the relaunch regardless of the session's own mode.
+   */
   async refreshSession(workspaceId, { dangerous = false } = {}) {
     const agentIds = await this.#cmux.listAgentWorkspaceIds();
     if (!agentIds.has(workspaceId)) {
@@ -223,10 +261,16 @@ export class Refresher {
 
     this.#inFlight.add(workspaceId);
     try {
-      // Kill the Claude Code process on this tty
+      // The flags have to be read before the kill — argv only exists while the
+      // process does.
       const pid = await this.#findClaudePid(tty);
+      const relaunchFlags = dangerous
+        ? ["--dangerously-skip-permissions"]
+        : await this.#readPermissionFlags(pid);
+
+      // Kill the Claude Code process on this tty
       if (pid) {
-        try { process.kill(pid, "SIGTERM"); } catch {}
+        try { this.#kill(pid, "SIGTERM"); } catch {}
       }
 
       // Wait for Claude Code to exit and print session ID
@@ -254,11 +298,11 @@ export class Refresher {
       await sleep(500);
 
       // Relaunch Claude Code
-      const dangerousSuffix = dangerous ? " --dangerously-skip-permissions" : "";
+      const flagSuffix = relaunchFlags.length ? ` ${relaunchFlags.join(" ")}` : "";
       if (sessionId) {
-        await this.#cmux.sendText(workspaceId, surfaceRef, `claude --resume ${sessionId}${dangerousSuffix}`);
+        await this.#cmux.sendText(workspaceId, surfaceRef, `claude --resume ${sessionId}${flagSuffix}`);
       } else {
-        await this.#cmux.sendText(workspaceId, surfaceRef, `claude${dangerousSuffix}`);
+        await this.#cmux.sendText(workspaceId, surfaceRef, `claude${flagSuffix}`);
       }
       await this.#cmux.sendKey(workspaceId, surfaceRef, "Enter");
 
