@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.54.0] - 2026-09-14
+
+### Added
+
+- Skill-managed status override: workspaces with a `cmux set-status` tag (e.g. set by `/babysit` before entering a wait) now show as "waiting" instead of "completion" in the dashboard, with the skill's reason text as the card body.
+
 ## [1.53.0] - 2026-09-10
 
 ### Fixed

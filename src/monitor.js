@@ -132,12 +132,13 @@ export class Monitor {
 
   async #doPoll() {
     try {
-      const [notifications, workspaces, terminals, agentWsIds, bypassWsIds, windowCount] = await Promise.all([
+      const [notifications, workspaces, terminals, agentWsIds, bypassWsIds, skillStatusMap, windowCount] = await Promise.all([
         this.#cmux.listNotifications(),
         this.#cmux.listWorkspaces(),
         this.#cmux.listTerminals(),
         this.#cmux.listAgentWorkspaceIds(),
         this.#cmux.listBypassWorkspaceIds(),
+        this.#cmux.listSkillStatusWorkspaces ? this.#cmux.listSkillStatusWorkspaces() : new Map(),
         this.#cmux.getWindowCount ? this.#cmux.getWindowCount() : 1,
       ]);
       this.#windowCount = windowCount;
@@ -175,7 +176,18 @@ export class Monitor {
           return enriched;
         })
       );
-      for (const enriched of enrichedNotifications) this.#queue.upsert(enriched);
+
+      // Skill-managed status override: when a skill (e.g. /babysit) sets a
+      // cmux status tag before entering a wait, override "completion" → "waiting"
+      // so agent-triage shows the workspace as actively waiting, not done.
+      for (const enriched of enrichedNotifications) {
+        const skillStatus = skillStatusMap.get(enriched.workspaceId);
+        if (skillStatus && enriched.category === "completion") {
+          enriched.category = "waiting";
+          enriched.body = skillStatus.value;
+        }
+        this.#queue.upsert(enriched);
+      }
 
       const notifiedWorkspaceIds = new Set(notifications.map((n) => n.workspaceId));
       const syntheticWorkspaces = workspaces.filter((ws) => !notifiedWorkspaceIds.has(ws.id));

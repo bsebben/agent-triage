@@ -321,6 +321,35 @@ async function systemTopScopedToOwnWindow() {
   return rpc("system.top", ownWindowId ? { window_id: ownWindowId } : { all_windows: true });
 }
 
+/**
+ * Returns a Map of workspace ID → skill status for workspaces that have a
+ * skill-managed status tag (set via `cmux set-status <key> <value>`).
+ *
+ * Skills like /babysit set a status tag before entering a wait (ScheduleWakeup,
+ * run_in_background) and clear it when resuming. Tags with key "claude_code"
+ * are excluded — those are cmux's own agent-detection tags.
+ *
+ * @returns {Promise<Map<string, {key: string, value: string}>>}
+ */
+export async function listSkillStatusWorkspaces() {
+  try {
+    const raw = await systemTopScopedToOwnWindow();
+    const statuses = new Map();
+    for (const win of raw.windows || []) {
+      for (const ws of win.workspaces || []) {
+        for (const tag of ws.tags || []) {
+          if (tag.key !== "claude_code" && tag.value) {
+            statuses.set(ws.id, { key: tag.key, value: tag.value });
+          }
+        }
+      }
+    }
+    return statuses;
+  } catch {
+    return new Map();
+  }
+}
+
 export async function listAgentWorkspaceIds() {
   try {
     const raw = await systemTopScopedToOwnWindow();

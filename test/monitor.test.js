@@ -56,13 +56,14 @@ describe("enrichNotification", () => {
 describe("Monitor terminal detection", () => {
   let queue;
 
-  function makeCmux({ notifications = [], workspaces = [], terminals = [], agentWorkspaceIds = new Set(), bypassWorkspaceIds = new Set(), reorderWorkspaces = async () => {} }) {
+  function makeCmux({ notifications = [], workspaces = [], terminals = [], agentWorkspaceIds = new Set(), bypassWorkspaceIds = new Set(), skillStatusWorkspaces = new Map(), reorderWorkspaces = async () => {} }) {
     return {
       listNotifications: async () => notifications,
       listWorkspaces: async () => workspaces,
       listTerminals: async () => terminals,
       listAgentWorkspaceIds: async () => agentWorkspaceIds,
       listBypassWorkspaceIds: async () => bypassWorkspaceIds,
+      listSkillStatusWorkspaces: async () => skillStatusWorkspaces,
       readScreen: async () => null,
       reorderWorkspaces,
     };
@@ -156,6 +157,39 @@ describe("Monitor terminal detection", () => {
     await monitor.poll();
 
     assert.equal(queue.items()[0].isHost, false);
+  });
+
+  it("overrides completion category to waiting when a skill status tag is present", async () => {
+    const cmuxApi = makeCmux({
+      notifications: [
+        { id: "N1", workspaceId: "W1", surfaceId: "S1", category: "completion", body: "Completed in 5s", subtitle: "Completed", title: "Claude Code" },
+      ],
+      workspaces: [{ id: "W1", title: "babysit-pr", directory: "/home/user/project" }],
+      skillStatusWorkspaces: new Map([["W1", { key: "babysit", value: "Waiting for CI — PR #42" }]]),
+    });
+    const monitor = new Monitor(queue, { cmuxApi });
+    await monitor.poll();
+
+    const items = queue.items();
+    assert.equal(items.length, 1);
+    assert.equal(items[0].category, "waiting");
+    assert.equal(items[0].body, "Waiting for CI — PR #42");
+  });
+
+  it("does not override non-completion categories even when skill status is present", async () => {
+    const cmuxApi = makeCmux({
+      notifications: [
+        { id: "N1", workspaceId: "W1", surfaceId: "S1", category: "permission", body: "Claude needs your permission", subtitle: "Permission", title: "Claude Code" },
+      ],
+      workspaces: [{ id: "W1", title: "babysit-pr", directory: "/home/user/project" }],
+      skillStatusWorkspaces: new Map([["W1", { key: "babysit", value: "Waiting for CI — PR #42" }]]),
+    });
+    const monitor = new Monitor(queue, { cmuxApi });
+    await monitor.poll();
+
+    const items = queue.items();
+    assert.equal(items.length, 1);
+    assert.equal(items[0].category, "permission");
   });
 
   it("marks workspace with claude_code tag as running", async () => {
