@@ -445,7 +445,7 @@ async function searchPrs(query, filter, sortFn) {
 
   const groups = [];
   for (const [repo, prs] of byRepo) {
-    prs.sort((a, b) => sortFn(a) - sortFn(b));
+    sortPrsByPriority(prs, sortFn);
     groups.push({ repo, prs });
   }
   groups.sort((a, b) => b.prs.length - a.prs.length);
@@ -504,18 +504,35 @@ export function trunkQueueState(checks) {
   return check.conclusion === "SUCCESS" ? null : "failed";
 }
 
+// Timestamp a PR's age is measured from: when it was marked ready for review,
+// or createdAt for a PR that was never a draft. Shared by slaLevel (coloring)
+// and sortPrsByPriority (the age tiebreaker), so the two always agree on "how
+// old is this PR". Infinity when neither date is present, so such a PR (should
+// never happen in practice) sorts last rather than crashing the comparator.
+export function prSinceTimestamp(pr) {
+  const since = pr.readyForReviewAt || pr.createdAt;
+  return since ? new Date(since).getTime() : Infinity;
+}
+
 // SLA coloring threshold, keyed by fraction of slaDays elapsed since the PR was
 // last marked ready for review (or created, if never a draft). Drafts and PRs
 // with no slaDays configured are never colored.
 export function slaLevel(pr, slaDays, now = Date.now()) {
   if (!slaDays || pr.isDraft) return null;
-  const since = pr.readyForReviewAt || pr.createdAt;
-  if (!since) return null;
-  const pct = (now - new Date(since).getTime()) / (slaDays * 24 * 60 * 60 * 1000);
+  const since = prSinceTimestamp(pr);
+  if (!Number.isFinite(since)) return null;
+  const pct = (now - since) / (slaDays * 24 * 60 * 60 * 1000);
   if (pct >= 1) return "red";
   if (pct >= 0.75) return "orange";
   if (pct >= 0.5) return "yellow";
   return null;
+}
+
+// Sorts by the caller's priority function first (status buckets in Mine, CI
+// state in Reviews), then breaks ties within the same bucket by age, oldest
+// first. Mutates and returns `prs`, mirroring Array#sort.
+export function sortPrsByPriority(prs, sortFn) {
+  return prs.sort((a, b) => sortFn(a) - sortFn(b) || prSinceTimestamp(a) - prSinceTimestamp(b));
 }
 
 export function prStatus(node, trunk = null) {
