@@ -17,6 +17,7 @@ import {
   shouldShowDeployDots,
   collectSearchPages,
   RETRYABLE_ERROR,
+  slaLevel,
 } from "../src/tabs/pulls.js";
 
 const fulfilled = (value) => ({ status: "fulfilled", value });
@@ -76,6 +77,59 @@ describe("prStatus", () => {
 
   it("prefers 'queued' over 'queue_failed' ordering (queued wins when native queue is set)", () => {
     assert.equal(prStatus({ isInMergeQueue: true }, "failed"), "queued");
+  });
+});
+
+describe("slaLevel", () => {
+  const NOW = new Date("2026-09-15T00:00:00Z").getTime();
+  const daysAgo = (n) => new Date(NOW - n * 24 * 60 * 60 * 1000).toISOString();
+
+  it("returns null when slaDays is not set", () => {
+    assert.equal(slaLevel({ createdAt: daysAgo(10) }, null, NOW), null);
+  });
+
+  it("returns null for draft PRs regardless of age", () => {
+    assert.equal(slaLevel({ createdAt: daysAgo(10), isDraft: true }, 5, NOW), null);
+  });
+
+  it("returns null under 50% of the SLA", () => {
+    assert.equal(slaLevel({ createdAt: daysAgo(2) }, 5, NOW), null);
+  });
+
+  it("returns 'yellow' at 50% of the SLA", () => {
+    assert.equal(slaLevel({ createdAt: daysAgo(2.5) }, 5, NOW), "yellow");
+  });
+
+  it("returns 'yellow' just under 75% of the SLA", () => {
+    assert.equal(slaLevel({ createdAt: daysAgo(3.7) }, 5, NOW), "yellow");
+  });
+
+  it("returns 'orange' at 75% of the SLA", () => {
+    assert.equal(slaLevel({ createdAt: daysAgo(3.75) }, 5, NOW), "orange");
+  });
+
+  it("returns 'orange' just under 100% of the SLA", () => {
+    assert.equal(slaLevel({ createdAt: daysAgo(4.9) }, 5, NOW), "orange");
+  });
+
+  it("returns 'red' at 100% of the SLA", () => {
+    assert.equal(slaLevel({ createdAt: daysAgo(5) }, 5, NOW), "red");
+  });
+
+  it("returns 'red' when well past the SLA", () => {
+    assert.equal(slaLevel({ createdAt: daysAgo(10) }, 5, NOW), "red");
+  });
+
+  it("prefers readyForReviewAt over createdAt when present", () => {
+    // Created 10 days ago (would be red on createdAt alone), but only marked
+    // ready for review 1 day ago — should be under the SLA.
+    const pr = { createdAt: daysAgo(10), readyForReviewAt: daysAgo(1) };
+    assert.equal(slaLevel(pr, 5, NOW), null);
+  });
+
+  it("falls back to createdAt when readyForReviewAt is absent", () => {
+    const pr = { createdAt: daysAgo(5), readyForReviewAt: null };
+    assert.equal(slaLevel(pr, 5, NOW), "red");
   });
 });
 
