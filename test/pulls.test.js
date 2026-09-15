@@ -122,6 +122,14 @@ describe("slaLevel", () => {
     assert.equal(slaLevel({ createdAt: daysAgo(10) }, 5, NOW), "red");
   });
 
+  it("treats an SLA of 0 as 'flag immediately' rather than disabled", () => {
+    assert.equal(slaLevel({ createdAt: daysAgo(1) }, 0, NOW), "red");
+  });
+
+  it("returns null for a merged PR regardless of age", () => {
+    assert.equal(slaLevel({ createdAt: daysAgo(30), mergedAt: daysAgo(1) }, 5, NOW), null);
+  });
+
   it("prefers readyForReviewAt over createdAt when present", () => {
     // Created 10 days ago (would be red on createdAt alone), but only marked
     // ready for review 1 day ago — should be under the SLA.
