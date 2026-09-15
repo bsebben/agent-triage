@@ -18,6 +18,8 @@ import {
   collectSearchPages,
   RETRYABLE_ERROR,
   slaLevel,
+  prSinceTimestamp,
+  sortPrsByPriority,
 } from "../src/tabs/pulls.js";
 
 const fulfilled = (value) => ({ status: "fulfilled", value });
@@ -130,6 +132,47 @@ describe("slaLevel", () => {
   it("falls back to createdAt when readyForReviewAt is absent", () => {
     const pr = { createdAt: daysAgo(5), readyForReviewAt: null };
     assert.equal(slaLevel(pr, 5, NOW), "red");
+  });
+});
+
+describe("sortPrsByPriority", () => {
+  const pr = (name, priority, since) => ({ name, priority, createdAt: since });
+
+  it("sorts by the priority function first", () => {
+    const prs = [pr("b", 2, "2026-09-01"), pr("a", 1, "2026-09-01"), pr("c", 3, "2026-09-01")];
+    const sorted = sortPrsByPriority(prs, (p) => p.priority);
+    assert.deepEqual(sorted.map((p) => p.name), ["a", "b", "c"]);
+  });
+
+  it("breaks ties within the same priority by age, oldest first", () => {
+    const prs = [
+      pr("newer", 1, "2026-09-10"),
+      pr("oldest", 1, "2026-09-01"),
+      pr("middle", 1, "2026-09-05"),
+    ];
+    const sorted = sortPrsByPriority(prs, (p) => p.priority);
+    assert.deepEqual(sorted.map((p) => p.name), ["oldest", "middle", "newer"]);
+  });
+
+  it("never lets an older PR in a lower-priority bucket jump ahead of a higher-priority one", () => {
+    const prs = [
+      { name: "high-priority-newer", priority: 1, createdAt: "2026-09-10" },
+      { name: "low-priority-older", priority: 2, createdAt: "2026-09-01" },
+    ];
+    const sorted = sortPrsByPriority(prs, (p) => p.priority);
+    assert.deepEqual(sorted.map((p) => p.name), ["high-priority-newer", "low-priority-older"]);
+  });
+});
+
+describe("prSinceTimestamp", () => {
+  it("prefers readyForReviewAt over createdAt", () => {
+    const ts = prSinceTimestamp({ createdAt: "2026-09-01", readyForReviewAt: "2026-09-10" });
+    assert.equal(ts, new Date("2026-09-10").getTime());
+  });
+
+  it("falls back to createdAt when readyForReviewAt is absent", () => {
+    const ts = prSinceTimestamp({ createdAt: "2026-09-01", readyForReviewAt: null });
+    assert.equal(ts, new Date("2026-09-01").getTime());
   });
 });
 
