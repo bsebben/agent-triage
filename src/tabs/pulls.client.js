@@ -253,9 +253,10 @@ function renderPullGroup(group, showAuthor, subTab, slaDays) {
 // shouldShowDeployDots above: this browser script has no build step to import it).
 // Drafts and PRs with no slaDays configured are never colored.
 function slaLevel(pr, slaDays, now = Date.now()) {
-  if (!slaDays || pr.isDraft) return null;
+  if (slaDays == null || pr.isDraft || pr.mergedAt) return null;
   const since = pr.readyForReviewAt || pr.createdAt;
   if (!since) return null;
+  if (slaDays <= 0) return "red";
   const pct = (now - new Date(since).getTime()) / (slaDays * 24 * 60 * 60 * 1000);
   if (pct >= 1) return "red";
   if (pct >= 0.75) return "orange";
@@ -267,6 +268,7 @@ function slaTooltip(pr, slaDays, now = Date.now()) {
   const since = pr.readyForReviewAt || pr.createdAt;
   if (!since) return "";
   const ageDays = (now - new Date(since).getTime()) / (24 * 60 * 60 * 1000);
+  if (!slaDays || slaDays <= 0) return `${ageDays.toFixed(1)}d old`;
   const pct = Math.round((ageDays / slaDays) * 100);
   return `${ageDays.toFixed(1)}d old — ${pct}% of ${slaDays}d SLA`;
 }
@@ -340,7 +342,7 @@ function renderPullRow(pr, showAuthor, repo, subTab, slaDays) {
     ? `<td class="pull-deploy">${deployDots(pr.deploy, pr.repoTracked, pr.deployLinks)}</td>`
     : `<td class="pull-status"><span class="pull-badge status-${pr.status}">${STATUS_LABELS[pr.status] || pr.status}</span></td>
     <td class="pull-ci">${ciCell(pr.ci)}</td>`;
-  const level = subTab === "merged" ? null : slaLevel(pr, slaDays);
+  const level = slaLevel(pr, slaDays);
   const rowClass = level ? ` pull-row-sla-${level}` : "";
   const rowTitle = level ? ` title="${escapeHtml(slaTooltip(pr, slaDays))}"` : "";
   return `<tr class="pull-row${rowClass}"${rowTitle} onclick="openExternal('${escapeHtml(pr.url)}')">

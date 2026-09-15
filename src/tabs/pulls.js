@@ -357,13 +357,17 @@ export function parseDeployLinks(deployments) {
 }
 
 // GitHub caps the execution resources a single GraphQL request may consume, and the cost
-// tracks the nested per-PR fan-out (commits -> statusCheckRollup -> contexts) times the
-// number of rows *returned* — not how many results the search matched. Measured against
-// the broad review-requested search: 50 rows is reliable, the failure cliff starts around
-// 75, and 100 rows fails every time (reproduces identically running `gh api graphql` by
-// hand, outside this app). So every search pages at 50, regardless of expected size —
-// paging short-circuits on `hasNextPage: false`, so a small result set still costs one
-// request and no search is left sitting past the cliff.
+// tracks the nested per-PR fan-out (commits -> statusCheckRollup -> contexts, plus the
+// timelineItems ready-for-review lookup) times the number of rows *returned* — not how
+// many results the search matched. Measured against the broad review-requested search
+// (pre-timelineItems): 50 rows is reliable, the failure cliff starts around 75, and 100
+// rows fails every time (reproduces identically running `gh api graphql` by hand, outside
+// this app). timelineItems(last: 1) adds a second nested connection per row but doesn't
+// fan out further itself, and 50/100-row fetches have held up fine in practice since it
+// was added — re-verify against a real broad search if this constant ever needs raising.
+// So every search pages at 50, regardless of expected size — paging short-circuits on
+// `hasNextPage: false`, so a small result set still costs one request and no search is
+// left sitting past the cliff.
 const SEARCH_PAGE_SIZE = 50;
 // Two pages preserves the 100-row ceiling the single-request version had.
 const MAX_SEARCH_PAGES = 2;
@@ -518,9 +522,10 @@ export function prSinceTimestamp(pr) {
 // last marked ready for review (or created, if never a draft). Drafts and PRs
 // with no slaDays configured are never colored.
 export function slaLevel(pr, slaDays, now = Date.now()) {
-  if (!slaDays || pr.isDraft) return null;
+  if (slaDays == null || pr.isDraft || pr.mergedAt) return null;
   const since = prSinceTimestamp(pr);
   if (!Number.isFinite(since)) return null;
+  if (slaDays <= 0) return "red";
   const pct = (now - since) / (slaDays * 24 * 60 * 60 * 1000);
   if (pct >= 1) return "red";
   if (pct >= 0.75) return "orange";
