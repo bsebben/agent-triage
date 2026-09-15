@@ -130,7 +130,7 @@ function renderPulls() {
     if (filteredCount === 0) {
       html += `<div class="empty-state">No open pull requests</div>`;
     } else {
-      html += filtered.map((g) => renderPullGroup(g, false, "mine")).join("");
+      html += filtered.map((g) => renderPullGroup(g, false, "mine", pullsCfg.slaDays)).join("");
     }
   } else if (pullsSubTab === "merged") {
     const merged = pulls.merged || [];
@@ -159,7 +159,7 @@ function renderPulls() {
     if (filteredCount === 0) {
       html += `<div class="empty-state">No review requests</div>`;
     } else {
-      html += filtered.map((g) => renderPullGroup(g, true, "reviews")).join("");
+      html += filtered.map((g) => renderPullGroup(g, true, "reviews", pullsCfg.slaDays)).join("");
     }
   }
 
@@ -231,7 +231,7 @@ function repoMergedLink(group) {
   return `<a class="pulls-repo-more" href="${escapeHtml(url)}" target="_blank" rel="noopener" title="View all merged PRs for this repo on GitHub" onclick="openExternalClick(event, '${escapeHtml(url)}')">more →</a>`;
 }
 
-function renderPullGroup(group, showAuthor, subTab) {
+function renderPullGroup(group, showAuthor, subTab, slaDays) {
   const key = `${subTab}:${group.repo}`;
   const isCollapsed = collapsedPullRepos.has(key);
   return `<div class="pulls-repo-group">
@@ -243,10 +243,32 @@ function renderPullGroup(group, showAuthor, subTab) {
     </div>
     <div class="group-items${isCollapsed ? " collapsed" : ""}">
       <table class="pulls-table">
-        <tbody>${group.prs.map((pr) => renderPullRow(pr, showAuthor, group.repo, subTab)).join("")}</tbody>
+        <tbody>${group.prs.map((pr) => renderPullRow(pr, showAuthor, group.repo, subTab, slaDays)).join("")}</tbody>
       </table>
     </div>
   </div>`;
+}
+
+// Mirror of slaLevel in src/tabs/pulls.js (kept in lockstep — same rationale as
+// shouldShowDeployDots above: this browser script has no build step to import it).
+// Drafts and PRs with no slaDays configured are never colored.
+function slaLevel(pr, slaDays, now = Date.now()) {
+  if (!slaDays || pr.isDraft) return null;
+  const since = pr.readyForReviewAt || pr.createdAt;
+  if (!since) return null;
+  const pct = (now - new Date(since).getTime()) / (slaDays * 24 * 60 * 60 * 1000);
+  if (pct >= 1) return "red";
+  if (pct >= 0.75) return "orange";
+  if (pct >= 0.5) return "yellow";
+  return null;
+}
+
+function slaTooltip(pr, slaDays, now = Date.now()) {
+  const since = pr.readyForReviewAt || pr.createdAt;
+  if (!since) return "";
+  const ageDays = (now - new Date(since).getTime()) / (24 * 60 * 60 * 1000);
+  const pct = Math.round((ageDays / slaDays) * 100);
+  return `${ageDays.toFixed(1)}d old — ${pct}% of ${slaDays}d SLA`;
 }
 
 function ciCell(ci) {
@@ -309,7 +331,7 @@ function deployDots(deploy, repoTracked, links) {
   }${deployDot("S", "Staging", deploy.stage, links?.stage)}${deployDot("D", "Demo", deploy.demo, links?.demo)}</span>`;
 }
 
-function renderPullRow(pr, showAuthor, repo, subTab) {
+function renderPullRow(pr, showAuthor, repo, subTab, slaDays) {
   const atLimit = isAtWorkspaceLimit();
   const actionBtn = atLimit
     ? `<button class="agent-btn" title="Workspace limit reached" disabled>${claudeIcon()}</button>`
@@ -318,7 +340,10 @@ function renderPullRow(pr, showAuthor, repo, subTab) {
     ? `<td class="pull-deploy">${deployDots(pr.deploy, pr.repoTracked, pr.deployLinks)}</td>`
     : `<td class="pull-status"><span class="pull-badge status-${pr.status}">${STATUS_LABELS[pr.status] || pr.status}</span></td>
     <td class="pull-ci">${ciCell(pr.ci)}</td>`;
-  return `<tr class="pull-row" onclick="openExternal('${escapeHtml(pr.url)}')">
+  const level = subTab === "merged" ? null : slaLevel(pr, slaDays);
+  const rowClass = level ? ` pull-row-sla-${level}` : "";
+  const rowTitle = level ? ` title="${escapeHtml(slaTooltip(pr, slaDays))}"` : "";
+  return `<tr class="pull-row${rowClass}"${rowTitle} onclick="openExternal('${escapeHtml(pr.url)}')">
     <td class="pull-title"><a class="pull-title-link" href="${escapeHtml(pr.url)}" target="_blank" rel="noopener" onclick="openExternalClick(event, '${escapeHtml(pr.url)}')"><span class="pull-number">#${pr.number}</span> <span class="pull-title-text">${escapeHtml(pr.title)}</span></a></td>
     ${showAuthor ? `<td class="pull-author">${escapeHtml(pr.author)}</td>` : ""}
     ${statusCells}

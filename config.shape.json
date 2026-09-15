@@ -1,5 +1,5 @@
 {
-  "configVersion": 1,
+  "configVersion": 2,
   "keys": {
     "cmux.binary": {
       "type": "string",
@@ -49,6 +49,10 @@
     },
     "tabs.pulls.orgFilter": {
       "type": "string",
+      "nullable": true
+    },
+    "tabs.pulls.slaDays": {
+      "type": "number",
       "nullable": true
     },
     "tabs.tasks.enabled": {

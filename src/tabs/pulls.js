@@ -17,6 +17,8 @@ export const defaults = {
   // Off unless a base URL is configured (deployStatusUrl or DEPLOY_STATUS_API_URL).
   deployStatus: true,
   deployStatusUrl: null,
+  // SLA (in days) for open PRs in the Mine/Reviews sub-tabs. Off unless set.
+  slaDays: null,
 };
 
 // Base URL of the deploy-status API, resolved at init() from config or the
@@ -69,6 +71,9 @@ query($q: String!, $n: Int!, $after: String) {
         mergeCommit { oid }
         author { login }
         repository { nameWithOwner }
+        timelineItems(itemTypes: [READY_FOR_REVIEW_EVENT], last: 1) {
+          nodes { ... on ReadyForReviewEvent { createdAt } }
+        }
         commits(last: 1) {
           nodes {
             commit {
@@ -100,6 +105,7 @@ async function init(tabConfig, onUpdate) {
   tab.enabled = cfg.enabled;
   tab.available = ghAvailable;
   tab.hint = ghAvailable ? null : "GitHub CLI (gh) not found. Install it with: brew install gh";
+  tab.slaDays = cfg.slaDays;
 
   console.log(`Config: pulls ${cfg.enabled ? "enabled" : "disabled"}${ghAvailable ? "" : " (gh CLI not found)"}`);
   if (!cfg.enabled || !ghAvailable) return;
@@ -455,6 +461,7 @@ function summarize(node) {
     branch: node.headRefName,
     url: node.url,
     createdAt: node.createdAt,
+    readyForReviewAt: node.timelineItems?.nodes?.[0]?.createdAt || null,
     mergedAt: node.mergedAt,
     mergeCommitOid: node.mergeCommit?.oid || null,
     repoWithOwner: node.repository?.nameWithOwner || "",
@@ -495,6 +502,20 @@ export function trunkQueueState(checks) {
   if (!check) return null;
   if (check.status !== "COMPLETED") return "queued";
   return check.conclusion === "SUCCESS" ? null : "failed";
+}
+
+// SLA coloring threshold, keyed by fraction of slaDays elapsed since the PR was
+// last marked ready for review (or created, if never a draft). Drafts and PRs
+// with no slaDays configured are never colored.
+export function slaLevel(pr, slaDays, now = Date.now()) {
+  if (!slaDays || pr.isDraft) return null;
+  const since = pr.readyForReviewAt || pr.createdAt;
+  if (!since) return null;
+  const pct = (now - new Date(since).getTime()) / (slaDays * 24 * 60 * 60 * 1000);
+  if (pct >= 1) return "red";
+  if (pct >= 0.75) return "orange";
+  if (pct >= 0.5) return "yellow";
+  return null;
 }
 
 export function prStatus(node, trunk = null) {

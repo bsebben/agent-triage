@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.54.0] - 2026-09-15
+
+### Added
+
+- Pulls tab can flag aging PRs: set an optional SLA (in days) for the Mine/Reviews tabs and rows are tinted yellow/orange/red at 50%/75%/100% of that SLA, measured from when the PR was marked ready for review (draft PRs are never flagged).
+
 ## [1.53.0] - 2026-09-10
 
 ### Fixed

@@ -30,6 +30,19 @@ export const migrations = [
       };
     },
   },
+  {
+    version: 2,
+    describe: "add tabs.pulls.slaDays (default null, disabled)",
+    migrate(cfg) {
+      return {
+        ...cfg,
+        tabs: {
+          ...cfg.tabs,
+          pulls: { slaDays: null, ...cfg.tabs?.pulls },
+        },
+      };
+    },
+  },
 ];
 
 export const CURRENT_CONFIG_VERSION = migrations.length;
