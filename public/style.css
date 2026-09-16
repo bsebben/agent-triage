@@ -911,9 +911,11 @@ main { padding: 8px; position: relative; }
 .pull-row { cursor: pointer; }
 .pull-row:hover { background: var(--surface); }
 
-.pull-row-sla-yellow { box-shadow: inset 3px 0 0 var(--clr-waiting); }
-.pull-row-sla-orange { box-shadow: inset 3px 0 0 var(--clr-permission); }
-.pull-row-sla-red { box-shadow: inset 3px 0 0 var(--clr-error); }
+/* box-shadow on <tr> doesn't paint in Chromium's table layout — apply it to
+   the row's first cell instead, which renders it without shifting layout. */
+.pull-row-sla-yellow > .pull-title { box-shadow: inset 3px 0 0 var(--clr-waiting); }
+.pull-row-sla-orange > .pull-title { box-shadow: inset 3px 0 0 var(--clr-permission); }
+.pull-row-sla-red > .pull-title { box-shadow: inset 3px 0 0 var(--clr-error); }
 
 .pull-title {
   color: var(--text);
