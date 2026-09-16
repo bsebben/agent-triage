@@ -7,6 +7,9 @@ const execFileAsync = promisify(execFile);
 const SESSION_ID_PATTERN = /claude --resume\s+([0-9a-f-]{36})/i;
 const POLL_INTERVAL_MS = 500;
 const TIMEOUT_MS = 30000;
+// Plugins first: they can register skills, so reloading skills before
+// plugins would miss any skill a just-updated plugin adds.
+const RELOAD_COMMANDS = ["/reload-plugins", "/reload-skills"];
 
 export { SESSION_ID_PATTERN };
 
@@ -157,6 +160,12 @@ export class Refresher {
         prev = screen;
       }
     }
+  }
+
+  /** True once the input box has nothing typed into it. */
+  async #inputBoxIsClear(workspaceRef) {
+    const screen = await this.#cmux.readScreenByWorkspace(workspaceRef);
+    return inputBoxText(screen) === "";
   }
 
   /** Polls until the input box holds exactly `text`. */
@@ -319,15 +328,30 @@ export class Refresher {
       // the resume/initialization flow finishes and the input prompt is active.
       await this.#waitForScreenStable(workspaceRef, { timeoutMs: this.#timeoutMs });
 
-      const submitted = await this.#submitCommand(workspaceId, surfaceRef, workspaceRef, "/reload-plugins");
+      // Each is attempted even if an earlier one fails, so a stuck dropdown on
+      // one command doesn't cost the others their reload.
+      const results = [];
+      for (const command of RELOAD_COMMANDS) {
+        // A command that failed to submit can leave stray text sitting in the box (a
+        // swallowed dropdown Enter, or the wrong autocomplete pick accepted instead).
+        // cmux types into whatever the box already holds rather than replacing it, so
+        // typing the next command on top would concatenate into one garbled string —
+        // report an honest skip instead of a second, misleading failure.
+        if (!(await this.#inputBoxIsClear(workspaceRef))) {
+          results.push({ ok: false, error: `${command} was skipped: the input box still holds leftover text` });
+          continue;
+        }
+        results.push(await this.#submitCommand(workspaceId, surfaceRef, workspaceRef, command));
+      }
 
       // Restore the workspace title
       if (title) {
         try { await this.#cmux.renameWorkspace(workspaceId, title); } catch {}
       }
 
-      if (!submitted.ok) {
-        return { ok: false, sessionId: sessionId || null, error: `Claude Code restarted, but ${submitted.error}` };
+      const failures = results.filter((r) => !r.ok).map((r) => r.error);
+      if (failures.length) {
+        return { ok: false, sessionId: sessionId || null, error: `Claude Code restarted, but ${failures.join("; ")}` };
       }
 
       return { ok: true, sessionId: sessionId || null };

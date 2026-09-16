@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.55.0] - 2026-09-16
+
+### Changed
+
+- Refresh now also submits `/reload-skills` after `/reload-plugins` in the resumed session, so skill changes take effect without a manual reload. Each command gets its own independent attempt as long as the input box is clear; if a command fails to submit and leaves stray text behind, the next one is skipped rather than typed into it, so a stuck dropdown can't cascade into a garbled, misleading command.
+
 ## [1.54.0] - 2026-09-15
 
 ### Added

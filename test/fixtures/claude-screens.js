@@ -91,3 +91,42 @@ export const DROPDOWN_ACCEPTED_OTHER = screen(
   "❯ /reload-plugins-force",
   RULE,
 );
+
+/** `/reload-skills` typed with the autocomplete dropdown still open. */
+export const PENDING_WITH_DROPDOWN_SKILLS = screen(
+  "❯ 4",
+  "  ⎿  SessionStart:resume says: ✓ MCP proxy: healthy",
+  "",
+  "  /reload-skills                                                    Reload skill definitions from disk",
+  RULE,
+  "❯ /reload-skills",
+  RULE,
+);
+
+/** `/reload-skills` typed with the dropdown dismissed, still unsubmitted. */
+export const PENDING_NO_DROPDOWN_SKILLS = screen(
+  "⏺ Ready.",
+  "",
+  RULE,
+  "❯ /reload-skills",
+  RULE,
+);
+
+/** `/reload-skills` submitted: echoed into the transcript, input box now empty. */
+export const SUBMITTED_SKILLS = screen(
+  "❯ /reload-skills",
+  "  ⎿  Reloaded 5 skills",
+  "",
+  RULE,
+  "❯                                                                        ",
+  RULE,
+);
+
+/** The dropdown accepted a different highlighted suggestion than /reload-skills. */
+export const DROPDOWN_ACCEPTED_OTHER_SKILLS = screen(
+  "⏺ Ready.",
+  "",
+  RULE,
+  "❯ /reload-skills-force",
+  RULE,
+);
