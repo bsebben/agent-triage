@@ -17,6 +17,9 @@ import {
   shouldShowDeployDots,
   collectSearchPages,
   RETRYABLE_ERROR,
+  slaLevel,
+  prSinceTimestamp,
+  sortPrsByPriority,
 } from "../src/tabs/pulls.js";
 
 const fulfilled = (value) => ({ status: "fulfilled", value });
@@ -76,6 +79,108 @@ describe("prStatus", () => {
 
   it("prefers 'queued' over 'queue_failed' ordering (queued wins when native queue is set)", () => {
     assert.equal(prStatus({ isInMergeQueue: true }, "failed"), "queued");
+  });
+});
+
+describe("slaLevel", () => {
+  const NOW = new Date("2026-09-15T00:00:00Z").getTime();
+  const daysAgo = (n) => new Date(NOW - n * 24 * 60 * 60 * 1000).toISOString();
+
+  it("returns null when slaDays is not set", () => {
+    assert.equal(slaLevel({ createdAt: daysAgo(10) }, null, NOW), null);
+  });
+
+  it("returns null for draft PRs regardless of age", () => {
+    assert.equal(slaLevel({ createdAt: daysAgo(10), isDraft: true }, 5, NOW), null);
+  });
+
+  it("returns null under 50% of the SLA", () => {
+    assert.equal(slaLevel({ createdAt: daysAgo(2) }, 5, NOW), null);
+  });
+
+  it("returns 'yellow' at 50% of the SLA", () => {
+    assert.equal(slaLevel({ createdAt: daysAgo(2.5) }, 5, NOW), "yellow");
+  });
+
+  it("returns 'yellow' just under 75% of the SLA", () => {
+    assert.equal(slaLevel({ createdAt: daysAgo(3.7) }, 5, NOW), "yellow");
+  });
+
+  it("returns 'orange' at 75% of the SLA", () => {
+    assert.equal(slaLevel({ createdAt: daysAgo(3.75) }, 5, NOW), "orange");
+  });
+
+  it("returns 'orange' just under 100% of the SLA", () => {
+    assert.equal(slaLevel({ createdAt: daysAgo(4.9) }, 5, NOW), "orange");
+  });
+
+  it("returns 'red' at 100% of the SLA", () => {
+    assert.equal(slaLevel({ createdAt: daysAgo(5) }, 5, NOW), "red");
+  });
+
+  it("returns 'red' when well past the SLA", () => {
+    assert.equal(slaLevel({ createdAt: daysAgo(10) }, 5, NOW), "red");
+  });
+
+  it("treats an SLA of 0 as 'flag immediately' rather than disabled", () => {
+    assert.equal(slaLevel({ createdAt: daysAgo(1) }, 0, NOW), "red");
+  });
+
+  it("returns null for a merged PR regardless of age", () => {
+    assert.equal(slaLevel({ createdAt: daysAgo(30), mergedAt: daysAgo(1) }, 5, NOW), null);
+  });
+
+  it("prefers readyForReviewAt over createdAt when present", () => {
+    // Created 10 days ago (would be red on createdAt alone), but only marked
+    // ready for review 1 day ago — should be under the SLA.
+    const pr = { createdAt: daysAgo(10), readyForReviewAt: daysAgo(1) };
+    assert.equal(slaLevel(pr, 5, NOW), null);
+  });
+
+  it("falls back to createdAt when readyForReviewAt is absent", () => {
+    const pr = { createdAt: daysAgo(5), readyForReviewAt: null };
+    assert.equal(slaLevel(pr, 5, NOW), "red");
+  });
+});
+
+describe("sortPrsByPriority", () => {
+  const pr = (name, priority, since) => ({ name, priority, createdAt: since });
+
+  it("sorts by the priority function first", () => {
+    const prs = [pr("b", 2, "2026-09-01"), pr("a", 1, "2026-09-01"), pr("c", 3, "2026-09-01")];
+    const sorted = sortPrsByPriority(prs, (p) => p.priority);
+    assert.deepEqual(sorted.map((p) => p.name), ["a", "b", "c"]);
+  });
+
+  it("breaks ties within the same priority by age, oldest first", () => {
+    const prs = [
+      pr("newer", 1, "2026-09-10"),
+      pr("oldest", 1, "2026-09-01"),
+      pr("middle", 1, "2026-09-05"),
+    ];
+    const sorted = sortPrsByPriority(prs, (p) => p.priority);
+    assert.deepEqual(sorted.map((p) => p.name), ["oldest", "middle", "newer"]);
+  });
+
+  it("never lets an older PR in a lower-priority bucket jump ahead of a higher-priority one", () => {
+    const prs = [
+      { name: "high-priority-newer", priority: 1, createdAt: "2026-09-10" },
+      { name: "low-priority-older", priority: 2, createdAt: "2026-09-01" },
+    ];
+    const sorted = sortPrsByPriority(prs, (p) => p.priority);
+    assert.deepEqual(sorted.map((p) => p.name), ["high-priority-newer", "low-priority-older"]);
+  });
+});
+
+describe("prSinceTimestamp", () => {
+  it("prefers readyForReviewAt over createdAt", () => {
+    const ts = prSinceTimestamp({ createdAt: "2026-09-01", readyForReviewAt: "2026-09-10" });
+    assert.equal(ts, new Date("2026-09-10").getTime());
+  });
+
+  it("falls back to createdAt when readyForReviewAt is absent", () => {
+    const ts = prSinceTimestamp({ createdAt: "2026-09-01", readyForReviewAt: null });
+    assert.equal(ts, new Date("2026-09-01").getTime());
   });
 });
 

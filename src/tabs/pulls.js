@@ -17,6 +17,8 @@ export const defaults = {
   // Off unless a base URL is configured (deployStatusUrl or DEPLOY_STATUS_API_URL).
   deployStatus: true,
   deployStatusUrl: null,
+  // SLA (in days) for open PRs in the Mine/Reviews sub-tabs. Nullable to allow disabling.
+  slaDays: 2,
 };
 
 // Base URL of the deploy-status API, resolved at init() from config or the
@@ -69,6 +71,9 @@ query($q: String!, $n: Int!, $after: String) {
         mergeCommit { oid }
         author { login }
         repository { nameWithOwner }
+        timelineItems(itemTypes: [READY_FOR_REVIEW_EVENT], last: 1) {
+          nodes { ... on ReadyForReviewEvent { createdAt } }
+        }
         commits(last: 1) {
           nodes {
             commit {
@@ -100,6 +105,7 @@ async function init(tabConfig, onUpdate) {
   tab.enabled = cfg.enabled;
   tab.available = ghAvailable;
   tab.hint = ghAvailable ? null : "GitHub CLI (gh) not found. Install it with: brew install gh";
+  tab.slaDays = cfg.slaDays;
 
   console.log(`Config: pulls ${cfg.enabled ? "enabled" : "disabled"}${ghAvailable ? "" : " (gh CLI not found)"}`);
   if (!cfg.enabled || !ghAvailable) return;
@@ -351,13 +357,17 @@ export function parseDeployLinks(deployments) {
 }
 
 // GitHub caps the execution resources a single GraphQL request may consume, and the cost
-// tracks the nested per-PR fan-out (commits -> statusCheckRollup -> contexts) times the
-// number of rows *returned* — not how many results the search matched. Measured against
-// the broad review-requested search: 50 rows is reliable, the failure cliff starts around
-// 75, and 100 rows fails every time (reproduces identically running `gh api graphql` by
-// hand, outside this app). So every search pages at 50, regardless of expected size —
-// paging short-circuits on `hasNextPage: false`, so a small result set still costs one
-// request and no search is left sitting past the cliff.
+// tracks the nested per-PR fan-out (commits -> statusCheckRollup -> contexts, plus the
+// timelineItems ready-for-review lookup) times the number of rows *returned* — not how
+// many results the search matched. Measured against the broad review-requested search
+// (pre-timelineItems): 50 rows is reliable, the failure cliff starts around 75, and 100
+// rows fails every time (reproduces identically running `gh api graphql` by hand, outside
+// this app). timelineItems(last: 1) adds a second nested connection per row but doesn't
+// fan out further itself, and 50/100-row fetches have held up fine in practice since it
+// was added — re-verify against a real broad search if this constant ever needs raising.
+// So every search pages at 50, regardless of expected size — paging short-circuits on
+// `hasNextPage: false`, so a small result set still costs one request and no search is
+// left sitting past the cliff.
 const SEARCH_PAGE_SIZE = 50;
 // Two pages preserves the 100-row ceiling the single-request version had.
 const MAX_SEARCH_PAGES = 2;
@@ -439,7 +449,7 @@ async function searchPrs(query, filter, sortFn) {
 
   const groups = [];
   for (const [repo, prs] of byRepo) {
-    prs.sort((a, b) => sortFn(a) - sortFn(b));
+    sortPrsByPriority(prs, sortFn);
     groups.push({ repo, prs });
   }
   groups.sort((a, b) => b.prs.length - a.prs.length);
@@ -455,6 +465,7 @@ function summarize(node) {
     branch: node.headRefName,
     url: node.url,
     createdAt: node.createdAt,
+    readyForReviewAt: node.timelineItems?.nodes?.[0]?.createdAt || null,
     mergedAt: node.mergedAt,
     mergeCommitOid: node.mergeCommit?.oid || null,
     repoWithOwner: node.repository?.nameWithOwner || "",
@@ -495,6 +506,38 @@ export function trunkQueueState(checks) {
   if (!check) return null;
   if (check.status !== "COMPLETED") return "queued";
   return check.conclusion === "SUCCESS" ? null : "failed";
+}
+
+// Timestamp a PR's age is measured from: when it was marked ready for review,
+// or createdAt for a PR that was never a draft. Shared by slaLevel (coloring)
+// and sortPrsByPriority (the age tiebreaker), so the two always agree on "how
+// old is this PR". Infinity when neither date is present, so such a PR (should
+// never happen in practice) sorts last rather than crashing the comparator.
+export function prSinceTimestamp(pr) {
+  const since = pr.readyForReviewAt || pr.createdAt;
+  return since ? new Date(since).getTime() : Infinity;
+}
+
+// SLA coloring threshold, keyed by fraction of slaDays elapsed since the PR was
+// last marked ready for review (or created, if never a draft). Drafts and PRs
+// with no slaDays configured are never colored.
+export function slaLevel(pr, slaDays, now = Date.now()) {
+  if (slaDays == null || pr.isDraft || pr.mergedAt) return null;
+  const since = prSinceTimestamp(pr);
+  if (!Number.isFinite(since)) return null;
+  if (slaDays <= 0) return "red";
+  const pct = (now - since) / (slaDays * 24 * 60 * 60 * 1000);
+  if (pct >= 1) return "red";
+  if (pct >= 0.75) return "orange";
+  if (pct >= 0.5) return "yellow";
+  return null;
+}
+
+// Sorts by the caller's priority function first (status buckets in Mine, CI
+// state in Reviews), then breaks ties within the same bucket by age, oldest
+// first. Mutates and returns `prs`, mirroring Array#sort.
+export function sortPrsByPriority(prs, sortFn) {
+  return prs.sort((a, b) => sortFn(a) - sortFn(b) || prSinceTimestamp(a) - prSinceTimestamp(b));
 }
 
 export function prStatus(node, trunk = null) {
