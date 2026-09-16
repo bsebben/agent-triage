@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
-- Refresh now also submits `/reload-skills` after `/reload-plugins` in the resumed session, so skill changes take effect without a manual reload. Each command is attempted independently — a failure to submit one doesn't stop the other.
+- Refresh now also submits `/reload-skills` after `/reload-plugins` in the resumed session, so skill changes take effect without a manual reload. Each command gets its own independent attempt as long as the input box is clear; if a command fails to submit and leaves stray text behind, the next one is skipped rather than typed into it, so a stuck dropdown can't cascade into a garbled, misleading command.
 
 ## [1.54.0] - 2026-09-15
 
