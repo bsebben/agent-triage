@@ -319,15 +319,21 @@ export class Refresher {
       // the resume/initialization flow finishes and the input prompt is active.
       await this.#waitForScreenStable(workspaceRef, { timeoutMs: this.#timeoutMs });
 
-      const submitted = await this.#submitCommand(workspaceId, surfaceRef, workspaceRef, "/reload-plugins");
+      // /reload-plugins first: plugins can register skills, so reloading skills
+      // before plugins would miss any skill that a just-updated plugin adds.
+      // Both are attempted even if one fails, so a stuck dropdown on one command
+      // doesn't cost the other its reload.
+      const pluginsSubmitted = await this.#submitCommand(workspaceId, surfaceRef, workspaceRef, "/reload-plugins");
+      const skillsSubmitted = await this.#submitCommand(workspaceId, surfaceRef, workspaceRef, "/reload-skills");
 
       // Restore the workspace title
       if (title) {
         try { await this.#cmux.renameWorkspace(workspaceId, title); } catch {}
       }
 
-      if (!submitted.ok) {
-        return { ok: false, sessionId: sessionId || null, error: `Claude Code restarted, but ${submitted.error}` };
+      const failures = [pluginsSubmitted, skillsSubmitted].filter((r) => !r.ok).map((r) => r.error);
+      if (failures.length) {
+        return { ok: false, sessionId: sessionId || null, error: `Claude Code restarted, but ${failures.join("; ")}` };
       }
 
       return { ok: true, sessionId: sessionId || null };

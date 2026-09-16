@@ -10,6 +10,10 @@ import {
   PENDING_NO_DROPDOWN,
   SUBMITTED,
   DROPDOWN_ACCEPTED_OTHER,
+  PENDING_WITH_DROPDOWN_SKILLS,
+  PENDING_NO_DROPDOWN_SKILLS,
+  SUBMITTED_SKILLS,
+  DROPDOWN_ACCEPTED_OTHER_SKILLS,
 } from "./fixtures/claude-screens.js";
 
 function makeWorkspace(id, surfaceRef, wsRef, tty) {
@@ -24,36 +28,71 @@ function makeTopData(workspaces) {
   return { windows: [{ workspaces }] };
 }
 
+// refreshSession submits both slash commands in order, so the pane mock has to
+// simulate both in sequence even when a test only cares about one of them.
+const COMMAND_ORDER = ["/reload-plugins", "/reload-skills"];
+const HAPPY_PATH = {
+  "/reload-plugins": { pending: PENDING_NO_DROPDOWN, submitted: SUBMITTED },
+  "/reload-skills": { pending: PENDING_NO_DROPDOWN_SKILLS, submitted: SUBMITTED_SKILLS },
+};
+
 /**
- * Stateful screen source that mimics a real pane: `preSubmit` (a screen or a
- * function returning one) until `/reload-plugins` is typed, then the pending
- * input box, then the submitted screen once `entersToSubmit` Enters have landed.
+ * Stateful screen source that mimics a real pane across both submissions:
+ * `preSubmit` (a screen or a function returning one) until the first command is
+ * typed, then that command's pending input box, then its submitted screen once
+ * its configured number of Enters have landed — at which point the next command
+ * in `COMMAND_ORDER` takes over. `overrides` maps a command to
+ * `{ entersToSubmit, pending, submitted }`; any command not present there runs
+ * the happy path (types, one Enter, submits).
  */
-function makePane(preSubmit, { entersToSubmit = 1, pending = PENDING_NO_DROPDOWN, submitted = SUBMITTED } = {}) {
+function makeSequencedPane(preSubmit, overrides = {}, { focusCommand = "/reload-plugins" } = {}) {
   const sentTexts = [];
   const sentKeys = [];
+  const entersByCommand = { "/reload-plugins": 0, "/reload-skills": 0 };
+  let stageIndex = 0;
   let typed = false;
-  let enters = 0;
+
+  function config(cmd) {
+    return { entersToSubmit: 1, ...HAPPY_PATH[cmd], ...(overrides[cmd] || {}) };
+  }
+
   return {
     sentTexts,
     sentKeys,
     get entersAfterCommand() {
-      return enters;
+      return entersByCommand[focusCommand];
     },
     sendText: async (_wsId, _surfaceId, text) => {
       sentTexts.push(text);
-      if (text === "/reload-plugins") typed = true;
+      const idx = COMMAND_ORDER.indexOf(text);
+      if (idx !== -1 && idx >= stageIndex) {
+        stageIndex = idx;
+        typed = true;
+      }
     },
     sendKey: async (_wsId, _surfaceId, key) => {
       sentKeys.push(key);
-      if (typed) enters++;
+      if (typed) entersByCommand[COMMAND_ORDER[stageIndex]]++;
     },
     readScreenByWorkspace: async () => {
       if (!typed) return typeof preSubmit === "function" ? preSubmit() : preSubmit;
-      return enters >= entersToSubmit ? submitted : pending;
+      const cmd = COMMAND_ORDER[stageIndex];
+      const cfg = config(cmd);
+      return entersByCommand[cmd] >= cfg.entersToSubmit ? cfg.submitted : cfg.pending;
     },
     renameWorkspace: async () => {},
   };
+}
+
+/**
+ * Convenience wrapper over {@link makeSequencedPane} for tests that only care
+ * about one of the two commands — the other one runs the happy path silently.
+ */
+function makePane(preSubmit, { command = "/reload-plugins", entersToSubmit = 1, pending, submitted } = {}) {
+  const override = { entersToSubmit };
+  if (pending !== undefined) override.pending = pending;
+  if (submitted !== undefined) override.submitted = submitted;
+  return makeSequencedPane(preSubmit, { [command]: override }, { focusCommand: command });
 }
 
 // Above macOS's pid ceiling, so tests that let the real `process.kill` run can
@@ -605,6 +644,143 @@ describe("Refresher /reload-plugins submission", () => {
     assert.equal(result.ok, false);
     assert.match(result.error, /never reached the input box/);
     assert.equal(pane.entersAfterCommand, 0, "should not press Enter when the command never landed");
+  });
+});
+
+describe("Refresher /reload-skills submission", () => {
+  const mockExecFile = (_cmd, _args, cb) => cb(null, { stdout: "" });
+
+  const ws = () => makeWorkspace("W1", "surface:1", "workspace:W1", "ttysTest");
+
+  function run(pane) {
+    const refresher = new Refresher({
+      cmuxApi: makeCmuxApi(pane, [ws()]),
+      execFileFn: mockExecFile,
+      pollIntervalMs: 10,
+      timeoutMs: 3000,
+    });
+    return refresher.refreshSession("W1");
+  }
+
+  it("sends exactly one Enter when the first one submits", async () => {
+    const pane = makePane(IDLE, { command: "/reload-skills", entersToSubmit: 1 });
+    const result = await run(pane);
+
+    assert.equal(result.ok, true);
+    assert.ok(pane.sentTexts.includes("/reload-skills"), "should send /reload-skills");
+    assert.equal(pane.entersAfterCommand, 1, `expected a single Enter, got ${pane.entersAfterCommand}`);
+  });
+
+  it("re-sends Enter when the autocomplete dropdown swallowed the first one", async () => {
+    const pane = makePane(IDLE, {
+      command: "/reload-skills",
+      entersToSubmit: 2,
+      pending: PENDING_WITH_DROPDOWN_SKILLS,
+    });
+    const result = await run(pane);
+
+    assert.equal(result.ok, true);
+    assert.equal(pane.entersAfterCommand, 2, `expected a retried Enter, got ${pane.entersAfterCommand}`);
+  });
+
+  it("reports failure when /reload-skills never leaves the input box", async () => {
+    const pane = makePane(IDLE, {
+      command: "/reload-skills",
+      entersToSubmit: Infinity,
+      pending: PENDING_WITH_DROPDOWN_SKILLS,
+    });
+    const result = await run(pane);
+
+    assert.equal(result.ok, false);
+    assert.match(result.error, /reload-skills/);
+    assert.equal(pane.entersAfterCommand, 3, "should stop retrying Enter after 3 attempts");
+  });
+
+  it("reports failure when the dropdown accepted a different command", async () => {
+    const pane = makePane(IDLE, {
+      command: "/reload-skills",
+      entersToSubmit: 1,
+      submitted: DROPDOWN_ACCEPTED_OTHER_SKILLS,
+    });
+    const result = await run(pane);
+
+    assert.equal(result.ok, false);
+    assert.match(result.error, /replaced in the input box/);
+    assert.match(result.error, /reload-skills-force/);
+    assert.equal(pane.entersAfterCommand, 1, "should not keep pressing Enter on a foreign command");
+  });
+
+  it("reports failure when the typed command never reaches the input box", async () => {
+    // sendText silently no-ops: the pane keeps showing an empty prompt.
+    const pane = makePane(IDLE, { command: "/reload-skills", entersToSubmit: 1, pending: IDLE, submitted: IDLE });
+    const cmuxApi = makeCmuxApi(pane, [ws()]);
+    cmuxApi.readScreenByWorkspace = async () => IDLE;
+    const refresher = new Refresher({ cmuxApi, execFileFn: mockExecFile, pollIntervalMs: 10, timeoutMs: 3000 });
+
+    const result = await refresher.refreshSession("W1");
+
+    assert.equal(result.ok, false);
+    assert.match(result.error, /never reached the input box/);
+    assert.equal(pane.entersAfterCommand, 0, "should not press Enter when the command never landed");
+  });
+});
+
+describe("Refresher: /reload-plugins and /reload-skills together", () => {
+  const mockExecFile = (_cmd, _args, cb) => cb(null, { stdout: "" });
+
+  it("submits /reload-plugins before /reload-skills", async () => {
+    const ws = makeWorkspace("W1", "surface:1", "workspace:W1", "ttysTest");
+    const pane = makeSequencedPane(IDLE);
+    const refresher = new Refresher({
+      cmuxApi: makeCmuxApi(pane, [ws]),
+      execFileFn: mockExecFile,
+      pollIntervalMs: 10,
+      timeoutMs: 3000,
+    });
+
+    const result = await refresher.refreshSession("W1");
+
+    assert.equal(result.ok, true);
+    const commandTexts = pane.sentTexts.filter((t) => t.startsWith("/reload"));
+    assert.deepEqual(commandTexts, ["/reload-plugins", "/reload-skills"]);
+  });
+
+  it("still submits /reload-skills, and reports failure, when /reload-plugins fails to submit", async () => {
+    const ws = makeWorkspace("W1", "surface:1", "workspace:W1", "ttysTest");
+    const pane = makeSequencedPane(IDLE, {
+      "/reload-plugins": { entersToSubmit: Infinity, pending: PENDING_WITH_DROPDOWN },
+    });
+    const refresher = new Refresher({
+      cmuxApi: makeCmuxApi(pane, [ws]),
+      execFileFn: mockExecFile,
+      pollIntervalMs: 10,
+      timeoutMs: 3000,
+    });
+
+    const result = await refresher.refreshSession("W1");
+
+    assert.equal(result.ok, false);
+    assert.match(result.error, /reload-plugins/);
+    assert.ok(pane.sentTexts.includes("/reload-skills"), "should still attempt /reload-skills");
+  });
+
+  it("still submits /reload-plugins fully, and reports failure, when /reload-skills fails to submit", async () => {
+    const ws = makeWorkspace("W1", "surface:1", "workspace:W1", "ttysTest");
+    const pane = makeSequencedPane(IDLE, {
+      "/reload-skills": { entersToSubmit: Infinity, pending: PENDING_WITH_DROPDOWN_SKILLS },
+    });
+    const refresher = new Refresher({
+      cmuxApi: makeCmuxApi(pane, [ws]),
+      execFileFn: mockExecFile,
+      pollIntervalMs: 10,
+      timeoutMs: 3000,
+    });
+
+    const result = await refresher.refreshSession("W1");
+
+    assert.equal(result.ok, false);
+    assert.match(result.error, /reload-skills/);
+    assert.ok(pane.sentTexts.includes("/reload-plugins"), "should have fully attempted /reload-plugins first");
   });
 });
 
