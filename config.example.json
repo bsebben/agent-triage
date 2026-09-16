@@ -18,7 +18,7 @@
     "pulls": {
       "deployStatus": true,
       "deployStatusUrl": null,
-      "slaDays": null
+      "slaDays": 2
     },
     "tasks": {}
   }

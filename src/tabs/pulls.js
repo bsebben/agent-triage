@@ -17,8 +17,8 @@ export const defaults = {
   // Off unless a base URL is configured (deployStatusUrl or DEPLOY_STATUS_API_URL).
   deployStatus: true,
   deployStatusUrl: null,
-  // SLA (in days) for open PRs in the Mine/Reviews sub-tabs. Off unless set.
-  slaDays: null,
+  // SLA (in days) for open PRs in the Mine/Reviews sub-tabs. Nullable to allow disabling.
+  slaDays: 2,
 };
 
 // Base URL of the deploy-status API, resolved at init() from config or the

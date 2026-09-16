@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
-- Pulls tab can flag aging PRs: set an optional SLA (in days) for the Mine/Reviews tabs and rows are tinted yellow/orange/red at 50%/75%/100% of that SLA, measured from when the PR was marked ready for review (draft PRs are never flagged).
+- Pulls tab can flag aging PRs: set an optional SLA (in days) for the Mine/Reviews tabs and rows are tinted yellow/orange/red at 50%/75%/100% of that SLA, measured from when the PR was marked ready for review (draft PRs are never flagged). Defaults to 2 days for fresh installs; set `tabs.pulls.slaDays` to `null` to disable.
 
 ### Changed
 
