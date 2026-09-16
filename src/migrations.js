@@ -32,13 +32,13 @@ export const migrations = [
   },
   {
     version: 2,
-    describe: "add tabs.pulls.slaDays (default null, disabled)",
+    describe: "add tabs.pulls.slaDays (default 2 days)",
     migrate(cfg) {
       return {
         ...cfg,
         tabs: {
           ...cfg.tabs,
-          pulls: { slaDays: null, ...cfg.tabs?.pulls },
+          pulls: { slaDays: 2, ...cfg.tabs?.pulls },
         },
       };
     },
