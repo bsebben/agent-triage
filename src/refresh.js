@@ -323,15 +323,19 @@ export class Refresher {
         if (ids.has(workspaceId)) break;
       }
 
-      // Wait for the terminal screen to stabilize — the claude_code tag appears
-      // when the process starts, but Claude isn't ready for slash commands until
-      // the resume/initialization flow finishes and the input prompt is active.
-      await this.#waitForScreenStable(workspaceRef, { timeoutMs: this.#timeoutMs });
-
       // Each is attempted even if an earlier one fails, so a stuck dropdown on
       // one command doesn't cost the others their reload.
       const results = [];
       for (const command of RELOAD_COMMANDS) {
+        // Wait for the terminal screen to stabilize before each command. Before the
+        // first one, the claude_code tag has appeared but Claude isn't ready for slash
+        // commands until the resume/initialization flow finishes. Before a later one, a
+        // command that finished submitting can still be doing real background work
+        // (spawning MCP/LSP servers, re-registering plugin agents/hooks) that keeps the
+        // screen changing well after the box itself first reads back empty. Either way,
+        // typing or judging box-clearness too early risks acting on a screen that's
+        // about to change out from under it.
+        await this.#waitForScreenStable(workspaceRef, { timeoutMs: this.#timeoutMs });
         // A command that failed to submit can leave stray text sitting in the box (a
         // swallowed dropdown Enter, or the wrong autocomplete pick accepted instead).
         // cmux types into whatever the box already holds rather than replacing it, so
