@@ -717,6 +717,32 @@ describe("Refresher: /reload-plugins and /reload-skills together", () => {
     assert.deepEqual(commandTexts, ["/reload-plugins", "/reload-skills"]);
   });
 
+  it("waits for the input box to actually appear, not just for the screen to stop changing, before attempting /reload-plugins", async () => {
+    const ws = makeWorkspace("W1", "surface:1", "workspace:W1", "ttysTest");
+    // SessionStart hooks (MCP healthchecks, git status) can keep the screen showing
+    // status lines with no prompt row at all for a while after resume — long enough
+    // to itself satisfy #waitForScreenStable's own stability threshold (the same
+    // constant value, unchanged, for stableMs) before the prompt box actually renders.
+    let reads = 0;
+    const hookStillRunning = "SessionStart:resume says: checking...\n";
+    const pane = makeSequencedPane(() => {
+      reads++;
+      return reads <= 90 ? hookStillRunning : IDLE;
+    });
+    const refresher = new Refresher({
+      cmuxApi: makeCmuxApi(pane, [ws]),
+      execFileFn: mockExecFile,
+      pollIntervalMs: 10,
+      timeoutMs: 3000,
+    });
+
+    const result = await refresher.refreshSession("W1");
+
+    assert.equal(result.ok, true, `expected both commands to succeed, got: ${JSON.stringify(result)}`);
+    const commandTexts = pane.sentTexts.filter((t) => t.startsWith("/reload"));
+    assert.deepEqual(commandTexts, ["/reload-plugins", "/reload-skills"]);
+  });
+
   it("waits for /reload-plugins to genuinely finish (not just clear the box once) before attempting /reload-skills", async () => {
     const ws = makeWorkspace("W1", "surface:1", "workspace:W1", "ttysTest");
     // The box clears the moment Enter is accepted (confirming submission), but real

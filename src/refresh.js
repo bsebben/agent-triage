@@ -162,12 +162,6 @@ export class Refresher {
     }
   }
 
-  /** True once the input box has nothing typed into it. */
-  async #inputBoxIsClear(workspaceRef) {
-    const screen = await this.#cmux.readScreenByWorkspace(workspaceRef);
-    return inputBoxText(screen) === "";
-  }
-
   /** Polls until the input box holds exactly `text`. */
   async #waitForInputBox(workspaceRef, text, { polls = 20 } = {}) {
     let seen = null;
@@ -336,13 +330,21 @@ export class Refresher {
         // typing or judging box-clearness too early risks acting on a screen that's
         // about to change out from under it.
         await this.#waitForScreenStable(workspaceRef, { timeoutMs: this.#timeoutMs });
-        // A command that failed to submit can leave stray text sitting in the box (a
-        // swallowed dropdown Enter, or the wrong autocomplete pick accepted instead).
-        // cmux types into whatever the box already holds rather than replacing it, so
-        // typing the next command on top would concatenate into one garbled string —
-        // report an honest skip instead of a second, misleading failure.
-        if (!(await this.#inputBoxIsClear(workspaceRef))) {
-          results.push({ ok: false, error: `${command} was skipped: the input box still holds leftover text` });
+        // "Stable" only means the screen stopped visibly changing — it can settle on a
+        // moment where no prompt row is on screen at all yet (e.g. SessionStart hooks
+        // still printing status lines) just as easily as on one where a prior command
+        // left stray text behind (a swallowed dropdown Enter, or the wrong autocomplete
+        // pick). Poll for the box to actually go empty rather than judging it on a
+        // single read, so a screen that's merely still catching up isn't misread as one
+        // that's genuinely stuck — and cmux types into whatever the box already holds
+        // rather than replacing it, so typing the next command on top of real leftover
+        // text would concatenate into one garbled string; report an honest skip instead.
+        const clear = await this.#waitForInputBox(workspaceRef, "");
+        if (!clear.ok) {
+          results.push({
+            ok: false,
+            error: `${command} was skipped: the input box still holds leftover text (found ${describeBox(clear.seen)})`,
+          });
           continue;
         }
         results.push(await this.#submitCommand(workspaceId, surfaceRef, workspaceRef, command));
