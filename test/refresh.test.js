@@ -44,19 +44,28 @@ const COMMAND_ORDER = Object.keys(HAPPY_PATH);
  * typed, then that command's pending input box, then its submitted screen once
  * its configured number of Enters have landed — at which point the next command
  * in `COMMAND_ORDER` takes over. `overrides` maps a command to
- * `{ entersToSubmit, pending, submitted }`; any command not present there runs
- * the happy path (types, one Enter, submits).
+ * `{ entersToSubmit, pending, submitted, busyAfterConfirm }`; any command not
+ * present there runs the happy path (types, one Enter, submits, settles
+ * immediately). The read that confirms submission (an empty box, right after
+ * Enter) always lands first, exactly like a real terminal — `busyAfterConfirm`
+ * then inserts N reads of an actively-changing "still working" screen *after*
+ * that confirming read, before the screen genuinely, permanently settles into
+ * `submitted`. This models real background reload work (spawning MCP/LSP
+ * servers, re-registering plugin agents/hooks) that can keep the screen busy
+ * again even after the box has already briefly cleared once.
  */
 function makeSequencedPane(preSubmit, overrides = {}, { focusCommand = "/reload-plugins" } = {}) {
   const sentTexts = [];
   const sentKeys = [];
   const entersByCommand = Object.fromEntries(COMMAND_ORDER.map((cmd) => [cmd, 0]));
+  const confirmedByCommand = Object.fromEntries(COMMAND_ORDER.map((cmd) => [cmd, false]));
+  const busyReadsByCommand = Object.fromEntries(COMMAND_ORDER.map((cmd) => [cmd, 0]));
   let stageIndex = 0;
   let typed = false;
   let preSubmitCalls = 0;
 
   function config(cmd) {
-    return { entersToSubmit: 1, ...HAPPY_PATH[cmd], ...(overrides[cmd] || {}) };
+    return { entersToSubmit: 1, busyAfterConfirm: 0, ...HAPPY_PATH[cmd], ...(overrides[cmd] || {}) };
   }
 
   return {
@@ -90,7 +99,20 @@ function makeSequencedPane(preSubmit, overrides = {}, { focusCommand = "/reload-
       }
       const cmd = COMMAND_ORDER[stageIndex];
       const cfg = config(cmd);
-      return entersByCommand[cmd] >= cfg.entersToSubmit ? cfg.submitted : cfg.pending;
+      if (entersByCommand[cmd] < cfg.entersToSubmit) return cfg.pending;
+      // The very first read after Enter always confirms submission (box empty),
+      // exactly like a real terminal. Only afterward can background reload work
+      // make the screen busy (no stable prompt line) again for a few reads before
+      // it genuinely, permanently settles.
+      if (!confirmedByCommand[cmd]) {
+        confirmedByCommand[cmd] = true;
+        return cfg.submitted;
+      }
+      if (busyReadsByCommand[cmd] < cfg.busyAfterConfirm) {
+        busyReadsByCommand[cmd]++;
+        return `⏺ Reloading… (${busyReadsByCommand[cmd]})\n`;
+      }
+      return cfg.submitted;
     },
     renameWorkspace: async () => {},
   };
@@ -693,6 +715,55 @@ describe("Refresher: /reload-plugins and /reload-skills together", () => {
     assert.equal(result.ok, true);
     const commandTexts = pane.sentTexts.filter((t) => t.startsWith("/reload"));
     assert.deepEqual(commandTexts, ["/reload-plugins", "/reload-skills"]);
+  });
+
+  it("waits for the input box to actually appear, not just for the screen to stop changing, before attempting /reload-plugins", async () => {
+    const ws = makeWorkspace("W1", "surface:1", "workspace:W1", "ttysTest");
+    // SessionStart hooks (MCP healthchecks, git status) can keep the screen showing
+    // status lines with no prompt row at all for a while after resume — long enough
+    // to itself satisfy #waitForScreenStable's own stability threshold (the same
+    // constant value, unchanged, for stableMs) before the prompt box actually renders.
+    let reads = 0;
+    const hookStillRunning = "SessionStart:resume says: checking...\n";
+    const pane = makeSequencedPane(() => {
+      reads++;
+      return reads <= 90 ? hookStillRunning : IDLE;
+    });
+    const refresher = new Refresher({
+      cmuxApi: makeCmuxApi(pane, [ws]),
+      execFileFn: mockExecFile,
+      pollIntervalMs: 10,
+      timeoutMs: 3000,
+    });
+
+    const result = await refresher.refreshSession("W1");
+
+    assert.equal(result.ok, true, `expected both commands to succeed, got: ${JSON.stringify(result)}`);
+    const commandTexts = pane.sentTexts.filter((t) => t.startsWith("/reload"));
+    assert.deepEqual(commandTexts, ["/reload-plugins", "/reload-skills"]);
+  });
+
+  it("waits for /reload-plugins to genuinely finish (not just clear the box once) before attempting /reload-skills", async () => {
+    const ws = makeWorkspace("W1", "surface:1", "workspace:W1", "ttysTest");
+    // The box clears the moment Enter is accepted (confirming submission), but real
+    // reload work (spawning MCP/LSP servers, re-registering plugin agents/hooks)
+    // then makes the screen busy again for a bit — a check made right after
+    // submission confirms would race that and misread it as leftover garbage.
+    const pane = makeSequencedPane(IDLE, { "/reload-plugins": { busyAfterConfirm: 5 } });
+    const refresher = new Refresher({
+      cmuxApi: makeCmuxApi(pane, [ws]),
+      execFileFn: mockExecFile,
+      pollIntervalMs: 10,
+      timeoutMs: 3000,
+    });
+
+    const result = await refresher.refreshSession("W1");
+
+    assert.equal(result.ok, true, `expected both commands to succeed, got: ${JSON.stringify(result)}`);
+    assert.ok(
+      pane.sentTexts.includes("/reload-skills"),
+      "should wait for /reload-plugins to settle, then still attempt /reload-skills",
+    );
   });
 
   it("skips /reload-skills, rather than typing into it, when /reload-plugins leaves stray text in the input box", async () => {

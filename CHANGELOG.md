@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.55.2] - 2026-09-16
+
+### Fixed
+
+- Refresh no longer skips `/reload-plugins` outright when SessionStart hooks (MCP healthchecks, git status) are still printing status lines right after resume. The 1.55.1 fix only waited for the screen to stop visibly changing, which can settle on a moment with no prompt row on screen at all — indistinguishable from a genuinely stuck box on a single read. Now polls for the box to actually go empty instead of judging it on one read.
+
+## [1.55.1] - 2026-09-16
+
+### Fixed
+
+- Refresh no longer misreports `/reload-skills` as skipped due to "leftover text" when `/reload-plugins` actually succeeded. Real reload work (spawning MCP/LSP servers, re-registering plugin agents/hooks) can keep the screen changing for a bit after the box first reads back empty; the box-clear check now waits for the screen to genuinely settle first instead of judging it on a single read taken too early.
+
 ## [1.55.0] - 2026-09-16
 
 ### Changed
