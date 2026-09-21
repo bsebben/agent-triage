@@ -60,6 +60,25 @@ export const WORKING_PHRASE_IN_TRANSCRIPT = screen(
 );
 
 /**
+ * An idle session whose transcript quotes this very file's doc comment
+ * verbatim — Read tool output reproducing the example spinner line, complete
+ * with its own parenthetical. Unlike {@link WORKING_PHRASE_IN_TRANSCRIPT},
+ * this line does contain a real `(...)`, so it exercises the anchor that
+ * distinguishes it from a live spinner: a real spinner line never has
+ * anything after the closing paren, while a doc comment quoting it always
+ * trails off into more prose.
+ */
+export const WORKING_PHRASE_QUOTED_WITH_PARENS = screen(
+  "⏺ Read(src/refresh.js)",
+  "  ⎿   * line (`✻ Refactoring… (12s · ↑ 1.4k tokens · esc to interrupt)`) for as long as",
+  "     * a turn is actually running.",
+  "",
+  RULE,
+  "❯                                                                        ",
+  RULE,
+);
+
+/**
  * A session blocked on a tool-approval dialog. The dialog replaces the input box
  * while it is open and carries no spinner line, so the session reads as not
  * working and is left alone rather than having a second prompt queued behind the

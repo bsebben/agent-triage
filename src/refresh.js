@@ -26,13 +26,16 @@ const CONTINUE_PROMPT = "continue where you left off";
  *
  * Matching the bare phrase anywhere on the screen is not enough: the marker is
  * ordinary prose that a transcript can be quoting back (a diff, a file read, a
- * review of this very file), and reading that as "working" would inject an
+ * review of this very file — including this very doc comment, rendered verbatim
+ * by a Read tool call), and reading that as "working" would inject an
  * unrequested prompt into a session the user considers finished. So the match is
  * anchored to the spinner's shape the way {@link inputBoxText} is anchored to the
  * input box's position: the phrase has to sit inside a parenthetical, on a line
- * that isn't a prompt line.
+ * that isn't a prompt line, and that parenthetical has to be the last thing on
+ * the line — real spinner lines never have anything after it, but prose quoting
+ * the phrase always does (a closing backtick, a trailing clause).
  */
-const WORKING_PATTERN = /^(?!\s*[>❯➜])[^()\n]*\([^)\n]*esc to interrupt/im;
+const WORKING_PATTERN = /^(?!\s*[>❯➜])[^()\n]*\([^)\n]*esc to interrupt\)\s*$/im;
 
 export { SESSION_ID_PATTERN, CONTINUE_PROMPT };
 

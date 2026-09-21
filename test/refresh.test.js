@@ -18,6 +18,7 @@ import {
   pendingInput,
   submittedInput,
   WORKING_PHRASE_IN_TRANSCRIPT,
+  WORKING_PHRASE_QUOTED_WITH_PARENS,
   PERMISSION_PROMPT,
 } from "./fixtures/claude-screens.js";
 
@@ -836,6 +837,10 @@ describe("isWorking", () => {
 
   it("is false when the transcript merely quotes the spinner's marker", () => {
     assert.equal(isWorking(WORKING_PHRASE_IN_TRANSCRIPT), false);
+  });
+
+  it("is false when the transcript quotes the marker's own parenthetical verbatim", () => {
+    assert.equal(isWorking(WORKING_PHRASE_QUOTED_WITH_PARENS), false);
   });
 
   it("is false for an unreadable screen", () => {
