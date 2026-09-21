@@ -33,6 +33,66 @@ export const IDLE = screen(
   RULE,
 );
 
+/** A session actively working on a turn, interruptible. */
+export const WORKING = screen(
+  "⏺ Update(src/server.js)",
+  "  ⎿  Updated src/server.js with 4 additions",
+  "",
+  "✻ Refactoring… (12s · ↑ 1.4k tokens · esc to interrupt)",
+  RULE,
+  "❯                                                                        ",
+  RULE,
+);
+
+/**
+ * An idle session whose transcript happens to be quoting the spinner's marker —
+ * a diff, a file read, or a review of the refresh code itself. The phrase is on
+ * screen but not in a spinner parenthetical, so it is not "working".
+ */
+export const WORKING_PHRASE_IN_TRANSCRIPT = screen(
+  "⏺ Read(src/refresh.js)",
+  '  ⎿   * Claude Code renders "esc to interrupt" inside the parenthetical on its',
+  "     * spinner line for as long as a turn is actually running.",
+  "",
+  RULE,
+  "❯                                                                        ",
+  RULE,
+);
+
+/**
+ * A session blocked on a tool-approval dialog. The dialog replaces the input box
+ * while it is open and carries no spinner line, so the session reads as not
+ * working and is left alone rather than having a second prompt queued behind the
+ * pending approval. Note the `(esc)` parenthetical on the last option: a
+ * parenthetical alone is not the marker.
+ *
+ * Unlike the rest of this file, the dialog's box is reproduced by hand rather
+ * than captured — a pane has to be blocked on a real approval to capture one.
+ */
+export const PERMISSION_PROMPT = screen(
+  "⏺ Bash(npm run build)",
+  "  ⎿  Running…",
+  "",
+  "╭──────────────────────────────────────────────────────────────╮",
+  "│ Bash command                                                 │",
+  "│                                                              │",
+  "│   npm run build                                              │",
+  "│   Build the project                                          │",
+  "│                                                              │",
+  "│ Do you want to proceed?                                      │",
+  "│ ❯ 1. Yes                                                     │",
+  "│   2. Yes, and don't ask again for npm run build commands     │",
+  "│   3. No, and tell Claude what to do differently (esc)        │",
+  "╰──────────────────────────────────────────────────────────────╯",
+);
+
+/** A pane with `text` typed into the input box, still unsubmitted. */
+export const pendingInput = (text) => screen("⏺ Ready.", "", RULE, `❯ ${text}`, RULE);
+
+/** A pane where `text` has been submitted: echoed into the transcript, box empty. */
+export const submittedInput = (text) =>
+  screen(`❯ ${text}`, "  ⎿  Picking up where it left off", "", RULE, "❯                    ", RULE);
+
 /** The exited process printing its resume hint, before relaunch. */
 export const EXITED_WITH_SESSION_ID = [
   "  Session limit reached. Resume this session with:",
