@@ -8,10 +8,19 @@ const SESSION_ID_PATTERN = /claude --resume\s+([0-9a-f-]{36})/i;
 const POLL_INTERVAL_MS = 500;
 const TIMEOUT_MS = 30000;
 // Plugins first: they can register skills, so reloading skills before
-// plugins would miss any skill a just-updated plugin adds.
-const RELOAD_COMMANDS = ["/reload-plugins", "/reload-skills"];
+// plugins would miss any skill a just-updated plugin adds. The continue prompt
+// runs last, once both reloads are in place, and is sent unconditionally rather
+// than gated on some external "is this session mid-task" check: any such check
+// can only pattern-match the screen's rendered text, and real prose (a doc
+// comment or README describing this very prompt, terminal line-wrapping) can
+// coincidentally reproduce whatever shape it keys off. The session itself is a
+// better judge — it has the actual conversation context. Kept short
+// deliberately: a prompt long enough to wrap in the input box can't be
+// verified against a single prompt line (see {@link inputBoxText}).
+const CONTINUE_PROMPT = "If you had unfinished work, continue it — otherwise just wait.";
+const RELOAD_COMMANDS = ["/reload-plugins", "/reload-skills", CONTINUE_PROMPT];
 
-export { SESSION_ID_PATTERN };
+export { SESSION_ID_PATTERN, CONTINUE_PROMPT };
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -205,12 +214,12 @@ export class Refresher {
    *
    * @returns {Promise<{ok: boolean, error?: string}>}
    */
-  async #submitCommand(workspaceId, surfaceRef, workspaceRef, text, { attempts = 3 } = {}) {
+  async #submitCommand(workspaceId, surfaceRef, workspaceRef, text, { attempts = 3, label = text } = {}) {
     await this.#cmux.sendText(workspaceId, surfaceRef, text);
 
     const landed = await this.#waitForInputBox(workspaceRef, text);
     if (!landed.ok) {
-      return { ok: false, error: `${text} never reached the input box (found ${describeBox(landed.seen)})` };
+      return { ok: false, error: `${label} never reached the input box (found ${describeBox(landed.seen)})` };
     }
 
     for (let attempt = 0; attempt < attempts; attempt++) {
@@ -223,20 +232,23 @@ export class Refresher {
         // necessarily still holding it. We can't tell submitted from swallowed here,
         // and sending another blind Enter risks a spurious keystroke landing once
         // rendering catches up, so stop instead of retrying.
-        return { ok: false, error: `${text} submission could not be confirmed (no prompt visible after Enter)` };
+        return { ok: false, error: `${label} submission could not be confirmed (no prompt visible after Enter)` };
       }
       if (outcome.current !== text) {
-        return { ok: false, error: `${text} was replaced in the input box by ${describeBox(outcome.current)}` };
+        return { ok: false, error: `${label} was replaced in the input box by ${describeBox(outcome.current)}` };
       }
       // Still holding the command: the dropdown swallowed that Enter. It closes on
       // accepting the suggestion, so the next Enter reaches the input line.
     }
-    return { ok: false, error: `${text} is still sitting in the input box after ${attempts} attempts` };
+    return { ok: false, error: `${label} is still sitting in the input box after ${attempts} attempts` };
   }
 
   /**
    * Restarts the session in `workspaceId`, resuming it and replaying the
-   * permission flags it was launched with (see {@link permissionFlags}).
+   * permission flags it was launched with (see {@link permissionFlags}), then
+   * replaying {@link RELOAD_COMMANDS} — plugins, skills, and finally
+   * {@link CONTINUE_PROMPT} so a session that was mid-task picks its work back
+   * up instead of sitting idle.
    *
    * @param {object} [options]
    * @param {boolean} [options.dangerous] Force `--dangerously-skip-permissions`
@@ -321,6 +333,7 @@ export class Refresher {
       // one command doesn't cost the others their reload.
       const results = [];
       for (const command of RELOAD_COMMANDS) {
+        const label = command === CONTINUE_PROMPT ? "the continue prompt" : command;
         // Wait for the terminal screen to stabilize before each command. Before the
         // first one, the claude_code tag has appeared but Claude isn't ready for slash
         // commands until the resume/initialization flow finishes. Before a later one, a
@@ -340,14 +353,13 @@ export class Refresher {
         // rather than replacing it, so typing the next command on top of real leftover
         // text would concatenate into one garbled string; report an honest skip instead.
         const clear = await this.#waitForInputBox(workspaceRef, "");
-        if (!clear.ok) {
-          results.push({
-            ok: false,
-            error: `${command} was skipped: the input box still holds leftover text (found ${describeBox(clear.seen)})`,
-          });
-          continue;
-        }
-        results.push(await this.#submitCommand(workspaceId, surfaceRef, workspaceRef, command));
+        const outcome = clear.ok
+          ? await this.#submitCommand(workspaceId, surfaceRef, workspaceRef, command, { label })
+          : {
+              ok: false,
+              error: `${label} was skipped: the input box still holds leftover text (found ${describeBox(clear.seen)})`,
+            };
+        results.push(outcome);
       }
 
       // Restore the workspace title

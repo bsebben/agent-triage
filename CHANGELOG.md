@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.56.0] - 2026-09-21
+
+### Added
+
+- Refresh now sends a short "continue if you had unfinished work" prompt after the reload commands, so a restart doesn't quietly abandon work in flight. Sent unconditionally on every refresh — the session judges for itself whether it has anything to continue, rather than the dashboard guessing from the pane. If a reload leaves stray text in the input box the prompt is skipped rather than typed into it.
+
 ## [1.55.2] - 2026-09-16
 
 ### Fixed

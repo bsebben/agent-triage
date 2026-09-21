@@ -81,6 +81,8 @@ bin/install.sh   # safe to re-run, idempotent
 
 Each Workspaces card for a Claude Code session has a refresh button (&#x21bb;). Click it to restart the Claude Code session in that workspace — the dashboard kills the running Claude process and respawns it in place, preserving the session. Use it when a session gets stuck or you want a clean restart without leaving the dashboard.
 
+Every refresh is followed by a short prompt asking the resumed session to pick its work back up if it had any, so killing a session mid-task doesn't quietly abandon whatever it was doing. It's sent unconditionally rather than detected from the outside — the session itself, with its actual conversation context, is a better judge of whether it had unfinished work than anything the dashboard could infer from the pane. An idle session just answers that there's nothing to continue.
+
 The relaunch also replays the permission flags the session was started with (`--dangerously-skip-permissions`, `--permission-mode <mode>`), so a bypass session doesn't quietly come back in default mode — and **Refresh All** keeps each session in its own mode rather than levelling them all. The flags are read from the live process's own arguments, which bounds what can be replayed in two ways: a mode switched inside the session (shift+tab) isn't visible from the outside, and a session whose Claude process has already exited has no arguments left to read — refreshing either one relaunches in default mode.
 
 ### Shift-click danger mode

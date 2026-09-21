@@ -33,6 +33,13 @@ export const IDLE = screen(
   RULE,
 );
 
+/** A pane with `text` typed into the input box, still unsubmitted. */
+export const pendingInput = (text) => screen("⏺ Ready.", "", RULE, `❯ ${text}`, RULE);
+
+/** A pane where `text` has been submitted: echoed into the transcript, box empty. */
+export const submittedInput = (text) =>
+  screen(`❯ ${text}`, "  ⎿  Picking up where it left off", "", RULE, "❯                    ", RULE);
+
 /** The exited process printing its resume hint, before relaunch. */
 export const EXITED_WITH_SESSION_ID = [
   "  Session limit reached. Resume this session with:",

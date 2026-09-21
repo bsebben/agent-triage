@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { Refresher, SESSION_ID_PATTERN, isPendingInput, inputBoxText } from "../src/refresh.js";
+import { Refresher, SESSION_ID_PATTERN, CONTINUE_PROMPT, isPendingInput, inputBoxText } from "../src/refresh.js";
 import { permissionFlags } from "../src/utils.js";
 import {
   IDLE,
@@ -14,6 +14,8 @@ import {
   PENDING_NO_DROPDOWN_SKILLS,
   SUBMITTED_SKILLS,
   DROPDOWN_ACCEPTED_OTHER_SKILLS,
+  pendingInput,
+  submittedInput,
 } from "./fixtures/claude-screens.js";
 
 function makeWorkspace(id, surfaceRef, wsRef, tty) {
@@ -28,11 +30,12 @@ function makeTopData(workspaces) {
   return { windows: [{ workspaces }] };
 }
 
-// refreshSession submits both slash commands in order, so the pane mock has to
-// simulate both in sequence even when a test only cares about one of them.
+// refreshSession submits all three commands in order, so the pane mock has to
+// simulate all three in sequence even when a test only cares about one of them.
 const HAPPY_PATH = {
   "/reload-plugins": { pending: PENDING_NO_DROPDOWN, submitted: SUBMITTED },
   "/reload-skills": { pending: PENDING_NO_DROPDOWN_SKILLS, submitted: SUBMITTED_SKILLS },
+  [CONTINUE_PROMPT]: { pending: pendingInput(CONTINUE_PROMPT), submitted: submittedInput(CONTINUE_PROMPT) },
 };
 // Single source of truth for the command set and its submission order — derived
 // from HAPPY_PATH so a future reload command only needs to be added there.
@@ -91,11 +94,12 @@ function makeSequencedPane(preSubmit, overrides = {}, { focusCommand = "/reload-
         // A function-supplied preSubmit models its own transition (e.g. the
         // screen-stability test cycles through several screens before settling
         // on an idle one itself). A static preSubmit is just flavor text for the
-        // pre-relaunch/exit-detection read — real Claude UI (empty box) takes
-        // over the pane immediately after, so only the very first read sees it.
+        // two pre-relaunch reads (the mid-task check before the kill, then exit
+        // detection) — real Claude UI (empty box) takes over the pane
+        // immediately after, so no later read sees it.
         if (typeof preSubmit === "function") return preSubmit();
         preSubmitCalls++;
-        return preSubmitCalls === 1 ? preSubmit : IDLE;
+        return preSubmitCalls <= 2 ? preSubmit : IDLE;
       }
       const cmd = COMMAND_ORDER[stageIndex];
       const cfg = config(cmd);
@@ -808,6 +812,71 @@ describe("Refresher: /reload-plugins and /reload-skills together", () => {
     assert.equal(result.ok, false);
     assert.match(result.error, /reload-skills/);
     assert.ok(pane.sentTexts.includes("/reload-plugins"), "should have fully attempted /reload-plugins first");
+  });
+});
+
+describe("Refresher auto-continue prompt", () => {
+  const mockExecFile = (_cmd, _args, cb) => cb(null, { stdout: "" });
+
+  const ws = () => makeWorkspace("W1", "surface:1", "workspace:W1", "ttysTest");
+
+  function run(pane) {
+    const refresher = new Refresher({
+      cmuxApi: makeCmuxApi(pane, [ws()]),
+      execFileFn: mockExecFile,
+      pollIntervalMs: 10,
+      timeoutMs: 3000,
+    });
+    return refresher.refreshSession("W1");
+  }
+
+  it("submits the continue prompt last, after both reloads, on every refresh", async () => {
+    const pane = makeSequencedPane(IDLE);
+    const result = await run(pane);
+
+    assert.equal(result.ok, true, `expected a clean refresh, got: ${JSON.stringify(result)}`);
+    // Last, so it runs with the reloaded plugins and skills already in place.
+    assert.deepEqual(
+      pane.sentTexts.filter((t) => t.startsWith("/reload") || t === CONTINUE_PROMPT),
+      ["/reload-plugins", "/reload-skills", CONTINUE_PROMPT],
+    );
+  });
+
+  it("still sends the continue prompt when no session ID could be recovered", async () => {
+    const pane = makeSequencedPane(EXITED_WITHOUT_SESSION_ID);
+    const result = await run(pane);
+
+    assert.equal(result.ok, true, `expected a clean refresh, got: ${JSON.stringify(result)}`);
+    assert.equal(result.sessionId, null);
+    assert.equal(
+      pane.sentTexts.find((t) => t.startsWith("claude")),
+      "claude",
+      "no session ID means a brand-new session, not a resume",
+    );
+    assert.ok(
+      pane.sentTexts.includes(CONTINUE_PROMPT),
+      "the prompt's own wording hedges the case where there's nothing to continue",
+    );
+  });
+
+  it("skips the continue prompt, rather than typing into it, when an earlier reload leaves stray text", async () => {
+    const pane = makeSequencedPane(IDLE, {
+      "/reload-skills": { entersToSubmit: Infinity, pending: PENDING_WITH_DROPDOWN_SKILLS },
+    });
+    const result = await run(pane);
+
+    assert.equal(result.ok, false);
+    assert.match(result.error, /the continue prompt was skipped/);
+    assert.ok(
+      !pane.sentTexts.includes(CONTINUE_PROMPT),
+      "should never type the continue prompt into a box that still holds leftover text",
+    );
+  });
+
+  it("keeps the prompt short enough to be confirmed on a single input-box line", () => {
+    // inputBoxText only ever reads the bottom-most prompt line — a prompt long
+    // enough to wrap could never be confirmed as landed in the box (see refresh.js).
+    assert.ok(CONTINUE_PROMPT.length < 80, `CONTINUE_PROMPT is ${CONTINUE_PROMPT.length} chars: ${CONTINUE_PROMPT}`);
   });
 });
 
