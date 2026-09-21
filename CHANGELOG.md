@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.56.0] - 2026-09-21
+
+### Added
+
+- Refresh auto-continues a session that was mid-task: if the pane showed Claude's spinner line when the refresh started, the resumed session is sent a short `continue where you left off` prompt after the reload commands, so a restart doesn't abandon the work in flight. Idle sessions, ones whose transcript merely quotes "esc to interrupt", and ones waiting at a permission prompt are left alone; so is a refresh that recovered no session ID, since the brand-new session it relaunches has no work to continue. If a reload leaves stray text in the input box the prompt is skipped rather than typed into it.
+
 ## [1.55.2] - 2026-09-16
 
 ### Fixed

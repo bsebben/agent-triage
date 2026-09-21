@@ -10,8 +10,36 @@ const TIMEOUT_MS = 30000;
 // Plugins first: they can register skills, so reloading skills before
 // plugins would miss any skill a just-updated plugin adds.
 const RELOAD_COMMANDS = ["/reload-plugins", "/reload-skills"];
+/**
+ * Sent to a session that was interrupted mid-task, so it picks the work back up
+ * instead of coming back idle at an empty box. Kept short deliberately: a prompt
+ * long enough to wrap in the input box can't be verified against a single prompt
+ * line (see {@link inputBoxText}).
+ */
+const CONTINUE_PROMPT = "continue where you left off";
 
-export { SESSION_ID_PATTERN };
+/**
+ * Claude Code renders "esc to interrupt" inside the parenthetical on its spinner
+ * line (`✻ Refactoring… (12s · ↑ 1.4k tokens · esc to interrupt)`) for as long as
+ * a turn is actually running — so it is the one marker that separates a session
+ * doing work from one waiting at a prompt.
+ *
+ * Matching the bare phrase anywhere on the screen is not enough: the marker is
+ * ordinary prose that a transcript can be quoting back (a diff, a file read, a
+ * review of this very file), and reading that as "working" would inject an
+ * unrequested prompt into a session the user considers finished. So the match is
+ * anchored to the spinner's shape the way {@link inputBoxText} is anchored to the
+ * input box's position: the phrase has to sit inside a parenthetical, on a line
+ * that isn't a prompt line.
+ */
+const WORKING_PATTERN = /^(?!\s*[>❯➜])[^()\n]*\([^)\n]*esc to interrupt/im;
+
+export { SESSION_ID_PATTERN, CONTINUE_PROMPT };
+
+/** True when the screen shows Claude Code actively working on a turn. */
+export function isWorking(screen) {
+  return !!screen && WORKING_PATTERN.test(screen);
+}
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -205,12 +233,12 @@ export class Refresher {
    *
    * @returns {Promise<{ok: boolean, error?: string}>}
    */
-  async #submitCommand(workspaceId, surfaceRef, workspaceRef, text, { attempts = 3 } = {}) {
+  async #submitCommand(workspaceId, surfaceRef, workspaceRef, text, { attempts = 3, label = text } = {}) {
     await this.#cmux.sendText(workspaceId, surfaceRef, text);
 
     const landed = await this.#waitForInputBox(workspaceRef, text);
     if (!landed.ok) {
-      return { ok: false, error: `${text} never reached the input box (found ${describeBox(landed.seen)})` };
+      return { ok: false, error: `${label} never reached the input box (found ${describeBox(landed.seen)})` };
     }
 
     for (let attempt = 0; attempt < attempts; attempt++) {
@@ -223,20 +251,22 @@ export class Refresher {
         // necessarily still holding it. We can't tell submitted from swallowed here,
         // and sending another blind Enter risks a spurious keystroke landing once
         // rendering catches up, so stop instead of retrying.
-        return { ok: false, error: `${text} submission could not be confirmed (no prompt visible after Enter)` };
+        return { ok: false, error: `${label} submission could not be confirmed (no prompt visible after Enter)` };
       }
       if (outcome.current !== text) {
-        return { ok: false, error: `${text} was replaced in the input box by ${describeBox(outcome.current)}` };
+        return { ok: false, error: `${label} was replaced in the input box by ${describeBox(outcome.current)}` };
       }
       // Still holding the command: the dropdown swallowed that Enter. It closes on
       // accepting the suggestion, so the next Enter reaches the input line.
     }
-    return { ok: false, error: `${text} is still sitting in the input box after ${attempts} attempts` };
+    return { ok: false, error: `${label} is still sitting in the input box after ${attempts} attempts` };
   }
 
   /**
    * Restarts the session in `workspaceId`, resuming it and replaying the
-   * permission flags it was launched with (see {@link permissionFlags}).
+   * permission flags it was launched with (see {@link permissionFlags}). A
+   * session that was mid-task when it was killed is also sent
+   * {@link CONTINUE_PROMPT} once the reloads are through.
    *
    * @param {object} [options]
    * @param {boolean} [options.dangerous] Force `--dangerously-skip-permissions`
@@ -264,6 +294,11 @@ export class Refresher {
 
     this.#inFlight.add(workspaceId);
     try {
+      // Whether the session is mid-task has to be read before the kill too: the
+      // spinner line the check keys off is only on screen while the turn is
+      // running, and the exited process replaces it with its resume hint.
+      const wasWorking = isWorking(await this.#cmux.readScreenByWorkspace(workspaceRef));
+
       // The flags have to be read before the kill — argv only exists while the
       // process does.
       const pid = await this.#findClaudePid(tty);
@@ -320,7 +355,16 @@ export class Refresher {
       // Each is attempted even if an earlier one fails, so a stuck dropdown on
       // one command doesn't cost the others their reload.
       const results = [];
-      for (const command of RELOAD_COMMANDS) {
+      // A session killed mid-task comes back sitting at an empty box with its
+      // work abandoned, so nudge it to pick the task back up — last, so it
+      // resumes with the reloaded plugins and skills already in place. Only a
+      // session that actually came back resumed has work to continue: without a
+      // session id the relaunch above is a plain `claude` with no transcript, and
+      // the prompt would have it invent a task from nothing.
+      const submissions = wasWorking && sessionId ? [...RELOAD_COMMANDS, CONTINUE_PROMPT] : RELOAD_COMMANDS;
+      let continued = false;
+      for (const command of submissions) {
+        const label = command === CONTINUE_PROMPT ? "the continue prompt" : command;
         // Wait for the terminal screen to stabilize before each command. Before the
         // first one, the claude_code tag has appeared but Claude isn't ready for slash
         // commands until the resume/initialization flow finishes. Before a later one, a
@@ -340,14 +384,14 @@ export class Refresher {
         // rather than replacing it, so typing the next command on top of real leftover
         // text would concatenate into one garbled string; report an honest skip instead.
         const clear = await this.#waitForInputBox(workspaceRef, "");
-        if (!clear.ok) {
-          results.push({
-            ok: false,
-            error: `${command} was skipped: the input box still holds leftover text (found ${describeBox(clear.seen)})`,
-          });
-          continue;
-        }
-        results.push(await this.#submitCommand(workspaceId, surfaceRef, workspaceRef, command));
+        const outcome = clear.ok
+          ? await this.#submitCommand(workspaceId, surfaceRef, workspaceRef, command, { label })
+          : {
+              ok: false,
+              error: `${label} was skipped: the input box still holds leftover text (found ${describeBox(clear.seen)})`,
+            };
+        results.push(outcome);
+        if (command === CONTINUE_PROMPT) continued = outcome.ok;
       }
 
       // Restore the workspace title
@@ -357,10 +401,15 @@ export class Refresher {
 
       const failures = results.filter((r) => !r.ok).map((r) => r.error);
       if (failures.length) {
-        return { ok: false, sessionId: sessionId || null, error: `Claude Code restarted, but ${failures.join("; ")}` };
+        return {
+          ok: false,
+          sessionId: sessionId || null,
+          continued,
+          error: `Claude Code restarted, but ${failures.join("; ")}`,
+        };
       }
 
-      return { ok: true, sessionId: sessionId || null };
+      return { ok: true, sessionId: sessionId || null, continued };
     } finally {
       this.#inFlight.delete(workspaceId);
     }
