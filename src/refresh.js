@@ -8,41 +8,19 @@ const SESSION_ID_PATTERN = /claude --resume\s+([0-9a-f-]{36})/i;
 const POLL_INTERVAL_MS = 500;
 const TIMEOUT_MS = 30000;
 // Plugins first: they can register skills, so reloading skills before
-// plugins would miss any skill a just-updated plugin adds.
-const RELOAD_COMMANDS = ["/reload-plugins", "/reload-skills"];
-/**
- * Sent to a session that was interrupted mid-task, so it picks the work back up
- * instead of coming back idle at an empty box. Kept short deliberately: a prompt
- * long enough to wrap in the input box can't be verified against a single prompt
- * line (see {@link inputBoxText}).
- */
-const CONTINUE_PROMPT = "continue where you left off";
-
-/**
- * Claude Code renders "esc to interrupt" inside the parenthetical on its spinner
- * line (`✻ Refactoring… (12s · ↑ 1.4k tokens · esc to interrupt)`) for as long as
- * a turn is actually running — so it is the one marker that separates a session
- * doing work from one waiting at a prompt.
- *
- * Matching the bare phrase anywhere on the screen is not enough: the marker is
- * ordinary prose that a transcript can be quoting back (a diff, a file read, a
- * review of this very file — including this very doc comment, rendered verbatim
- * by a Read tool call), and reading that as "working" would inject an
- * unrequested prompt into a session the user considers finished. So the match is
- * anchored to the spinner's shape the way {@link inputBoxText} is anchored to the
- * input box's position: the phrase has to sit inside a parenthetical, on a line
- * that isn't a prompt line, and that parenthetical has to be the last thing on
- * the line — real spinner lines never have anything after it, but prose quoting
- * the phrase always does (a closing backtick, a trailing clause).
- */
-const WORKING_PATTERN = /^(?!\s*[>❯➜])[^()\n]*\([^)\n]*esc to interrupt\)\s*$/im;
+// plugins would miss any skill a just-updated plugin adds. The continue prompt
+// runs last, once both reloads are in place, and is sent unconditionally rather
+// than gated on some external "is this session mid-task" check: any such check
+// can only pattern-match the screen's rendered text, and real prose (a doc
+// comment or README describing this very prompt, terminal line-wrapping) can
+// coincidentally reproduce whatever shape it keys off. The session itself is a
+// better judge — it has the actual conversation context. Kept short
+// deliberately: a prompt long enough to wrap in the input box can't be
+// verified against a single prompt line (see {@link inputBoxText}).
+const CONTINUE_PROMPT = "If you had unfinished work, continue it — otherwise just wait.";
+const RELOAD_COMMANDS = ["/reload-plugins", "/reload-skills", CONTINUE_PROMPT];
 
 export { SESSION_ID_PATTERN, CONTINUE_PROMPT };
-
-/** True when the screen shows Claude Code actively working on a turn. */
-export function isWorking(screen) {
-  return !!screen && WORKING_PATTERN.test(screen);
-}
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -267,9 +245,10 @@ export class Refresher {
 
   /**
    * Restarts the session in `workspaceId`, resuming it and replaying the
-   * permission flags it was launched with (see {@link permissionFlags}). A
-   * session that was mid-task when it was killed is also sent
-   * {@link CONTINUE_PROMPT} once the reloads are through.
+   * permission flags it was launched with (see {@link permissionFlags}), then
+   * replaying {@link RELOAD_COMMANDS} — plugins, skills, and finally
+   * {@link CONTINUE_PROMPT} so a session that was mid-task picks its work back
+   * up instead of sitting idle.
    *
    * @param {object} [options]
    * @param {boolean} [options.dangerous] Force `--dangerously-skip-permissions`
@@ -297,11 +276,6 @@ export class Refresher {
 
     this.#inFlight.add(workspaceId);
     try {
-      // Whether the session is mid-task has to be read before the kill too: the
-      // spinner line the check keys off is only on screen while the turn is
-      // running, and the exited process replaces it with its resume hint.
-      const wasWorking = isWorking(await this.#cmux.readScreenByWorkspace(workspaceRef));
-
       // The flags have to be read before the kill — argv only exists while the
       // process does.
       const pid = await this.#findClaudePid(tty);
@@ -358,15 +332,7 @@ export class Refresher {
       // Each is attempted even if an earlier one fails, so a stuck dropdown on
       // one command doesn't cost the others their reload.
       const results = [];
-      // A session killed mid-task comes back sitting at an empty box with its
-      // work abandoned, so nudge it to pick the task back up — last, so it
-      // resumes with the reloaded plugins and skills already in place. Only a
-      // session that actually came back resumed has work to continue: without a
-      // session id the relaunch above is a plain `claude` with no transcript, and
-      // the prompt would have it invent a task from nothing.
-      const submissions = wasWorking && sessionId ? [...RELOAD_COMMANDS, CONTINUE_PROMPT] : RELOAD_COMMANDS;
-      let continued = false;
-      for (const command of submissions) {
+      for (const command of RELOAD_COMMANDS) {
         const label = command === CONTINUE_PROMPT ? "the continue prompt" : command;
         // Wait for the terminal screen to stabilize before each command. Before the
         // first one, the claude_code tag has appeared but Claude isn't ready for slash
@@ -394,7 +360,6 @@ export class Refresher {
               error: `${label} was skipped: the input box still holds leftover text (found ${describeBox(clear.seen)})`,
             };
         results.push(outcome);
-        if (command === CONTINUE_PROMPT) continued = outcome.ok;
       }
 
       // Restore the workspace title
@@ -404,15 +369,10 @@ export class Refresher {
 
       const failures = results.filter((r) => !r.ok).map((r) => r.error);
       if (failures.length) {
-        return {
-          ok: false,
-          sessionId: sessionId || null,
-          continued,
-          error: `Claude Code restarted, but ${failures.join("; ")}`,
-        };
+        return { ok: false, sessionId: sessionId || null, error: `Claude Code restarted, but ${failures.join("; ")}` };
       }
 
-      return { ok: true, sessionId: sessionId || null, continued };
+      return { ok: true, sessionId: sessionId || null };
     } finally {
       this.#inFlight.delete(workspaceId);
     }

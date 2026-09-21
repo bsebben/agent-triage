@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
-- Refresh auto-continues a session that was mid-task: if the pane showed Claude's spinner line when the refresh started, the resumed session is sent a short `continue where you left off` prompt after the reload commands, so a restart doesn't abandon the work in flight. Idle sessions, ones whose transcript merely quotes "esc to interrupt", and ones waiting at a permission prompt are left alone; so is a refresh that recovered no session ID, since the brand-new session it relaunches has no work to continue. If a reload leaves stray text in the input box the prompt is skipped rather than typed into it.
+- Refresh now sends a short "continue if you had unfinished work" prompt after the reload commands, so a restart doesn't quietly abandon work in flight. Sent unconditionally on every refresh — the session judges for itself whether it has anything to continue, rather than the dashboard guessing from the pane. If a reload leaves stray text in the input box the prompt is skipped rather than typed into it.
 
 ## [1.55.2] - 2026-09-16
 
