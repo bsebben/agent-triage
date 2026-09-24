@@ -93,6 +93,14 @@ Hold **Shift** when clicking an action (starting a new session, refreshing a ses
 
 Clicking a PR/ticket title, the parent-key chip, a "more →" link, or a Buildkite deploy dot drives **Google Chrome** via AppleScript to open the link in its own dedicated window, separate from wherever you clicked from — so it never dumps new tabs into whatever window you happen to be using. Cmd/ctrl/shift/opt-click bypass this and use the browser's native new-tab/new-window behavior instead. Requires Chrome and macOS Automation permission for the terminal/process running the server; without it, links fall back to opening in the dashboard's own browser window.
 
+### Cross-session address
+
+Each Claude Code card has a copy button (&#x29c9;) that puts the session's cross-session address on the clipboard — the name another session passes to `SendMessage`'s `to` field, e.g. `agent-triage-b7 [40e5ca]`. Paste it into whichever session should talk to that one, instead of reading it off a `ListAgents` listing and matching sessions up by hand.
+
+That name lives inside the Claude Code harness and appears in nothing the dashboard can read: cmux knows a pane's title, directory, branch and tty, not the session's address. So sessions report their own: enable **Cross-session address reporting** under Settings → Integrations and each session is asked once, at startup, to read its own name out of `ListAgents` and POST it to the dashboard on localhost. That POST is a `curl`, so the session needs permission to run it; if the ask goes unanswered it's retried on a couple of later prompts and then dropped, rather than repeating forever. Everything after that is shell-only — a liveness ping per prompt, and an unregister on exit. Requires `jq`.
+
+Until a session reports in, its copy button is dimmed and copies the pane's title, directory and branch instead — enough to find the session by hand, and deliberately not something that looks like a working address. The registry is in-memory only, so restarting the dashboard clears it and sessions re-report on their next prompt. A registration lasts as long as cmux still reports its pane — including through a long autonomous run that spends hours on a single prompt — and goes away when the pane does, when the session exits, or if the dashboard loses sight of cmux for more than ten minutes.
+
 ### Worktree indicator
 
 Workspace groups are keyed by repo, so a repo's main checkout and all its git worktrees share one group instead of appearing as unrelated siblings. A card whose pane is in a linked worktree shows a small pill with the worktree's name (hover for the full paths); the main checkout's own card shows no pill.

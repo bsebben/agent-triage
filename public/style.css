@@ -587,6 +587,24 @@ main { padding: 8px; position: relative; }
 .card-refresh:hover { color: var(--clr-running); }
 .card-refresh.refreshing { opacity: 1; animation: spin 1s linear infinite; color: var(--clr-running); }
 
+.card-copy-address {
+  font-size: 13px;
+  color: var(--text-dim);
+  cursor: pointer;
+  text-decoration: none;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+  display: inline-block;
+}
+
+.card:hover .card-copy-address { opacity: 1; }
+.card-copy-address:hover { color: var(--clr-running); }
+
+/* No address reported yet — the button still copies, but dimmed so it doesn't
+   promise a working SendMessage address. */
+.card:hover .card-copy-address.unverified { opacity: 0.45; }
+.card-copy-address.unverified:hover { opacity: 0.8; color: var(--text); }
+
 .card-close {
   font-size: 11px;
   color: var(--clr-error);

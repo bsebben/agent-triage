@@ -19,6 +19,7 @@ import { detectCmuxVersion } from "./cmux-version.js";
 import * as plugins from "./plugins.js";
 import { INTEGRATIONS, status as integrationStatus, enable as enableIntegration, disable as disableIntegration, isDecided as integrationIsDecided, dismiss as dismissIntegration } from "./integrations.js";
 import { refreshSession, refreshAll, refreshingIds } from "./refresh.js";
+import { SessionAddresses } from "./session-addresses.js";
 import { startHeartbeat } from "./heartbeat.js";
 import loops from "./tabs/loops.js";
 import pulls from "./tabs/pulls.js";
@@ -69,6 +70,14 @@ function sendToAll(payload) {
 const queue = new Queue();
 await queue.load(join(DATA_DIR, "queue.json"));
 
+// Cross-session addresses are deliberately never restored from disk (see
+// src/session-addresses.js): queue.json carries whatever the last poll wrote,
+// and an address that outlived its session would have a card offering a name
+// that silently reaches nothing. Live sessions re-report within a turn.
+for (const item of [...queue.items(), ...queue.dismissedItems()]) {
+  item.sessionAddress = null;
+}
+
 const directoryHistory = new DirectoryHistory();
 await directoryHistory.load(DIRECTORY_HISTORY_PATH);
 
@@ -87,7 +96,8 @@ if (cmuxVersion.compatible) {
 } else {
   console.log(`Config: cmux version = ${cmuxVersion.version || "unknown"} (${cmuxVersion.reason} — supported: ${cmuxVersion.range.min}–${cmuxVersion.range.max})`);
 }
-const monitor = new Monitor(queue, { onUpdate: broadcast });
+const sessionAddresses = new SessionAddresses();
+const monitor = new Monitor(queue, { onUpdate: broadcast, sessionAddresses });
 
 function getSessionCount() {
   const ids = new Set();
@@ -161,6 +171,17 @@ let lastLinksWindowId = "";
 
 function resolveCwd(pick) {
   return resolveDirectory(pick, { defaultDirectory: config.defaultDirectory, home: HOME });
+}
+
+// Longest address the registry will store. `ListAgents` names are short; this
+// is only here so a runaway payload can't be parked in memory.
+const MAX_ADDRESS_LENGTH = 200;
+
+// Accepts a tty name as cmux and `ps` report it ("ttys012"). The registry is
+// keyed by this value and nothing else reads it, but validating keeps a
+// malformed payload from filling the map with junk keys no prune can match.
+function isValidTty(tty) {
+  return typeof tty === "string" && /^[a-zA-Z0-9/]{1,32}$/.test(tty);
 }
 
 
@@ -593,6 +614,37 @@ const server = createServer(async (req, res) => {
     if (req.url === "/api/restore" && req.method === "POST") {
       const { id } = await readBody(req);
       queue.restore(id);
+      broadcast();
+      return jsonResponse(res, { ok: true });
+    }
+
+    // --- Cross-session addresses ---
+    // Written by the session-address hooks (bin/hooks/session-address.sh), the
+    // only parties that know a session's own SendMessage address.
+
+    if (req.url === "/api/session-address" && req.method === "POST") {
+      const { tty, address } = await readBody(req);
+      if (!isValidTty(tty)) return jsonResponse(res, { ok: false, error: "tty is required" }, 400);
+      if (typeof address !== "string" || !address.trim()) {
+        return jsonResponse(res, { ok: false, error: "address is required" }, 400);
+      }
+      sessionAddresses.register(tty, address.trim().slice(0, MAX_ADDRESS_LENGTH));
+      broadcast();
+      return jsonResponse(res, { ok: true });
+    }
+
+    if (req.url === "/api/session-address/heartbeat" && req.method === "POST") {
+      const { tty } = await readBody(req);
+      if (!isValidTty(tty)) return jsonResponse(res, { ok: false, error: "tty is required" }, 400);
+      // `known: false` tells the caller its address has been forgotten (server
+      // restart, TTL expiry), which is the hook's cue to announce again.
+      return jsonResponse(res, { ok: true, known: sessionAddresses.heartbeat(tty) });
+    }
+
+    if (req.url === "/api/session-address" && req.method === "DELETE") {
+      const { tty } = await readBody(req);
+      if (!isValidTty(tty)) return jsonResponse(res, { ok: false, error: "tty is required" }, 400);
+      sessionAddresses.unregister(tty);
       broadcast();
       return jsonResponse(res, { ok: true });
     }

@@ -158,6 +158,16 @@ function isGenericBody(body) {
   return GENERIC_BODIES.includes(body.toLowerCase().trim());
 }
 
+// What the copy button puts on the clipboard: the session's own cross-session
+// address when it has reported one (see src/session-addresses.js), otherwise
+// enough context to identify the pane by hand. The fallback is never an
+// address — SendMessage would reject it — so the button labels itself
+// unverified rather than implying otherwise.
+function sessionAddressText(item) {
+  if (item.sessionAddress) return item.sessionAddress;
+  return [item.workspaceTitle, item.workspaceDir, item.gitBranch].filter(Boolean).join(" — ");
+}
+
 function renderCard(item, { isDismissed = false } = {}) {
   const selectedClass = item.workspaceSelected ? " selected" : "";
 
@@ -189,6 +199,14 @@ function renderCard(item, { isDismissed = false } = {}) {
     ? `<a class="card-refresh${refreshing ? " refreshing" : ""}" data-tip="Refresh session" data-tip-dangerous="Refresh session (convert to dangerous)" onclick="event.stopPropagation();refreshOneSession('${item.workspaceId}', event.shiftKey)"${refreshing ? " style=\"pointer-events:none\"" : ""}>&#x21bb;</a>`
     : "";
 
+  // Terminals have no session to address, and the host card is this dashboard's
+  // own tab rather than an agent worth messaging.
+  const addressable = !item.isHost && item.category !== "terminal";
+  const addressText = addressable ? sessionAddressText(item) : "";
+  const copyAddressBtn = addressable && addressText
+    ? `<a class="card-copy-address${item.sessionAddress ? "" : " unverified"}" data-address="${escapeHtml(addressText)}" data-verified="${item.sessionAddress ? "1" : ""}" data-tip="${item.sessionAddress ? "Copy session address" : "No address reported — copy session details"}" onclick="event.stopPropagation();copySessionAddress(this)">&#x29c9;</a>`
+    : "";
+
   const displayCategory = refreshing ? "refreshing" : item.category;
   const bypassClass = item.bypassPermissions ? " bypass" : "";
   const bypassTip = item.bypassPermissions ? ` title="Running with --dangerously-skip-permissions"` : "";
@@ -196,7 +214,7 @@ function renderCard(item, { isDismissed = false } = {}) {
     ? `<span class="card-worktree" title="Worktree of ${escapeHtml(item.repoRoot || "")}">&#9095; ${escapeHtml(item.worktreeName || "")}</span>`
     : "";
   return `<div class="card${selectedClass}${bypassClass} cat-${escapeHtml(displayCategory)}" data-workspace-id="${item.workspaceId}"${bypassTip} onclick="cardClick(event,'${item.workspaceId}')">
-    <div class="card-title-row"><span class="card-title-group"><span class="card-title">${escapeHtml(cardTitle)}</span>${editLink}</span><span class="card-actions-col"><span class="card-actions-right">${refreshBtn}${dismissBtn}${closeBtn}</span>${item.createdAt ? `<span class="card-time">\u{1f559} ${timeAgo(item.createdAt)}</span>` : ""}</span></div>
+    <div class="card-title-row"><span class="card-title-group"><span class="card-title">${escapeHtml(cardTitle)}</span>${editLink}</span><span class="card-actions-col"><span class="card-actions-right">${copyAddressBtn}${refreshBtn}${dismissBtn}${closeBtn}</span>${item.createdAt ? `<span class="card-time">\u{1f559} ${timeAgo(item.createdAt)}</span>` : ""}</span></div>
     <div class="card-content">
       <div class="card-header">
         <span class="card-category ${escapeHtml(displayCategory)}"><span class="card-icon">${categoryIcon(displayCategory)}</span> ${escapeHtml(displayCategory)}</span>
@@ -259,6 +277,20 @@ function cardClick(event, workspaceId) {
   const tag = event.target.tagName;
   if (tag === "BUTTON" || tag === "INPUT") return;
   focusAgent(workspaceId);
+}
+
+async function copySessionAddress(el) {
+  const text = el.dataset.address || "";
+  if (!text) return;
+  try {
+    await navigator.clipboard.writeText(text);
+  } catch {
+    // Clipboard writes need a secure context — localhost qualifies, a plain-http
+    // LAN address does not.
+    showToast("Copy failed — clipboard unavailable");
+    return;
+  }
+  showToast(el.dataset.verified ? `Copied ${text}` : `Copied session details — no address reported`);
 }
 
 async function dismiss(id) {

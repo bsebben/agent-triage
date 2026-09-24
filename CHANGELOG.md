@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.57.0] - 2026-09-24
+
+### Added
+
+- Copy button on Claude Code workspace cards that yields the session's cross-session address — the name another session passes to `SendMessage`'s `to` field — so related sessions can be pointed at each other without matching a `ListAgents` listing up to panes by hand. Until a session reports an address the button is dimmed and copies the pane's title, directory and branch instead, which is findable by hand and deliberately not mistakable for a working address.
+- Cross-session address reporting integration (Settings → Integrations): registers `SessionStart`/`UserPromptSubmit`/`SessionEnd` hooks so each session reports its own address once and keeps it fresh. The address only exists inside the Claude Code harness — cmux knows a pane's title, directory, branch and tty, never the session's name — so self-reporting is the only way a card can offer a working one. Registrations live in memory only and are keyed by tty, dropped when cmux stops reporting the pane, on clean exit, and — as a backstop for when cmux can't be read at all — on a TTL. `bin/install-session-address-hook.sh`/`bin/uninstall-session-address-hook.sh` are directly runnable too — the Settings toggle shells out to the same scripts.
+
 ## [1.56.0] - 2026-09-21
 
 ### Added

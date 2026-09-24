@@ -11,6 +11,17 @@ function worktreeFields(worktree) {
   };
 }
 
+/**
+ * A cmux tty read (see cmux.listWorkspaceTtys), or null when it couldn't be
+ * read. Null and "cmux reports no panes" must stay distinguishable: only a
+ * successful read may drive address pruning, so anything that isn't recognizably
+ * a successful read is treated as no read at all.
+ */
+function validTtyRead(raw) {
+  if (!raw || !(raw.byWorkspace instanceof Map) || !(raw.liveTtys instanceof Set)) return null;
+  return raw;
+}
+
 export async function enrichNotification(notification, workspaces, terminals, resolveWorktreeFn = defaultResolveWorktree) {
   const workspace = workspaces.find((w) => w.id === notification.workspaceId);
   const terminal = terminals?.find((t) => t.workspaceId === notification.workspaceId);
@@ -37,6 +48,7 @@ export class Monitor {
   #knownAgentWorkspaces = new Set();
   #cmux;
   #resolveWorktree;
+  #sessionAddresses;
   #subscribeWorkspaceEvents;
   #immediatePollDebounceMs;
   #unsubscribeWorkspaceEvents = null;
@@ -51,6 +63,7 @@ export class Monitor {
     onUpdate = null,
     cmuxApi = null,
     resolveWorktreeFn = null,
+    sessionAddresses = null,
     subscribeWorkspaceEventsFn = null,
     immediatePollDebounceMs = 150,
   } = {}) {
@@ -59,6 +72,7 @@ export class Monitor {
     this.#onUpdate = onUpdate;
     this.#cmux = cmuxApi || cmux;
     this.#resolveWorktree = resolveWorktreeFn || defaultResolveWorktree;
+    this.#sessionAddresses = sessionAddresses;
     this.#subscribeWorkspaceEvents = subscribeWorkspaceEventsFn || this.#cmux.subscribeWorkspaceEvents;
     this.#immediatePollDebounceMs = immediatePollDebounceMs;
   }
@@ -130,17 +144,44 @@ export class Monitor {
     }
   }
 
+  /** The poll's tty read, or null when cmux couldn't answer — a failure here
+   * must not fail the whole poll, and must not look like an empty result. */
+  async #readWorkspaceTtys() {
+    if (!this.#cmux.listWorkspaceTtys) return null;
+    try {
+      return validTtyRead(await this.#cmux.listWorkspaceTtys());
+    } catch {
+      return null;
+    }
+  }
+
   async #doPoll() {
     try {
-      const [notifications, workspaces, terminals, agentWsIds, bypassWsIds, windowCount] = await Promise.all([
+      const [notifications, workspaces, terminals, agentWsIds, bypassWsIds, windowCount, ttyRead] = await Promise.all([
         this.#cmux.listNotifications(),
         this.#cmux.listWorkspaces(),
         this.#cmux.listTerminals(),
         this.#cmux.listAgentWorkspaceIds(),
         this.#cmux.listBypassWorkspaceIds(),
         this.#cmux.getWindowCount ? this.#cmux.getWindowCount() : 1,
+        this.#readWorkspaceTtys(),
       ]);
       this.#windowCount = windowCount;
+
+      // Reconcile the address registry against the panes cmux actually still
+      // reports, so a session that died without firing SessionEnd doesn't
+      // leave a card offering an address that goes nowhere. Only ever against a
+      // successful read: a failed one carries no evidence that anything died,
+      // and pruning on it would wipe every registration over one socket blip.
+      if (ttyRead) this.#sessionAddresses?.prune(ttyRead.liveTtys);
+      const addressFor = (workspaceId) => {
+        if (!ttyRead) return null;
+        for (const tty of ttyRead.byWorkspace.get(workspaceId) || []) {
+          const address = this.#sessionAddresses?.get(tty);
+          if (address) return address;
+        }
+        return null;
+      };
 
       for (const id of agentWsIds) this.#knownAgentWorkspaces.add(id);
       for (const id of this.#knownAgentWorkspaces) {
@@ -172,6 +213,7 @@ export class Monitor {
         relevantNotifications.map(async (n) => {
           const enriched = await enrichNotification(n, workspaces, terminals, this.#resolveWorktree);
           enriched.bypassPermissions = bypassWsIds.has(n.workspaceId);
+          enriched.sessionAddress = addressFor(n.workspaceId);
           return enriched;
         })
       );
@@ -199,6 +241,7 @@ export class Monitor {
             isHost: ws.id === this.#hostWorkspaceId,
             ...worktreeFields(worktree),
             bypassPermissions: bypassWsIds.has(ws.id),
+            sessionAddress: addressFor(ws.id),
           };
         })
       );

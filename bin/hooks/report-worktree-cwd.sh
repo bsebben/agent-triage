@@ -12,6 +12,10 @@
 # registered in ~/.claude/settings.json.
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+# shellcheck source=lib/resolve-pane-tty.sh
+source "$SCRIPT_DIR/lib/resolve-pane-tty.sh"
+
 INPUT=$(cat)
 
 TRANSCRIPT=$(echo "$INPUT" | jq -r '.transcript_path // empty' 2>/dev/null || true)
@@ -26,25 +30,7 @@ if [ -z "$CWD" ]; then
   exit 0
 fi
 
-# The hook process has no controlling terminal (`/dev/tty` fails with ENXIO), so
-# find the pane's tty by walking up to the nearest ancestor process running claude
-# and reading its tty column — that value stays a real ttysNNN even though this
-# process's own tty column shows "??". Must use `command=` (full command line),
-# not `comm=` — macOS `ps` truncates `comm=` to ~16 chars, which cuts
-# "/opt/homebrew/bin/claude" down to "/opt/homebrew/bi" and never matches.
-TTY=""
-PID=$PPID
-for _ in 1 2 3 4 5 6; do
-  [ -z "$PID" ] || [ "$PID" -le 1 ] && break
-  LINE=$(ps -o ppid=,tty=,command= -p "$PID" 2>/dev/null || true)
-  [ -z "$LINE" ] && break
-  read -r NEXT_PID TTY_COL COMM <<< "$LINE"
-  if [[ "$COMM" == *claude* ]] && [ "$TTY_COL" != "??" ] && [ -n "$TTY_COL" ]; then
-    TTY="$TTY_COL"
-    break
-  fi
-  PID="$NEXT_PID"
-done
+TTY=$(resolve_pane_tty)
 
 if [ -z "$TTY" ]; then
   echo '{}'

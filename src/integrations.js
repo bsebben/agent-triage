@@ -32,6 +32,16 @@ export const INTEGRATIONS = [
     installScript: "bin/install-worktree-hook.sh",
     uninstallScript: "bin/uninstall-worktree-hook.sh",
   },
+  {
+    id: "session-address-hook",
+    name: "Cross-session address reporting",
+    description:
+      "Lets each session report its own SendMessage address, so a workspace card's copy button yields an address another session can actually reach instead of just the pane's title and directory.",
+    warning:
+      "Registers global Claude Code hooks in ~/.claude/settings.json (SessionStart, UserPromptSubmit, SessionEnd) — they fire in every Claude Code session on this machine, not just ones Agent Triage tracks. Each session is asked once to read its own name from ListAgents and POST it to this dashboard on localhost, so it needs permission to run that curl; if it's declined the ask stops after a few tries and the card keeps its dimmed fallback.",
+    installScript: "bin/install-session-address-hook.sh",
+    uninstallScript: "bin/uninstall-session-address-hook.sh",
+  },
 ];
 
 function findIntegration(id) {

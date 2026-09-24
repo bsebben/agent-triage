@@ -169,5 +169,6 @@ Integrations are consent-gated optional features that change state outside this 
 | Integration | What it does | Scripts |
 |-------------|---------------|---------|
 | Worktree indicator hook | Registers a Claude Code `PostToolUse` hook (`EnterWorktree`/`ExitWorktree`) so the worktree pill stays accurate when an agent enters a worktree mid-session | `bin/install-worktree-hook.sh` / `bin/uninstall-worktree-hook.sh` |
+| Cross-session address reporting | Registers `SessionStart`/`UserPromptSubmit`/`SessionEnd` hooks so each session reports its own `SendMessage` address, which the card's copy button then hands over | `bin/install-session-address-hook.sh` / `bin/uninstall-session-address-hook.sh` |
 
 Removing an integration's effect is either toggling it off in Settings, or running its uninstall script directly — both do the same thing.

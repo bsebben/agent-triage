@@ -342,6 +342,99 @@ export async function listAgentWorkspaceIds() {
 }
 
 /**
+ * Maps workspace ID to the ttys of its terminal surfaces, from a system.top
+ * response.
+ *
+ * Every terminal tty in the workspace, not just one: a workspace routinely has
+ * several terminal panes (this repo's own convention is to run dev servers in
+ * their own pane), and which of them holds the Claude Code session isn't
+ * knowable from system.top alone.
+ *
+ * @param {object} raw system.top response.
+ * @param {{agentsOnly?: boolean}} options `agentsOnly` limits the result to
+ *   workspaces cmux tags as running Claude Code.
+ * @returns {Map<string, string[]>} Workspace ID to ttys (e.g. ["ttys012"]).
+ */
+export function collectWorkspaceTtys(raw, { agentsOnly = false } = {}) {
+  const ttysByWsId = new Map();
+  for (const win of raw.windows || []) {
+    for (const ws of win.workspaces || []) {
+      if (agentsOnly) {
+        let isAgent = false;
+        for (const tag of ws.tags || []) {
+          if (tag.key === "claude_code") isAgent = true;
+        }
+        if (!isAgent && AGENT_TITLE_PREFIX.test(ws.title || "")) isAgent = true;
+        if (!isAgent) continue;
+      }
+
+      for (const pane of ws.panes || []) {
+        for (const surface of pane.surfaces || []) {
+          if (surface.type === "terminal" && surface.tty) {
+            const ttys = ttysByWsId.get(ws.id);
+            if (ttys) {
+              if (!ttys.includes(surface.tty)) ttys.push(surface.tty);
+            } else {
+              ttysByWsId.set(ws.id, [surface.tty]);
+            }
+          }
+        }
+      }
+    }
+  }
+  return ttysByWsId;
+}
+
+/** Every terminal tty in a system.top response, regardless of window. */
+function collectAllTtys(raw) {
+  const ttys = new Set();
+  for (const win of raw.windows || []) {
+    for (const ws of win.workspaces || []) {
+      for (const pane of ws.panes || []) {
+        for (const surface of pane.surfaces || []) {
+          if (surface.type === "terminal" && surface.tty) ttys.add(surface.tty);
+        }
+      }
+    }
+  }
+  return ttys;
+}
+
+/**
+ * Reads the terminal ttys cmux currently reports, in two slices.
+ *
+ * tty is how a Claude Code session's self-reported cross-session address gets
+ * correlated back to the card it belongs to (see src/session-addresses.js), and
+ * how a registration for a pane that no longer exists gets pruned. Those two
+ * jobs want different scopes, hence both:
+ *
+ * - `byWorkspace` is our own window only, matching the workspace roster the
+ *   dashboard renders. Not limited to agent workspaces: a session whose
+ *   claude_code tag blinks out for a poll shouldn't lose its address.
+ * - `liveTtys` spans every open cmux window, because the hooks are installed
+ *   machine-globally. A session in another window has no card here, but its
+ *   registration must not be pruned as dead — that would put it in a loop of
+ *   re-announcing on every prompt.
+ *
+ * Returns null when cmux couldn't be read at all, which callers must
+ * distinguish from an empty result: pruning against "cmux didn't answer" would
+ * wipe every registration on a single socket blip.
+ *
+ * @returns {Promise<{byWorkspace: Map<string, string[]>, liveTtys: Set<string>}|null>}
+ */
+export async function listWorkspaceTtys() {
+  try {
+    // One all_windows read serves both scopes — our own window is a filter on
+    // it, so this costs no extra RPC over the own-window-only version.
+    const [ownWindowId, raw] = await Promise.all([getOwnWindowId(), rpc("system.top", { all_windows: true })]);
+    const ownWindow = ownWindowId ? { windows: (raw.windows || []).filter((win) => win.id === ownWindowId) } : raw;
+    return { byWorkspace: collectWorkspaceTtys(ownWindow), liveTtys: collectAllTtys(raw) };
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Returns the set of workspace IDs whose Claude Code process was launched
  * with --dangerously-skip-permissions.
  *
@@ -356,34 +449,21 @@ export async function listAgentWorkspaceIds() {
 export async function listBypassWorkspaceIds() {
   try {
     const raw = await systemTopScopedToOwnWindow();
-    const ttyByWsId = new Map();
-    for (const win of raw.windows || []) {
-      for (const ws of win.workspaces || []) {
-        let isAgent = false;
-        for (const tag of ws.tags || []) {
-          if (tag.key === "claude_code") isAgent = true;
-        }
-        if (!isAgent && AGENT_TITLE_PREFIX.test(ws.title || "")) isAgent = true;
-        if (!isAgent) continue;
-
-        for (const pane of ws.panes || []) {
-          for (const surface of pane.surfaces || []) {
-            if (surface.type === "terminal" && surface.tty) {
-              ttyByWsId.set(ws.id, surface.tty);
-            }
-          }
-        }
-      }
-    }
+    const ttysByWsId = collectWorkspaceTtys(raw, { agentsOnly: true });
 
     const bypassIds = new Set();
-    const checks = [...ttyByWsId.entries()].map(async ([wsId, tty]) => {
-      try {
-        const { stdout } = await execFileAsync("ps", ["-ww", "-t", tty, "-o", "args="]);
-        if (permissionFlags(stdout).includes("--dangerously-skip-permissions")) {
-          bypassIds.add(wsId);
-        }
-      } catch {}
+    const checks = [...ttysByWsId.entries()].map(async ([wsId, ttys]) => {
+      // Any terminal pane in the workspace may be the one running Claude, so
+      // check them all rather than betting on one.
+      for (const tty of ttys) {
+        try {
+          const { stdout } = await execFileAsync("ps", ["-ww", "-t", tty, "-o", "args="]);
+          if (permissionFlags(stdout).includes("--dangerously-skip-permissions")) {
+            bypassIds.add(wsId);
+            return;
+          }
+        } catch {}
+      }
     });
     await Promise.all(checks);
     return bypassIds;
