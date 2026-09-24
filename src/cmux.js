@@ -213,8 +213,22 @@ async function runCli(args, timeoutMs = 10000) {
 
 // --- Public API ---
 
+// Coalesces identical concurrent calls onto one socket round-trip. Each poll
+// cycle fans out several read-only system.top/workspace.list requests via
+// Promise.all (agent ids, bypass ids, tty map), and several of those resolve
+// to the exact same method+params — deduping them here means callers don't
+// have to know about each other. Safe only because every mutating cmux call
+// (close, rename, focus, send_text, ...) goes through socketRpc directly,
+// never through this exported wrapper — coalescing those would be wrong.
+const inFlightRpc = new Map();
+
 export async function rpc(method, params) {
-  return socketRpc(method, params);
+  const key = `${method}:${JSON.stringify(params ?? null)}`;
+  const existing = inFlightRpc.get(key);
+  if (existing) return existing;
+  const promise = socketRpc(method, params).finally(() => inFlightRpc.delete(key));
+  inFlightRpc.set(key, promise);
+  return promise;
 }
 
 export async function listNotifications() {
