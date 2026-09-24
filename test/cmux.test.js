@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { parseNotifications, categorizeNotification, AGENT_TITLE_PREFIX, findWindowIdForWorkspace } from "../src/cmux.js";
+import { parseNotifications, categorizeNotification, AGENT_TITLE_PREFIX, findWindowIdForWorkspace, collectWorkspaceTtys } from "../src/cmux.js";
 
 describe("parseNotifications", () => {
   it("parses cmux notification JSON into structured items", () => {
@@ -120,5 +120,52 @@ describe("findWindowIdForWorkspace", () => {
   it("returns null when windows/workspaces are missing", () => {
     assert.equal(findWindowIdForWorkspace({}, "WS-1"), null);
     assert.equal(findWindowIdForWorkspace({ windows: [{ id: "WIN-1" }] }, "WS-1"), null);
+  });
+});
+
+describe("collectWorkspaceTtys", () => {
+  // A workspace with the Claude session in one pane and a dev server in
+  // another — the layout this repo's own conventions produce.
+  const raw = {
+    windows: [
+      {
+        id: "WIN-1",
+        workspaces: [
+          {
+            id: "WS-1",
+            title: "✳ claude",
+            tags: [{ key: "claude_code" }],
+            panes: [
+              { surfaces: [{ type: "terminal", tty: "ttys009" }] },
+              { surfaces: [{ type: "terminal", tty: "ttys011" }] },
+            ],
+          },
+          {
+            id: "WS-2",
+            title: "notes",
+            panes: [{ surfaces: [{ type: "browser" }, { type: "terminal", tty: "ttys013" }] }],
+          },
+        ],
+      },
+    ],
+  };
+
+  it("keeps every terminal tty in a workspace, not just the last one", () => {
+    assert.deepEqual(collectWorkspaceTtys(raw).get("WS-1"), ["ttys009", "ttys011"]);
+  });
+
+  it("skips surfaces that aren't terminals, and workspaces with no terminal at all", () => {
+    const ttys = collectWorkspaceTtys(raw);
+    assert.deepEqual(ttys.get("WS-2"), ["ttys013"]);
+    assert.equal(ttys.has("WS-3"), false);
+  });
+
+  it("agentsOnly limits the result to Claude Code workspaces", () => {
+    const ttys = collectWorkspaceTtys(raw, { agentsOnly: true });
+    assert.deepEqual([...ttys.keys()], ["WS-1"]);
+  });
+
+  it("returns an empty map for a response with no windows", () => {
+    assert.equal(collectWorkspaceTtys({}).size, 0);
   });
 });

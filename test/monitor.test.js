@@ -2,6 +2,7 @@ import { describe, it, mock, beforeEach } from "node:test";
 import assert from "node:assert/strict";
 import { enrichNotification, Monitor } from "../src/monitor.js";
 import { Queue } from "../src/queue.js";
+import { SessionAddresses } from "../src/session-addresses.js";
 
 describe("enrichNotification", () => {
   it("adds workspace and terminal info to a notification", async () => {
@@ -909,5 +910,177 @@ describe("Monitor reentrancy and dependency injection", () => {
 
     assert.equal(subscribed, true);
     monitor.stop();
+  });
+});
+
+describe("Monitor session addresses", () => {
+  let queue;
+
+  beforeEach(() => {
+    queue = new Queue();
+  });
+
+  // Shapes a tty read the way cmux.listWorkspaceTtys does: own-window
+  // workspace → ttys for card correlation, plus every live tty for pruning.
+  function ttyRead(byWorkspace, extraLiveTtys = []) {
+    const map = new Map(Object.entries(byWorkspace));
+    const liveTtys = new Set(extraLiveTtys);
+    for (const ttys of map.values()) for (const tty of ttys) liveTtys.add(tty);
+    return { byWorkspace: map, liveTtys };
+  }
+
+  function makeCmux({ notifications = [], workspaces = [], agentWorkspaceIds = new Set(), ttys = ttyRead({}) }) {
+    return {
+      listNotifications: async () => notifications,
+      listWorkspaces: async () => workspaces,
+      listTerminals: async () => [],
+      listAgentWorkspaceIds: async () => agentWorkspaceIds,
+      listBypassWorkspaceIds: async () => new Set(),
+      listWorkspaceTtys: async () => ttys,
+      readScreen: async () => null,
+    };
+  }
+
+  it("attaches the address registered for a workspace's tty", async () => {
+    const cmuxApi = makeCmux({
+      workspaces: [{ id: "W1", title: "claude-session", directory: "/home/user/project" }],
+      agentWorkspaceIds: new Set(["W1"]),
+      ttys: ttyRead({ W1: ["ttys012"] }),
+    });
+    const sessionAddresses = new SessionAddresses();
+    sessionAddresses.register("ttys012", "agent-triage-b7 [40e5ca]");
+    const monitor = new Monitor(queue, { cmuxApi, sessionAddresses });
+
+    await monitor.poll();
+    assert.equal(queue.items()[0].sessionAddress, "agent-triage-b7 [40e5ca]");
+  });
+
+  it("finds the address when the session's pane isn't the workspace's only terminal", async () => {
+    // The repo's own convention: a dev server in its own pane alongside the
+    // Claude session. Whichever pane cmux lists last must not shadow the other.
+    const cmuxApi = makeCmux({
+      workspaces: [{ id: "W1", title: "claude-session", directory: "/home/user/project" }],
+      agentWorkspaceIds: new Set(["W1"]),
+      ttys: ttyRead({ W1: ["ttys009", "ttys011"] }),
+    });
+    const sessionAddresses = new SessionAddresses();
+    sessionAddresses.register("ttys009", "agent-triage-b7 [40e5ca]");
+    const monitor = new Monitor(queue, { cmuxApi, sessionAddresses });
+
+    await monitor.poll();
+    assert.equal(queue.items()[0].sessionAddress, "agent-triage-b7 [40e5ca]");
+    // And the registration survives the poll's reconciliation.
+    assert.equal(sessionAddresses.size, 1);
+  });
+
+  it("keeps a registration whose pane lives in another cmux window", async () => {
+    const cmuxApi = makeCmux({
+      workspaces: [{ id: "W1", title: "claude-session", directory: "/home/user/project" }],
+      agentWorkspaceIds: new Set(["W1"]),
+      ttys: ttyRead({ W1: ["ttys012"] }, ["ttys099"]),
+    });
+    const sessionAddresses = new SessionAddresses();
+    sessionAddresses.register("ttys099", "other-window [91fd22]");
+    const monitor = new Monitor(queue, { cmuxApi, sessionAddresses });
+
+    await monitor.poll();
+    // No card of its own here, but it's alive, so it must not be pruned into an
+    // announce/register/prune loop.
+    assert.equal(sessionAddresses.get("ttys099"), "other-window [91fd22]");
+  });
+
+  it("attaches the address to enriched notification items too", async () => {
+    const cmuxApi = makeCmux({
+      notifications: [{ id: "notif-1", category: "permission", workspaceId: "W1", surfaceId: "S1", body: "approve?" }],
+      workspaces: [{ id: "W1", title: "claude-session", directory: "/home/user/project" }],
+      ttys: ttyRead({ W1: ["ttys012"] }),
+    });
+    const sessionAddresses = new SessionAddresses();
+    sessionAddresses.register("ttys012", "agent-triage-b7 [40e5ca]");
+    const monitor = new Monitor(queue, { cmuxApi, sessionAddresses });
+
+    await monitor.poll();
+    assert.equal(queue.items()[0].sessionAddress, "agent-triage-b7 [40e5ca]");
+  });
+
+  it("leaves sessionAddress null for a session that never reported one", async () => {
+    const cmuxApi = makeCmux({
+      workspaces: [{ id: "W1", title: "claude-session", directory: "/home/user/project" }],
+      agentWorkspaceIds: new Set(["W1"]),
+      ttys: ttyRead({ W1: ["ttys012"] }),
+    });
+    const monitor = new Monitor(queue, { cmuxApi, sessionAddresses: new SessionAddresses() });
+
+    await monitor.poll();
+    assert.equal(queue.items()[0].sessionAddress, null);
+  });
+
+  it("prunes an address whose pane cmux no longer reports", async () => {
+    const state = { ttys: ttyRead({ W1: ["ttys012"] }) };
+    const cmuxApi = {
+      ...makeCmux({
+        workspaces: [{ id: "W1", title: "claude-session", directory: "/home/user/project" }],
+        agentWorkspaceIds: new Set(["W1"]),
+      }),
+      listWorkspaceTtys: async () => state.ttys,
+    };
+    const sessionAddresses = new SessionAddresses();
+    sessionAddresses.register("ttys012", "agent-triage-b7 [40e5ca]");
+    const monitor = new Monitor(queue, { cmuxApi, sessionAddresses });
+
+    await monitor.poll();
+    assert.equal(queue.items()[0].sessionAddress, "agent-triage-b7 [40e5ca]");
+
+    state.ttys = ttyRead({});
+    await monitor.poll();
+    assert.equal(queue.items()[0].sessionAddress, null);
+    assert.equal(sessionAddresses.size, 0);
+  });
+
+  it("keeps registrations when the tty read fails", async () => {
+    const state = { fail: false };
+    const cmuxApi = {
+      ...makeCmux({
+        workspaces: [{ id: "W1", title: "claude-session", directory: "/home/user/project" }],
+        agentWorkspaceIds: new Set(["W1"]),
+      }),
+      listWorkspaceTtys: async () => {
+        if (state.fail) throw new Error("socket closed");
+        return ttyRead({ W1: ["ttys012"] });
+      },
+    };
+    const sessionAddresses = new SessionAddresses();
+    sessionAddresses.register("ttys012", "agent-triage-b7 [40e5ca]");
+    const monitor = new Monitor(queue, { cmuxApi, sessionAddresses });
+
+    await monitor.poll();
+    assert.equal(queue.items()[0].sessionAddress, "agent-triage-b7 [40e5ca]");
+
+    // A failed read says nothing about which panes are alive, so it must not
+    // prune — otherwise one socket blip costs every session its address.
+    state.fail = true;
+    await monitor.poll();
+    assert.equal(sessionAddresses.get("ttys012"), "agent-triage-b7 [40e5ca]");
+
+    state.fail = false;
+    await monitor.poll();
+    assert.equal(queue.items()[0].sessionAddress, "agent-triage-b7 [40e5ca]");
+  });
+
+  it("works against a cmux API that predates listWorkspaceTtys", async () => {
+    const cmuxApi = makeCmux({
+      workspaces: [{ id: "W1", title: "claude-session", directory: "/home/user/project" }],
+      agentWorkspaceIds: new Set(["W1"]),
+    });
+    delete cmuxApi.listWorkspaceTtys;
+    const sessionAddresses = new SessionAddresses();
+    sessionAddresses.register("ttys012", "agent-triage-b7 [40e5ca]");
+    const monitor = new Monitor(queue, { cmuxApi, sessionAddresses });
+
+    await monitor.poll();
+    assert.equal(queue.items()[0].sessionAddress, null);
+    // No way to reconcile without the method, so registrations are left alone
+    // rather than wiped on every poll.
+    assert.equal(sessionAddresses.size, 1);
   });
 });

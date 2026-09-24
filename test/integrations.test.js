@@ -83,6 +83,23 @@ describe("integrations: worktree-hook", () => {
   });
 });
 
+describe("integrations: session-address-hook", () => {
+  it("status() shells out to its own install script with --check", async () => {
+    const execFileFn = makeExec((cmd, args, cb) => ok(cb));
+    assert.equal(await status("session-address-hook", { execFileFn }), true);
+    assert.match(execFileFn.calls[0][0], /install-session-address-hook\.sh$/);
+    assert.deepEqual(execFileFn.calls[0].slice(1), ["--check"]);
+  });
+
+  it("enable()/disable() run its own scripts, not another integration's", async () => {
+    const execFileFn = makeExec((cmd, args, cb) => ok(cb));
+    await enable("session-address-hook", { execFileFn, configIO: makeConfigIO({}) });
+    await disable("session-address-hook", { execFileFn });
+    assert.match(execFileFn.calls[0][0], /install-session-address-hook\.sh$/);
+    assert.match(execFileFn.calls[1][0], /uninstall-session-address-hook\.sh$/);
+  });
+});
+
 describe("integrations: opt-in nudge (decided tracking)", () => {
   it("isDecided() is false when decidedIntegrations is absent", () => {
     const configIO = makeConfigIO({});
