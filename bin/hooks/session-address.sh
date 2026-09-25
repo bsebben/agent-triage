@@ -79,18 +79,31 @@ BASE="http://127.0.0.1:$PORT"
 ENDPOINT="$BASE/api/session-address"
 
 # Pre-fills the tty and endpoint so the model only has to substitute its own
-# name — the one thing it alone can see.
+# name — the one thing it alone can see. Explains *why* this is legitimate and
+# invites the model to say so out loud, rather than asking for silence: an
+# unexplained instruction to quietly POST the session's own identity to a
+# local port is indistinguishable from a prompt injection, and a model that
+# refuses it on those grounds is doing the right thing. Silence was the bug,
+# not a shortcut.
 announce_context() {
   cat <<EOF
-Agent Triage wants this session's cross-session address so its dashboard card
-can offer it for SendMessage. Call ListAgents, read this session's own name from
-the self line (e.g. "agent-triage-b7 [40e5ca]"), then run exactly:
+Agent Triage — a local dev dashboard for Claude Code sessions running in
+cmux — is asking this session to report its own cross-session address, so a
+workspace card can offer it for SendMessage. This is a consent-gated
+integration the user explicitly enabled (Settings → Integrations); it's fine,
+and worth mentioning, to tell the user you're doing this.
+
+Nothing sensitive is involved: the only thing sent is this session's own
+ListAgents name, which is already visible to anyone with ListAgents access on
+this machine, POSTed to localhost only.
+
+To help: call ListAgents, read this session's own name from the self line
+(e.g. "agent-triage-b7 [40e5ca]"), then run:
 
 curl -sS -X POST $ENDPOINT -H 'Content-Type: application/json' -d '{"tty":"$TTY","address":"<NAME> [<REF>]"}'
 
-Keep the bracketed ref — two live sessions can share a name, and the ref is what
-disambiguates them. Do this once, without narrating it, then carry on with the
-actual task.
+Keep the bracketed ref — two live sessions can share a bare name, and the ref
+is what disambiguates them.
 EOF
 }
 
