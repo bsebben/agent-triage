@@ -94,6 +94,20 @@ describe("filterTicketGroupsByStatus", () => {
   });
 });
 
+describe("status filter dropdown visibility", () => {
+  it("hides the dropdown when only one status is present", () => {
+    sandbox.state.tickets = [group("P-1", [ticket("a", "In Progress"), ticket("b", "In Progress")])];
+    setTicketsStatusFilter("");
+    assert.doesNotMatch(sandbox.queue.innerHTML, /tickets-filter-select/);
+  });
+
+  it("shows the dropdown once a second status is present", () => {
+    sandbox.state.tickets = [group("P-1", [ticket("a", "In Progress"), ticket("b", "To Do")])];
+    setTicketsStatusFilter("");
+    assert.match(sandbox.queue.innerHTML, /tickets-filter-select/);
+  });
+});
+
 describe("stale status selection", () => {
   it("clears a status the backlog toggle has just hidden", () => {
     sandbox.state.tickets = [
