@@ -2,9 +2,15 @@
 
 const collapsedTicketGroups = new Set();
 let ticketsShowBacklog = false;
+let ticketsStatusFilter = "";
 
 function toggleTicketsBacklog() {
   ticketsShowBacklog = !ticketsShowBacklog;
+  renderTickets();
+}
+
+function setTicketsStatusFilter(status) {
+  ticketsStatusFilter = status;
   renderTickets();
 }
 
@@ -13,6 +19,33 @@ function filterTicketGroups(groups) {
   return groups
     .map((g) => ({ ...g, tickets: g.tickets.filter((t) => t.status.toLowerCase() !== "backlog") }))
     .filter((g) => g.tickets.length > 0);
+}
+
+function collectTicketStatuses(groups) {
+  const statuses = new Set();
+  for (const g of groups) {
+    for (const t of g.tickets) {
+      if (t.status) statuses.add(t.status);
+    }
+  }
+  return [...statuses].sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }));
+}
+
+function filterTicketGroupsByStatus(groups, status) {
+  if (!status) return groups;
+  return groups
+    .map((g) => ({ ...g, tickets: g.tickets.filter((t) => t.status === status) }))
+    .filter((g) => g.tickets.length > 0);
+}
+
+function renderTicketStatusFilter(statuses) {
+  const options = statuses
+    .map((s) => `<option value="${escapeHtml(s)}"${s === ticketsStatusFilter ? " selected" : ""}>${escapeHtml(s)}</option>`)
+    .join("");
+  return `<select class="tickets-filter-select" onchange="setTicketsStatusFilter(this.value)">
+    <option value="">All statuses</option>
+    ${options}
+  </select>`;
 }
 
 function renderTickets() {
@@ -24,9 +57,15 @@ function renderTickets() {
   }
   const allGroups = state.tickets || [];
   const groups = filterTicketGroups(allGroups);
+  // Statuses come from what the backlog toggle leaves visible, so "Backlog" isn't offered
+  // as an option while backlog tickets are hidden. Drop a selected status the visible set
+  // no longer contains — otherwise the dropdown renders without it and the user is stuck
+  // on an empty list they can't clear.
+  const statuses = collectTicketStatuses(groups);
+  if (ticketsStatusFilter && !statuses.includes(ticketsStatusFilter)) ticketsStatusFilter = "";
+  const filtered = filterTicketGroupsByStatus(groups, ticketsStatusFilter);
   const totalAll = allGroups.reduce((n, g) => n + g.tickets.length, 0);
-  const totalVisible = groups.reduce((n, g) => n + g.tickets.length, 0);
-  const backlogCount = totalAll - totalVisible + (ticketsShowBacklog ? 0 : 0);
+  const totalVisible = filtered.reduce((n, g) => n + g.tickets.length, 0);
   const hiddenBacklog = allGroups.reduce((n, g) => n + g.tickets.filter((t) => t.status.toLowerCase() === "backlog").length, 0);
   if (totalAll === 0) {
     const hint = ticketStatus.hint ? escapeHtml(ticketStatus.hint) : "No assigned tickets";
@@ -37,13 +76,14 @@ function renderTickets() {
     <button class="tickets-filter-btn${ticketsShowBacklog ? " active" : ""}" onclick="toggleTicketsBacklog()">
       Backlog${hiddenBacklog > 0 && !ticketsShowBacklog ? ` (${hiddenBacklog})` : ""}
     </button>
+    ${statuses.length > 1 ? renderTicketStatusFilter(statuses) : ""}
   </div>`;
   if (totalVisible === 0) {
     queue.innerHTML = workspaceLimitBanner() + filterBar + `<div class="empty-state">No active tickets</div>`;
     return;
   }
   queue.innerHTML = workspaceLimitBanner() + filterBar + `<div class="tickets-section">
-    ${groups.map(renderTicketGroup).join("")}
+    ${filtered.map(renderTicketGroup).join("")}
   </div>`;
 }
 

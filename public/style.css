@@ -1165,6 +1165,24 @@ a.deploy-dot:hover {
   color: var(--text);
 }
 
+.tickets-filter-select {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+  border-radius: 12px;
+  padding: 2px 8px;
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.tickets-filter-select:hover {
+  border-color: var(--text-dim);
+  color: var(--text);
+}
+
 .tickets-section {
   padding-top: 12px;
 }

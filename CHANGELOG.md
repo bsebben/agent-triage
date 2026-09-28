@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.57.0] - 2026-09-28
+
+### Added
+
+- Status filter dropdown on the Tickets tab, alongside the existing Backlog toggle. Options come from the statuses actually present in the visible tickets, so "Backlog" is only offered when backlog tickets are shown, and the dropdown is hidden when there's only one status to pick from.
+
 ## [1.56.0] - 2026-09-21
 
 ### Added
