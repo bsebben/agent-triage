@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.58.0] - 2026-10-01
+
+### Added
+
+- "Explain it" and "Update from main" actions in the PR action drawer. "Explain it" gives a plain-language, non-critical overview of the diff and offers a file-by-file walkthrough. "Update from main" resolves merge conflicts, auto-detecting rebase vs. merge main based on review state.
+- Workspaces dispatched from the PR/ticket action drawer now get a descriptive name instead of showing just a bare number: an instant placeholder name (repo + PR number + truncated title, or ticket key + truncated summary) is set at creation, and the dispatched session is instructed to rename it to something it composes itself once it's read the task.
+
+### Changed
+
+- "Review the PR" and "Address review comments" PR actions no longer name a specific plugin/slash command — they describe the desired outcome generically so any installed review tool can pick them up, with a plain fallback when none is installed.
+
 ## [1.57.0] - 2026-09-28
 
 ### Added
