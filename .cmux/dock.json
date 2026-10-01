@@ -1,0 +1,11 @@
+{
+  "controls": [
+    {
+      "id": "agent-triage",
+      "title": "Agent Triage",
+      "type": "browser",
+      "url": "http://localhost:7777",
+      "chrome": false
+    }
+  ]
+}
