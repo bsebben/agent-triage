@@ -9,7 +9,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
-- "Explain it" and "Update from main" actions in the PR action drawer. "Explain it" gives a plain-language, non-critical overview of the diff and offers a file-by-file walkthrough. "Update from main" resolves merge conflicts, auto-detecting rebase vs. merge main based on review state.
 - Workspaces dispatched from the PR/ticket action drawer now get a descriptive name instead of showing just a bare number: an instant placeholder name (PR number + truncated title, or ticket key + truncated summary — plus the repo name, but only when no local checkout was found to resolve the workspace into) is set at creation, and the dispatched session is instructed to rename it to something it composes itself once it's read the task.
 
 ### Changed
