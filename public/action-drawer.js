@@ -171,7 +171,7 @@ function openActionDrawer(item, type, repo) {
       const body = {
         prompt: renameInstruction(item, type) + action.prompt(item),
         repo,
-        name: workspaceName(item, type, repo),
+        name: workspaceName(item, type),
       };
       if (type === "ticket") {
         const directoryInput = el.querySelector("#drawer-directory-input");
@@ -207,9 +207,13 @@ function truncateText(text, max) {
 
 // Instant placeholder name set at workspace creation, before the dispatched session has
 // had a chance to rename itself (see renameInstruction below) — so the workspace is never
-// left showing just a bare number.
-function workspaceName(item, type, repo) {
-  if (type === "pr") return `${repo} PR #${item.number}: ${truncateText(item.title, 40)}`;
+// left showing just a bare number. Repo-less by design: when the repo resolves to a
+// dedicated local checkout, that's already visible elsewhere (the workspace's own cwd/pill),
+// so repeating it here would be redundant. The server prepends it when resolution instead
+// falls back to the default directory — see resolveCwd in src/server.js — since that's the
+// one case where the repo isn't otherwise discoverable from the workspace at all.
+function workspaceName(item, type) {
+  if (type === "pr") return `PR #${item.number}: ${truncateText(item.title, 40)}`;
   return `${item.key}: ${truncateText(item.summary, 40)}`;
 }
 

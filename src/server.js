@@ -2,7 +2,7 @@ import { createServer } from "node:http";
 import { randomUUID } from "node:crypto";
 import { readFileSync, existsSync, utimesSync } from "node:fs";
 import { readFile } from "node:fs/promises";
-import { join } from "node:path";
+import { join, basename } from "node:path";
 import { fileURLToPath } from "node:url";
 import { WebSocketServer } from "ws";
 import { Queue } from "./queue.js";
@@ -161,6 +161,15 @@ let lastLinksWindowId = "";
 
 function resolveCwd(pick) {
   return resolveDirectory(pick, { defaultDirectory: config.defaultDirectory, home: HOME });
+}
+
+// True when resolveCwd actually found a dedicated checkout for `pick` (its own directory)
+// rather than falling back to the default directory or home. The only place that knows
+// this is here, after resolution has run — the client has no way to tell whether a repo is
+// cloned locally, so the decision of whether a repo name is still useful workspace-name
+// context (vs. redundant with a cwd that already shows it) has to live server-side.
+function resolvedToDedicatedCheckout(pick, cwd) {
+  return Boolean(pick) && basename(cwd) === pick.split("/").pop();
 }
 
 
@@ -513,10 +522,16 @@ const server = createServer(async (req, res) => {
       }
       const escaped = "'" + prompt.replace(/'/g, "'\\''") + "'";
       const flags = dangerous ? " --dangerously-skip-permissions" : "";
+      const cwd = resolveCwd(directory || repo);
+      // Only a PR dispatch has a repo to prepend, and only when the cwd fell back to the
+      // default directory instead of the repo's own checkout — otherwise the cwd already
+      // shows it, and repeating it in the name would be redundant.
+      const dedicatedCheckout = resolvedToDedicatedCheckout(directory || repo, cwd);
+      const finalName = repo && !dedicatedCheckout && name ? `${repo} ${name}` : name;
       await cmux.createWorkspace({
-        cwd: resolveCwd(directory || repo),
+        cwd,
         command: `claude${flags} ${escaped}`,
-        name,
+        name: finalName,
       });
       await monitor.poll();
       // Remember the pick so this ticket's project (and directories in general) guess better
