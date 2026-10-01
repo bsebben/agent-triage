@@ -219,11 +219,11 @@ function workspaceName(item, type, repo) {
 // example so the model's title stays cross-referenceable with the number/key, same as the
 // instant placeholder name it's replacing.
 function renameInstruction(item, type) {
-  const id = type === "pr" ? `#${item.number}` : item.key;
+  const id = type === "pr" ? `PR #${item.number}` : item.key;
   return `First, rename this workspace to a short, descriptive title (5 words or ` +
-    `fewer) that still includes the number for quick cross-reference, e.g. ` +
-    `'${id}: fix flaky session test'. Run \`cmux rename-workspace '<title>'\`. ` +
-    `Then continue with the task below.\n\n`;
+    `fewer) that still includes the id so it's clearly identifiable (and not ` +
+    `mistaken for a task/ticket number), e.g. '${id}: fix flaky session test'. ` +
+    `Run \`cmux rename-workspace '<title>'\`. Then continue with the task below.\n\n`;
 }
 
 function closeActionDrawer() {
