@@ -168,7 +168,11 @@ function openActionDrawer(item, type, repo) {
       if (!action) return;
       const dangerous = e.shiftKey;
       const el = drawerEl;
-      const body = { prompt: action.prompt(item), repo };
+      const body = {
+        prompt: renameInstruction(item, type) + action.prompt(item),
+        repo,
+        name: workspaceName(item, type, repo),
+      };
       if (type === "ticket") {
         const directoryInput = el.querySelector("#drawer-directory-input");
         // A click can land before the guess does. Typing beats the guess, so only an
@@ -188,6 +192,38 @@ function openActionDrawer(item, type, repo) {
   closeDrawer = openOverlay(drawerEl, {
     onClose: () => { drawerEl.remove(); drawerEl = null; closeDrawer = null; },
   });
+}
+
+// Word-boundary truncation so the instant workspace name never cuts mid-word. Only used
+// for the placeholder name set at creation — the dispatched session renames the workspace
+// to something it composes itself shortly after, so this truncation never has to be clever.
+function truncateText(text, max) {
+  if (!text || text.length <= max) return text || "";
+  const slice = text.slice(0, max);
+  const cutAt = slice.lastIndexOf(" ");
+  const cut = cutAt > max * 0.6 ? slice.slice(0, cutAt) : slice;
+  return `${cut.trim()}…`;
+}
+
+// Instant placeholder name set at workspace creation, before the dispatched session has
+// had a chance to rename itself (see renameInstruction below) — so the workspace is never
+// left showing just a bare number.
+function workspaceName(item, type, repo) {
+  if (type === "pr") return `${repo} PR #${item.number}: ${truncateText(item.title, 40)}`;
+  return `${item.key}: ${truncateText(item.summary, 40)}`;
+}
+
+// Prepended to every dispatched prompt so the session gives its workspace a short,
+// descriptive title once it has read the task — a synthesized summary reads better than
+// any truncation of a long PR title or ticket summary could. The id is included in the
+// example so the model's title stays cross-referenceable with the number/key, same as the
+// instant placeholder name it's replacing.
+function renameInstruction(item, type) {
+  const id = type === "pr" ? `#${item.number}` : item.key;
+  return `First, rename this workspace to a short, descriptive title (5 words or ` +
+    `fewer) that still includes the number for quick cross-reference, e.g. ` +
+    `'${id}: fix flaky session test'. Run \`cmux rename-workspace '<title>'\`. ` +
+    `Then continue with the task below.\n\n`;
 }
 
 function closeActionDrawer() {

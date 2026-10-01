@@ -479,12 +479,13 @@ export async function sendKey(workspaceId, surfaceId, key) {
   await socketRpc("surface.send_key", { surface_id: surfaceId, key });
 }
 
-export async function createWorkspace({ cwd, command } = {}) {
+export async function createWorkspace({ cwd, command, name } = {}) {
   let workspaceId;
-  if (cwd || command) {
+  if (cwd || command || name) {
     const args = ["new-workspace", "--focus", "true"];
     if (cwd) args.push("--cwd", cwd);
     if (command) args.push("--command", command);
+    if (name) args.push("--name", name);
     const { stdout } = await runCli(args);
     workspaceId = stdout.match(/workspace:\d+/)?.[0];
     if (!workspaceId) return null;

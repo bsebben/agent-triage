@@ -507,7 +507,7 @@ const server = createServer(async (req, res) => {
       // `directory` is the ticket drawer's explicit pick; `repo` is the PR drawer's GitHub
       // repo name. Kept as separate fields so only a deliberate directory choice feeds the
       // picker's history — a PR dispatch shouldn't reorder the ticket guess.
-      const { prompt, repo, directory, dangerous, jiraProject } = await readBody(req);
+      const { prompt, repo, directory, dangerous, jiraProject, name } = await readBody(req);
       if (!prompt || typeof prompt !== "string") {
         return jsonResponse(res, { error: "prompt required" }, 400);
       }
@@ -516,6 +516,7 @@ const server = createServer(async (req, res) => {
       await cmux.createWorkspace({
         cwd: resolveCwd(directory || repo),
         command: `claude${flags} ${escaped}`,
+        name,
       });
       await monitor.poll();
       // Remember the pick so this ticket's project (and directories in general) guess better
