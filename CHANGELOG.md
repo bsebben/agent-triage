@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.59.0] - 2026-10-07
+
+### Changed
+
+- Workspaces dispatched from the PR/ticket action drawer are now titled by the server (a short background Haiku call via `claude -p`) instead of instructing the dispatched session to rename itself, so the session no longer spends a turn or shows output on it. The placeholder name stays if title generation fails.
+
 ## [1.58.0] - 2026-10-01
 
 ### Added

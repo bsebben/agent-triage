@@ -456,6 +456,12 @@ export async function renameWorkspace(workspaceId, title) {
   await socketRpc("workspace.rename", { workspace_id: workspaceId, title });
 }
 
+// createWorkspace returns the CLI's short ref (workspace:N), which the CLI resolves
+// itself — unlike renameWorkspace, which is only ever handed full ids from the monitor.
+export async function renameWorkspaceByRef(workspaceRef, title) {
+  await runCli(["rename-workspace", "--workspace", workspaceRef, "--", title]);
+}
+
 export async function readScreenByWorkspace(workspaceRef, lines = 30) {
   try {
     const { stdout } = await runCli([
