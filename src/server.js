@@ -20,6 +20,7 @@ import * as plugins from "./plugins.js";
 import { INTEGRATIONS, status as integrationStatus, enable as enableIntegration, disable as disableIntegration, isDecided as integrationIsDecided, dismiss as dismissIntegration } from "./integrations.js";
 import { refreshSession, refreshAll, refreshingIds } from "./refresh.js";
 import { startHeartbeat } from "./heartbeat.js";
+import { generateTitle } from "./workspace-title.js";
 import loops from "./tabs/loops.js";
 import pulls from "./tabs/pulls.js";
 import tickets from "./tabs/tickets.js";
@@ -516,7 +517,7 @@ const server = createServer(async (req, res) => {
       // `directory` is the ticket drawer's explicit pick; `repo` is the PR drawer's GitHub
       // repo name. Kept as separate fields so only a deliberate directory choice feeds the
       // picker's history — a PR dispatch shouldn't reorder the ticket guess.
-      const { prompt, repo, directory, dangerous, jiraProject, name } = await readBody(req);
+      const { prompt, repo, directory, dangerous, jiraProject, name, titleId, titleText } = await readBody(req);
       if (!prompt || typeof prompt !== "string") {
         return jsonResponse(res, { error: "prompt required" }, 400);
       }
@@ -528,11 +529,19 @@ const server = createServer(async (req, res) => {
       // shows it, and repeating it in the name would be redundant.
       const dedicatedCheckout = resolvedToDedicatedCheckout(directory || repo, cwd);
       const finalName = repo && !dedicatedCheckout && name ? `${repo} ${name}` : name;
-      await cmux.createWorkspace({
+      const created = await cmux.createWorkspace({
         cwd,
         command: `claude${flags} ${escaped}`,
         name: finalName,
       });
+      // Detached on purpose: the title is a refinement of the placeholder, so the response
+      // never waits on it and the dispatched session never sees it.
+      if (created?.workspace_id && typeof titleId === "string" && typeof titleText === "string" && titleId && titleText) {
+        const prefix = finalName !== name ? `${repo} ` : "";
+        generateTitle(titleId, titleText.slice(0, 300))
+          .then((title) => title && cmux.renameWorkspaceByRef(created.workspace_id, prefix + title))
+          .catch(() => {});
+      }
       await monitor.poll();
       // Remember the pick so this ticket's project (and directories in general) guess better
       // next time — best-effort, never blocks the response on a disk write.
