@@ -109,22 +109,6 @@ export class Refresher {
     return null;
   }
 
-  /**
-   * The title someone explicitly gave this workspace (card edit, dispatch), or
-   * null while it still shows Claude Code's own terminal title. Writing the live
-   * title back would pin it as a custom title, freezing the status glyph and
-   * blocking every title the relaunched session sets afterward.
-   */
-  async #customTitle(workspaceId) {
-    try {
-      const workspaces = await this.#cmux.listWorkspaces();
-      return workspaces.find((w) => w.id === workspaceId)?.customTitle || null;
-    } catch (err) {
-      console.warn(`[refresh] could not read the title of ${workspaceId}: ${err.message}`);
-      return null;
-    }
-  }
-
   async #findClaudePid(tty) {
     try {
       const { stdout } = await this.#execFileAsync("ps", ["-t", tty, "-o", "pid,comm"]);
@@ -289,7 +273,6 @@ export class Refresher {
     if (!tty) {
       return { ok: false, error: "No tty found for workspace" };
     }
-    const title = await this.#customTitle(workspaceId);
 
     this.#inFlight.add(workspaceId);
     try {
@@ -377,14 +360,6 @@ export class Refresher {
               error: `${label} was skipped: the input box still holds leftover text (found ${describeBox(clear.seen)})`,
             };
         results.push(outcome);
-      }
-
-      if (title) {
-        try {
-          await this.#cmux.renameWorkspace(workspaceId, title);
-        } catch (err) {
-          console.warn(`[refresh] could not restore the title of ${workspaceId}: ${err.message}`);
-        }
       }
 
       const failures = results.filter((r) => !r.ok).map((r) => r.error);

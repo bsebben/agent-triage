@@ -404,9 +404,6 @@ export async function listWorkspaces() {
   return (raw.workspaces || []).map((w) => ({
     id: w.id,
     title: w.title,
-    // Only set when someone renamed the workspace. `title` alone can't tell that apart
-    // from Claude Code's own terminal title, status glyph and all.
-    customTitle: w.has_custom_title ? w.custom_title ?? null : null,
     directory: w.current_directory || null,
     ref: w.ref,
     windowId,
