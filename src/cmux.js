@@ -452,14 +452,11 @@ export async function closeWorkspace(workspaceId) {
   await socketRpc("workspace.close", { workspace_id: workspaceId });
 }
 
-export async function renameWorkspace(workspaceId, title) {
-  await socketRpc("workspace.rename", { workspace_id: workspaceId, title });
-}
-
-// createWorkspace returns the CLI's short ref (workspace:N), which the CLI resolves
-// itself — unlike renameWorkspace, which is only ever handed full ids from the monitor.
-export async function renameWorkspaceByRef(workspaceRef, title) {
-  await runCli(["rename-workspace", "--workspace", workspaceRef, "--", title]);
+// The single rename path for every caller (card edit, dispatch, session refresh). The
+// CLI accepts both full ids (from the monitor) and the short refs createWorkspace
+// returns (workspace:N), which the socket's workspace.rename can't resolve.
+export async function renameWorkspace(workspace, title) {
+  await runCli(["rename-workspace", "--workspace", workspace, "--", title]);
 }
 
 export async function readScreenByWorkspace(workspaceRef, lines = 30) {

@@ -103,7 +103,7 @@ export class Refresher {
           if (surfaceRef) break;
         }
         if (!surfaceRef) return null;
-        return { surfaceRef, workspaceRef: ws.ref, tty, title: ws.title || null };
+        return { surfaceRef, workspaceRef: ws.ref, tty };
       }
     }
     return null;
@@ -268,7 +268,7 @@ export class Refresher {
     if (!resolved) {
       return { ok: false, error: "Workspace not found" };
     }
-    const { surfaceRef, workspaceRef, tty, title } = resolved;
+    const { surfaceRef, workspaceRef, tty } = resolved;
 
     if (!tty) {
       return { ok: false, error: "No tty found for workspace" };
@@ -360,11 +360,6 @@ export class Refresher {
               error: `${label} was skipped: the input box still holds leftover text (found ${describeBox(clear.seen)})`,
             };
         results.push(outcome);
-      }
-
-      // Restore the workspace title
-      if (title) {
-        try { await this.#cmux.renameWorkspace(workspaceId, title); } catch {}
       }
 
       const failures = results.filter((r) => !r.ok).map((r) => r.error);

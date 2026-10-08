@@ -321,6 +321,18 @@ describe("Refresher.refreshSession", () => {
     assert.equal(relaunchCmd, "claude", "should start fresh without --continue or --resume");
   });
 
+  it("never renames the workspace", async () => {
+    const ws = { ...makeWorkspace("W1", "surface:1", "workspace:W1", "ttysTest"), title: "PR #1: fix flaky test" };
+    const pane = makePane(EXITED_WITH_SESSION_ID);
+    const renames = [];
+    const cmuxApi = { ...makeCmuxApi(pane, [ws]), renameWorkspace: async (id, title) => renames.push({ id, title }) };
+    const refresher = new Refresher({ cmuxApi, execFileFn: mockExecFile, pollIntervalMs: 10, timeoutMs: 3000 });
+
+    const result = await refresher.refreshSession("W1");
+    assert.equal(result.ok, true);
+    assert.deepEqual(renames, [], "refresh must leave the workspace title alone");
+  });
+
   it("starts fresh with --dangerously-skip-permissions when no session ID and dangerous=true", async () => {
     const ws = makeWorkspace("W1", "surface:1", "workspace:W1", "ttysTest");
     const pane = makePane(EXITED_WITHOUT_SESSION_ID);

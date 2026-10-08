@@ -539,7 +539,7 @@ const server = createServer(async (req, res) => {
       if (created?.workspace_id && typeof titleId === "string" && typeof titleText === "string" && titleId && titleText) {
         const prefix = finalName !== name ? `${repo} ` : "";
         generateTitle(titleId, titleText.slice(0, 300))
-          .then((title) => title && cmux.renameWorkspaceByRef(created.workspace_id, prefix + title))
+          .then((title) => title && cmux.renameWorkspace(created.workspace_id, prefix + title))
           .catch(() => {});
       }
       await monitor.poll();
