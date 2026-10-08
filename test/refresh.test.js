@@ -119,7 +119,6 @@ function makeSequencedPane(preSubmit, overrides = {}, { focusCommand = "/reload-
       return cfg.submitted;
     },
     renameWorkspace: async () => {},
-    setWorkspaceTitle: async () => {},
   };
 }
 
@@ -191,11 +190,12 @@ function makeCmuxApi(pane, workspaces) {
       if (method === "system.top") return makeTopData(workspaces);
       return {};
     },
+    listWorkspaces: async () =>
+      workspaces.map((ws) => ({ id: ws.id, ref: ws.ref, title: ws.title, customTitle: ws.customTitle ?? null })),
     sendText: pane.sendText,
     sendKey: pane.sendKey,
     readScreenByWorkspace: pane.readScreenByWorkspace,
     renameWorkspace: pane.renameWorkspace,
-    setWorkspaceTitle: pane.setWorkspaceTitle,
   };
 }
 
@@ -285,6 +285,7 @@ describe("Refresher.refreshSession", () => {
         if (method === "system.top") return makeTopData([makeWorkspace("W1", "surface:1", null, "ttysTest")]);
         return {};
       },
+      listWorkspaces: async () => [],
       sendText: async () => {},
       sendKey: async () => {},
       readScreenByWorkspace: async () => {
@@ -321,6 +322,34 @@ describe("Refresher.refreshSession", () => {
     const relaunchCmd = pane.sentTexts.find((t) => t.startsWith("claude"));
     assert.ok(relaunchCmd, "should have sent a relaunch command");
     assert.equal(relaunchCmd, "claude", "should start fresh without --continue or --resume");
+  });
+
+  it("leaves a workspace still showing Claude Code's own title unrenamed", async () => {
+    const ws = { ...makeWorkspace("W1", "surface:1", "workspace:W1", "ttysTest"), title: "◐ Fix flaky session test" };
+    const pane = makePane(EXITED_WITH_SESSION_ID);
+    const renames = [];
+    const cmuxApi = { ...makeCmuxApi(pane, [ws]), renameWorkspace: async (id, title) => renames.push({ id, title }) };
+    const refresher = new Refresher({ cmuxApi, execFileFn: mockExecFile, pollIntervalMs: 10, timeoutMs: 3000 });
+
+    const result = await refresher.refreshSession("W1");
+    assert.equal(result.ok, true);
+    assert.deepEqual(renames, [], "pinning the live title would freeze its status glyph and block the session's own titles");
+  });
+
+  it("re-applies a title someone explicitly gave the workspace", async () => {
+    const ws = {
+      ...makeWorkspace("W1", "surface:1", "workspace:W1", "ttysTest"),
+      title: "PR #1: fix flaky test",
+      customTitle: "PR #1: fix flaky test",
+    };
+    const pane = makePane(EXITED_WITH_SESSION_ID);
+    const renames = [];
+    const cmuxApi = { ...makeCmuxApi(pane, [ws]), renameWorkspace: async (id, title) => renames.push({ id, title }) };
+    const refresher = new Refresher({ cmuxApi, execFileFn: mockExecFile, pollIntervalMs: 10, timeoutMs: 3000 });
+
+    const result = await refresher.refreshSession("W1");
+    assert.equal(result.ok, true);
+    assert.deepEqual(renames, [{ id: "W1", title: "PR #1: fix flaky test" }]);
   });
 
   it("starts fresh with --dangerously-skip-permissions when no session ID and dangerous=true", async () => {
@@ -905,6 +934,7 @@ describe("Refresher.refreshAll", () => {
         if (method === "system.top") return makeTopData([makeWorkspace("W1", "surface:1")]);
         return {};
       },
+      listWorkspaces: async () => [],
       sendText: async () => {},
       sendKey: async () => {},
       readScreenByWorkspace: async () => null,
@@ -929,11 +959,11 @@ describe("Refresher.refreshAll", () => {
     const cmuxApi = {
       listAgentWorkspaceIds: async () => new Set(["W1", "W2"]),
       rpc: async (method) => (method === "system.top" ? makeTopData(workspaces) : {}),
+      listWorkspaces: async () => [],
       sendText: async (wsId, surfaceId, text) => panes[wsId].sendText(wsId, surfaceId, text),
       sendKey: async (wsId, surfaceId, key) => panes[wsId].sendKey(wsId, surfaceId, key),
       readScreenByWorkspace: async (wsRef) => panes[wsRef.replace("workspace:", "")].readScreenByWorkspace(),
       renameWorkspace: async () => {},
-      setWorkspaceTitle: async () => {},
     };
     const refresher = new Refresher({
       cmuxApi,
@@ -966,11 +996,11 @@ describe("Refresher.refreshAll", () => {
     const cmuxApi = {
       listAgentWorkspaceIds: async () => new Set(["W1", "W2"]),
       rpc: async (method) => (method === "system.top" ? makeTopData(workspaces) : {}),
+      listWorkspaces: async () => [],
       sendText: async (wsId, surfaceId, text) => panes[wsId].sendText(wsId, surfaceId, text),
       sendKey: async (wsId, surfaceId, key) => panes[wsId].sendKey(wsId, surfaceId, key),
       readScreenByWorkspace: async (wsRef) => panes[wsRef.replace("workspace:", "")].readScreenByWorkspace(),
       renameWorkspace: async () => {},
-      setWorkspaceTitle: async () => {},
     };
     const refresher = new Refresher({
       cmuxApi,

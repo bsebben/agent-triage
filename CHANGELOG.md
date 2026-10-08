@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.59.1] - 2026-10-08
+
+### Changed
+
+- Workspace renames from the card edit button, PR/ticket action dispatch, and session refresh now all go through one shared rename path, so every button renames the workspace the same way (server-side, never by prompting the session).
+
+### Fixed
+
+- Refreshing a session no longer renames its workspace. Refresh used to write Claude Code's live title back as a custom title, which froze the status glyph (e.g. `◐`) and stopped the workspace from picking up any title the session set afterward. Now it only re-applies a title someone explicitly set (card edit or dispatch), and it logs a failed rename instead of swallowing it.
+
 ## [1.59.0] - 2026-10-07
 
 ### Changed

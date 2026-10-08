@@ -404,6 +404,9 @@ export async function listWorkspaces() {
   return (raw.workspaces || []).map((w) => ({
     id: w.id,
     title: w.title,
+    // Only set when someone renamed the workspace. `title` alone can't tell that apart
+    // from Claude Code's own terminal title, status glyph and all.
+    customTitle: w.has_custom_title ? w.custom_title ?? null : null,
     directory: w.current_directory || null,
     ref: w.ref,
     windowId,
@@ -452,28 +455,11 @@ export async function closeWorkspace(workspaceId) {
   await socketRpc("workspace.close", { workspace_id: workspaceId });
 }
 
-export async function renameWorkspace(workspaceId, title) {
-  await socketRpc("workspace.rename", { workspace_id: workspaceId, title });
-}
-
-// createWorkspace returns the CLI's short ref (workspace:N), which the CLI resolves
-// itself — unlike renameWorkspace, which is only ever handed full ids from the monitor.
-export async function renameWorkspaceByRef(workspaceRef, title) {
-  await runCli(["rename-workspace", "--workspace", workspaceRef, "--", title]);
-}
-
-// Unified title restoration: use the same approach for both dispatch and refresh.
-// This ensures consistent behavior whether the workspace is being set up for a
-// newly dispatched action or being restored after a session refresh.
-// Takes either a workspace ref (from createWorkspace) or workspaceId (from monitor).
-export async function setWorkspaceTitle(workspaceIdentifier, title) {
-  if (!title) return;
-  // workspace:N format indicates it's a ref; otherwise treat as full workspaceId
-  if (workspaceIdentifier?.match(/^workspace:\d+$/)) {
-    await renameWorkspaceByRef(workspaceIdentifier, title);
-  } else {
-    await renameWorkspace(workspaceIdentifier, title);
-  }
+// The single rename path for every caller (card edit, dispatch, session refresh). The
+// CLI accepts both full ids (from the monitor) and the short refs createWorkspace
+// returns (workspace:N), which the socket's workspace.rename can't resolve.
+export async function renameWorkspace(workspace, title) {
+  await runCli(["rename-workspace", "--workspace", workspace, "--", title]);
 }
 
 export async function readScreenByWorkspace(workspaceRef, lines = 30) {
