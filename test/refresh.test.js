@@ -119,6 +119,7 @@ function makeSequencedPane(preSubmit, overrides = {}, { focusCommand = "/reload-
       return cfg.submitted;
     },
     renameWorkspace: async () => {},
+    setWorkspaceTitle: async () => {},
   };
 }
 
@@ -194,6 +195,7 @@ function makeCmuxApi(pane, workspaces) {
     sendKey: pane.sendKey,
     readScreenByWorkspace: pane.readScreenByWorkspace,
     renameWorkspace: pane.renameWorkspace,
+    setWorkspaceTitle: pane.setWorkspaceTitle,
   };
 }
 
@@ -931,6 +933,7 @@ describe("Refresher.refreshAll", () => {
       sendKey: async (wsId, surfaceId, key) => panes[wsId].sendKey(wsId, surfaceId, key),
       readScreenByWorkspace: async (wsRef) => panes[wsRef.replace("workspace:", "")].readScreenByWorkspace(),
       renameWorkspace: async () => {},
+      setWorkspaceTitle: async () => {},
     };
     const refresher = new Refresher({
       cmuxApi,
@@ -967,6 +970,7 @@ describe("Refresher.refreshAll", () => {
       sendKey: async (wsId, surfaceId, key) => panes[wsId].sendKey(wsId, surfaceId, key),
       readScreenByWorkspace: async (wsRef) => panes[wsRef.replace("workspace:", "")].readScreenByWorkspace(),
       renameWorkspace: async () => {},
+      setWorkspaceTitle: async () => {},
     };
     const refresher = new Refresher({
       cmuxApi,

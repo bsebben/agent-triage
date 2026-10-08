@@ -362,9 +362,9 @@ export class Refresher {
         results.push(outcome);
       }
 
-      // Restore the workspace title
+      // Restore the workspace title using the same logic as dispatch
       if (title) {
-        try { await this.#cmux.renameWorkspace(workspaceId, title); } catch {}
+        try { await this.#cmux.setWorkspaceTitle(workspaceId, title); } catch {}
       }
 
       const failures = results.filter((r) => !r.ok).map((r) => r.error);

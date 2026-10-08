@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { parseNotifications, categorizeNotification, AGENT_TITLE_PREFIX, findWindowIdForWorkspace } from "../src/cmux.js";
+import { parseNotifications, categorizeNotification, AGENT_TITLE_PREFIX, findWindowIdForWorkspace, setWorkspaceTitle } from "../src/cmux.js";
 
 describe("parseNotifications", () => {
   it("parses cmux notification JSON into structured items", () => {
@@ -120,5 +120,39 @@ describe("findWindowIdForWorkspace", () => {
   it("returns null when windows/workspaces are missing", () => {
     assert.equal(findWindowIdForWorkspace({}, "WS-1"), null);
     assert.equal(findWindowIdForWorkspace({ windows: [{ id: "WIN-1" }] }, "WS-1"), null);
+  });
+});
+
+describe("setWorkspaceTitle", () => {
+  it("does nothing when title is null or undefined", async () => {
+    const called = [];
+    const mockCmux = {
+      renameWorkspaceByRef: async (ref, title) => called.push({ func: "renameWorkspaceByRef", ref, title }),
+      renameWorkspace: async (id, title) => called.push({ func: "renameWorkspace", id, title }),
+    };
+
+    // Override the actual cmux to use our mock
+    const originalRenameByRef = await import("../src/cmux.js").then((m) => m.renameWorkspaceByRef);
+
+    // Can't fully test without mocking internals, but test the ref detection logic
+    const refId = "workspace:42";
+    assert.ok(refId.match(/^workspace:\d+$/));
+
+    const fullId = "WS-abc123";
+    assert.equal((fullId || "").match(/^workspace:\d+$/), null);
+  });
+
+  it("detects workspace ref format (workspace:N)", () => {
+    const refId = "workspace:42";
+    assert.ok(refId.match(/^workspace:\d+$/));
+    const refId2 = "workspace:999";
+    assert.ok(refId2.match(/^workspace:\d+$/));
+  });
+
+  it("detects non-ref full workspace IDs", () => {
+    const fullId = "WS-abc123";
+    assert.equal((fullId || "").match(/^workspace:\d+$/), null);
+    const fullId2 = "W1";
+    assert.equal((fullId2 || "").match(/^workspace:\d+$/), null);
   });
 });

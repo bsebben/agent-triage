@@ -462,6 +462,20 @@ export async function renameWorkspaceByRef(workspaceRef, title) {
   await runCli(["rename-workspace", "--workspace", workspaceRef, "--", title]);
 }
 
+// Unified title restoration: use the same approach for both dispatch and refresh.
+// This ensures consistent behavior whether the workspace is being set up for a
+// newly dispatched action or being restored after a session refresh.
+// Takes either a workspace ref (from createWorkspace) or workspaceId (from monitor).
+export async function setWorkspaceTitle(workspaceIdentifier, title) {
+  if (!title) return;
+  // workspace:N format indicates it's a ref; otherwise treat as full workspaceId
+  if (workspaceIdentifier?.match(/^workspace:\d+$/)) {
+    await renameWorkspaceByRef(workspaceIdentifier, title);
+  } else {
+    await renameWorkspace(workspaceIdentifier, title);
+  }
+}
+
 export async function readScreenByWorkspace(workspaceRef, lines = 30) {
   try {
     const { stdout } = await runCli([
