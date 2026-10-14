@@ -43,6 +43,19 @@ export const migrations = [
       };
     },
   },
+  {
+    version: 3,
+    describe: 'add tabs.tickets.pillStatuses (default "Backlog, Acceptance")',
+    migrate(cfg) {
+      return {
+        ...cfg,
+        tabs: {
+          ...cfg.tabs,
+          tickets: { pillStatuses: "Backlog, Acceptance", ...cfg.tabs?.tickets },
+        },
+      };
+    },
+  },
 ];
 
 export const CURRENT_CONFIG_VERSION = migrations.length;

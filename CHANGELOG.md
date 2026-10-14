@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.60.0] - 2026-10-14
+
+### Added
+
+- `tabs.tickets.pillStatuses` (default `"Backlog, Acceptance"`): statuses that get an opt-in filter pill with a count. A pill only appears when a ticket has that status, so it is safe across teams with different workflows. Existing configs are migrated automatically.
+
+### Changed
+
+- The Tickets tab's default view now leaves out the pill statuses, and the status dropdown's first option is **Active** (everything except pill statuses). The Backlog toggle is now one of the pills, and picking a pill or a dropdown status replaces the previous selection.
+
 ## [1.59.1] - 2026-10-08
 
 ### Changed

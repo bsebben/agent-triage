@@ -145,6 +145,7 @@ If you need to override the auto-detected URL (e.g. you have multiple Runlayer J
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
 | `excludeProjects` | string | `null` | Comma-separated project keys to hide (e.g. `"USPUDU, BBO"`) |
+| `pillStatuses` | string | `"Backlog, Acceptance"` | Comma-separated Jira statuses that get an opt-in filter pill instead of appearing in the default view |
 
 `excludeProjects` adds an `AND project NOT IN (...)` clause to the ticket query, so tickets from those projects never appear. Example — hide two noisy projects:
 
@@ -153,6 +154,18 @@ If you need to override the auto-detected URL (e.g. you have multiple Runlayer J
   "tabs": {
     "tickets": {
       "excludeProjects": "USPUDU, BBO"
+    }
+  }
+}
+```
+
+`pillStatuses` keeps parking-lot statuses out of the way. Tickets in a listed status are left out of the default **Active** view; a pill with a count (e.g. `Backlog (12)`) appears for each listed status that at least one ticket has, and clicking it shows only that status. Names are matched case-insensitively and a name no ticket carries renders nothing, so the list is safe to share across teams with different workflows. The status dropdown lists the remaining statuses, and **Active** in it returns to the default view. Tickets already resolved (Done category) are excluded by the query itself, so they never reach the pills. Set `pillStatuses` to `null` to turn pills off. Example — add an Icebox pill:
+
+```json
+{
+  "tabs": {
+    "tickets": {
+      "pillStatuses": "Backlog, Acceptance, Icebox"
     }
   }
 }

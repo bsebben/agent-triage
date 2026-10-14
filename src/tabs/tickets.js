@@ -30,6 +30,7 @@ export const defaults = {
   enabled: true,
   jql: null,
   excludeProjects: null,
+  pillStatuses: "Backlog, Acceptance",
   runlayerUrl: null,
   runlayerUserApiKey: null,
 };
@@ -49,6 +50,7 @@ let data = [];
 
 async function init(tabConfig, onUpdate) {
   resolvedCfg = { ...defaults, ...tabConfig };
+  tab.pillStatuses = parsePillStatuses(resolvedCfg.pillStatuses);
   tab.enabled = resolvedCfg.enabled;
   if (!tab.enabled) return;
   const baseJql = resolvedCfg.jql || DEFAULT_JQL;
@@ -125,6 +127,22 @@ export function applyExcludeProjects(jql, excludeProjects) {
   const where = orderMatch ? jql.slice(0, orderMatch.index) : jql;
   const order = orderMatch ? orderMatch[0] : "";
   return `${where} AND project NOT IN (${notIn})${order}`;
+}
+
+// Statuses that get an opt-in filter pill instead of appearing in the default view. The
+// client matches them case-insensitively against what Jira returns, so a name no ticket
+// carries simply never renders.
+export function parsePillStatuses(pillStatuses) {
+  if (!pillStatuses) return [];
+  const seen = new Set();
+  const out = [];
+  for (const name of String(pillStatuses).split(",").map((s) => s.trim()).filter(Boolean)) {
+    const key = name.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(name);
+  }
+  return out;
 }
 
 // Resumes pagination via the search API's own nextPageToken rather than a hand-rolled
@@ -588,6 +606,7 @@ const tab = {
   enabled: false,
   available: false,
   hint: null,
+  pillStatuses: [],
   get data() { return data; },
   init,
 };
