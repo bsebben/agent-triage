@@ -63,3 +63,19 @@ describe("runMigrations", () => {
     assert.equal(run({}, 3).trail, undefined);
   });
 });
+
+describe("migration 3: tabs.tickets.pillStatuses", () => {
+  it("adds the default list to a config that lacks it", () => {
+    const result = runMigrations({ tabs: { tickets: { excludeProjects: "BBO" } } }, 2);
+    assert.deepEqual(result.tabs.tickets, { pillStatuses: "Backlog, Acceptance", excludeProjects: "BBO" });
+  });
+
+  it("creates the tickets block when the config has none", () => {
+    assert.equal(runMigrations({}, 2).tabs.tickets.pillStatuses, "Backlog, Acceptance");
+  });
+
+  it("keeps a user-set value, including null", () => {
+    assert.equal(runMigrations({ tabs: { tickets: { pillStatuses: "Icebox" } } }, 2).tabs.tickets.pillStatuses, "Icebox");
+    assert.equal(runMigrations({ tabs: { tickets: { pillStatuses: null } } }, 2).tabs.tickets.pillStatuses, null);
+  });
+});
