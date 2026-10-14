@@ -1,24 +1,44 @@
 // public/tab-tickets.js
 
 const collapsedTicketGroups = new Set();
-let ticketsShowBacklog = false;
+// "" is the default Active view: every status that isn't a pill status.
 let ticketsStatusFilter = "";
-
-function toggleTicketsBacklog() {
-  ticketsShowBacklog = !ticketsShowBacklog;
-  renderTickets();
-}
 
 function setTicketsStatusFilter(status) {
   ticketsStatusFilter = status;
   renderTickets();
 }
 
-function filterTicketGroups(groups) {
-  if (ticketsShowBacklog) return groups;
+function toggleTicketsPill(status) {
+  setTicketsStatusFilter(ticketsStatusFilter === status ? "" : status);
+}
+
+function isPillStatus(status, pills) {
+  const s = (status || "").toLowerCase();
+  return pills.some((p) => p.toLowerCase() === s);
+}
+
+function filterTicketGroups(groups, pills) {
   return groups
-    .map((g) => ({ ...g, tickets: g.tickets.filter((t) => t.status.toLowerCase() !== "backlog") }))
+    .map((g) => ({ ...g, tickets: g.tickets.filter((t) => !isPillStatus(t.status, pills)) }))
     .filter((g) => g.tickets.length > 0);
+}
+
+// One entry per configured pill status that at least one ticket carries, in config order.
+// The label is the status exactly as Jira spells it, which is also the value the status
+// filter compares against.
+function collectTicketPills(groups, pills) {
+  const found = new Map();
+  for (const g of groups) {
+    for (const t of g.tickets) {
+      if (!isPillStatus(t.status, pills)) continue;
+      const key = t.status.toLowerCase();
+      const entry = found.get(key) || { status: t.status, count: 0 };
+      entry.count += 1;
+      found.set(key, entry);
+    }
+  }
+  return pills.map((p) => found.get(p.toLowerCase())).filter(Boolean);
 }
 
 function collectTicketStatuses(groups) {
@@ -43,9 +63,16 @@ function renderTicketStatusFilter(statuses) {
     .map((s) => `<option value="${escapeHtml(s)}"${s === ticketsStatusFilter ? " selected" : ""}>${escapeHtml(s)}</option>`)
     .join("");
   return `<select class="tickets-filter-select" onchange="setTicketsStatusFilter(this.value)">
-    <option value="">All statuses</option>
+    <option value="">Active</option>
     ${options}
   </select>`;
+}
+
+function renderTicketPill(pill) {
+  const active = pill.status === ticketsStatusFilter;
+  return `<button class="tickets-filter-btn${active ? " active" : ""}" data-status="${escapeHtml(pill.status)}" onclick="toggleTicketsPill(this.dataset.status)">
+      ${escapeHtml(pill.status)} (${pill.count})
+    </button>`;
 }
 
 function renderTickets() {
@@ -56,26 +83,25 @@ function renderTickets() {
     return;
   }
   const allGroups = state.tickets || [];
-  const groups = filterTicketGroups(allGroups);
-  // Statuses come from what the backlog toggle leaves visible, so "Backlog" isn't offered
-  // as an option while backlog tickets are hidden. Drop a selected status the visible set
-  // no longer contains — otherwise the dropdown renders without it and the user is stuck
-  // on an empty list they can't clear.
-  const statuses = collectTicketStatuses(groups);
-  if (ticketsStatusFilter && !statuses.includes(ticketsStatusFilter)) ticketsStatusFilter = "";
-  const filtered = filterTicketGroupsByStatus(groups, ticketsStatusFilter);
+  const pillConfig = ticketStatus.pillStatuses || [];
+  const activeGroups = filterTicketGroups(allGroups, pillConfig);
+  const pills = collectTicketPills(allGroups, pillConfig);
+  // The dropdown only lists non-pill statuses; pill statuses are reached through their
+  // pills. Drop a selection neither control can show any more — otherwise the user is
+  // stranded on an empty list they can't clear.
+  const statuses = collectTicketStatuses(activeGroups);
+  const pillSelected = pills.some((p) => p.status === ticketsStatusFilter);
+  if (ticketsStatusFilter && !pillSelected && !statuses.includes(ticketsStatusFilter)) ticketsStatusFilter = "";
+  const filtered = filterTicketGroupsByStatus(pillSelected ? allGroups : activeGroups, ticketsStatusFilter);
   const totalAll = allGroups.reduce((n, g) => n + g.tickets.length, 0);
   const totalVisible = filtered.reduce((n, g) => n + g.tickets.length, 0);
-  const hiddenBacklog = allGroups.reduce((n, g) => n + g.tickets.filter((t) => t.status.toLowerCase() === "backlog").length, 0);
   if (totalAll === 0) {
     const hint = ticketStatus.hint ? escapeHtml(ticketStatus.hint) : "No assigned tickets";
     queue.innerHTML = `<div class="empty-state">${hint}</div>`;
     return;
   }
   const filterBar = `<div class="tickets-filter-bar">
-    <button class="tickets-filter-btn${ticketsShowBacklog ? " active" : ""}" onclick="toggleTicketsBacklog()">
-      Backlog${hiddenBacklog > 0 && !ticketsShowBacklog ? ` (${hiddenBacklog})` : ""}
-    </button>
+    ${pills.map(renderTicketPill).join("")}
     ${statuses.length > 1 ? renderTicketStatusFilter(statuses) : ""}
   </div>`;
   if (totalVisible === 0) {

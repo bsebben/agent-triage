@@ -1,5 +1,5 @@
 {
-  "configVersion": 2,
+  "configVersion": 3,
   "port": 7777,
   "defaultDirectory": "~/workspace",
   "maxSessions": null,
@@ -13,6 +13,7 @@
     "loops": {},
     "tickets": {
       "excludeProjects": null,
+      "pillStatuses": "Backlog, Acceptance",
       "runlayerUserApiKey": null
     },
     "pulls": {

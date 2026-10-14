@@ -2,7 +2,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 
-import { applyExcludeProjects, paginateIssues } from "../src/tabs/tickets.js";
+import { applyExcludeProjects, paginateIssues, parsePillStatuses } from "../src/tabs/tickets.js";
 
 const DEFAULT_JQL = "assignee = currentUser() AND statusCategory != Done ORDER BY status ASC";
 
@@ -301,5 +301,21 @@ describe("paginateIssues", () => {
       assert.equal(calls, 1);
       assert.ok(warnings.some((w) => w.includes("retry budget spent")));
     });
+  });
+});
+
+describe("parsePillStatuses", () => {
+  it("returns an empty list for null, empty, or whitespace-only input", () => {
+    assert.deepEqual(parsePillStatuses(null), []);
+    assert.deepEqual(parsePillStatuses(""), []);
+    assert.deepEqual(parsePillStatuses("  ,  , "), []);
+  });
+
+  it("splits on commas and trims whitespace", () => {
+    assert.deepEqual(parsePillStatuses("Backlog, Acceptance , Icebox"), ["Backlog", "Acceptance", "Icebox"]);
+  });
+
+  it("dedupes case-insensitively, keeping the first spelling", () => {
+    assert.deepEqual(parsePillStatuses("Backlog, backlog, BACKLOG, Done"), ["Backlog", "Done"]);
   });
 });

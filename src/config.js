@@ -35,6 +35,7 @@ export const FIELD_META = {
   "tabs.pulls.deployStatusUrl": { type: "string", nullable: true, description: "Base URL of the deploy-status API used to populate merged-PR deploy dots (or set DEPLOY_STATUS_API_URL env var). Leave null to disable." },
   "tabs.pulls.slaDays":         { type: "number", nullable: true, description: "SLA (in days) for open PRs in the Mine/Reviews tabs. Rows are tinted yellow/orange/red at 50%/75%/100% of this SLA, measured from when the PR was marked ready for review (or created, if never a draft). Draft PRs are never colored. Leave null to disable." },
   "tabs.tickets.excludeProjects":    { type: "string", nullable: true, description: "Comma-separated Jira project keys to hide (e.g. \"USPUDU, BBO\")" },
+  "tabs.tickets.pillStatuses":       { type: "string", nullable: true, description: "Comma-separated Jira statuses that get an opt-in filter pill and are left out of the default view (e.g. \"Backlog, Acceptance\"). A pill only appears when a ticket has that status. Leave null for none." },
   "tabs.tickets.runlayerUserApiKey": { type: "string", nullable: true, description: "Runlayer user API key (or set RUNLAYER_USER_KEY env var). Required when not using mcpproxy." },
   "tabs.tickets.runlayerUrl":        { type: "string", nullable: true, description: "Runlayer Jira MCP endpoint URL — auto-detected from Claude Code MCP config if not set" },
   "tabs.tasks.maxAgeDays":      { type: "number", description: "Hide tasks older than this many days (0 = never expire)" },

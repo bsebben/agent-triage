@@ -1,5 +1,5 @@
 {
-  "configVersion": 2,
+  "configVersion": 3,
   "keys": {
     "cmux.binary": {
       "type": "string",
@@ -76,6 +76,10 @@
       "nullable": true
     },
     "tabs.tickets.jql": {
+      "type": "string",
+      "nullable": true
+    },
+    "tabs.tickets.pillStatuses": {
       "type": "string",
       "nullable": true
     },
