@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.61.0] - 2026-10-19
+
+### Added
+
+- Workspace cards show clickable pills, right-aligned, for the PR or ticket a session is about. Matches come from ticket keys and `PR #N` in the workspace title and git branch, and only link items already loaded in the Pulls or Tickets tab.
+
 ## [1.60.0] - 2026-10-14
 
 ### Added
