@@ -195,13 +195,14 @@ function renderCard(item, { isDismissed = false } = {}) {
   const worktreePill = item.isWorktree
     ? `<span class="card-worktree" title="Worktree of ${escapeHtml(item.repoRoot || "")}">&#9095; ${escapeHtml(item.worktreeName || "")}</span>`
     : "";
+  const links = renderWorkspaceLinks(findWorkspaceLinks(item, { pulls: state.pulls, tickets: state.tickets }));
   return `<div class="card${selectedClass}${bypassClass} cat-${escapeHtml(displayCategory)}" data-workspace-id="${item.workspaceId}"${bypassTip} onclick="cardClick(event,'${item.workspaceId}')">
     <div class="card-title-row"><span class="card-title-group"><span class="card-title">${escapeHtml(cardTitle)}</span>${editLink}</span><span class="card-actions-col"><span class="card-actions-right">${refreshBtn}${dismissBtn}${closeBtn}</span>${item.createdAt ? `<span class="card-time">\u{1f559} ${timeAgo(item.createdAt)}</span>` : ""}</span></div>
     <div class="card-content">
       <div class="card-header">
         <span class="card-category ${escapeHtml(displayCategory)}"><span class="card-icon">${categoryIcon(displayCategory)}</span> ${escapeHtml(displayCategory)}</span>
       </div>
-    ${subtitle || worktreePill ? `<div class="card-subtitle">${worktreePill}${worktreePill && subtitle ? " / " : ""}${subtitle ? escapeHtml(subtitle) : ""}</div>` : ""}
+    ${subtitle || worktreePill || links ? `<div class="card-subtitle"><span class="card-subtitle-text">${worktreePill}${worktreePill && subtitle ? " / " : ""}${subtitle ? escapeHtml(subtitle) : ""}</span>${links}</div>` : ""}
     ${item.body && !isGenericBody(item.body) ? `<div class="card-body">${escapeHtml(item.body)}</div>` : ""}
     </div>
   </div>`;

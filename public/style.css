@@ -602,9 +602,51 @@ main { padding: 8px; position: relative; }
 .btn-refresh-all.refreshing { color: var(--clr-running); border-color: var(--clr-running); }
 
 .card-subtitle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
   font-size: 11px;
   color: var(--text-dim);
   margin-bottom: 4px;
+}
+
+.card-subtitle-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.card-links {
+  display: inline-flex;
+  flex-shrink: 0;
+  gap: 4px;
+  margin-left: auto;
+}
+
+.card-link {
+  padding: 1px 8px;
+  border: 1px solid color-mix(in srgb, var(--text) 30%, transparent);
+  border-radius: 999px;
+  font-weight: 600;
+  color: var(--text);
+  background: color-mix(in srgb, var(--text) 10%, transparent);
+  text-decoration: none;
+  cursor: pointer;
+  transition: transform 0.15s ease, background 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.card-link:hover {
+  transform: translateY(-1px);
+  background: color-mix(in srgb, var(--text) 22%, transparent);
+  border-color: var(--text);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
+  text-decoration: underline;
+}
+
+.card-link:active {
+  transform: translateY(0);
 }
 
 .card-worktree {
