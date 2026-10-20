@@ -13,7 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
-- The Pulls tab status and CI columns use icons instead of text, with the status name as a tooltip. Narrow panels move the reviewer groups to a second line under the title.
+- The Pulls tab status and CI columns use icons instead of text, with the status name as a tooltip, and a PR with requested changes gets its own status icon. Pull request and ticket rows are cards with a gap between them, and narrow panels move the PR number, reviewer pills, and a labelled CI pill to a second line under the title.
 
 ## [1.61.0] - 2026-10-19
 

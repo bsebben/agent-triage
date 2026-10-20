@@ -22,6 +22,10 @@ function iconComment() {
   return pullIcon('<path d="M2.5 3h11v7.5H8l-3 2.7v-2.7H2.5z"/>');
 }
 
+function iconCommentBlocked() {
+  return pullIcon('<path d="M2.5 3h11v7.5H8l-3 2.7v-2.7H2.5z"/><path d="M6.3 5.2l3.4 3.4M9.7 5.2L6.3 8.6"/>');
+}
+
 function iconCheck() {
   return pullIcon('<path d="M3 8.5l3.2 3.2L13 4.8"/>');
 }

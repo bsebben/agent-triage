@@ -1006,6 +1006,7 @@ main { padding: 8px; position: relative; }
 .pull-status-icon.status-draft { color: var(--text-dim); }
 .pull-status-icon.status-open { color: var(--clr-running); }
 .pull-status-icon.status-comments { color: var(--clr-question); }
+.pull-status-icon.status-blocked { color: var(--clr-error); }
 .pull-status-icon.status-approved { color: var(--clr-completion); }
 .pull-status-icon.status-queued { color: var(--clr-permission); }
 .pull-status-icon.status-queue_failed { color: var(--clr-error); }
@@ -1019,19 +1020,28 @@ main { padding: 8px; position: relative; }
 
 .pull-icon { width: 14px; height: 14px; flex: none; vertical-align: middle; }
 
+.pull-num { display: none; }
+
 .pull-reviews { white-space: nowrap; width: 1px; padding: 6px 4px; }
 .pull-reviews:empty { padding: 0; }
 
-.pull-rev-group {
+.pull-pills { display: inline-flex; align-items: center; gap: 4px; vertical-align: middle; }
+
+/* One fixed height keeps the human, bot, and CI pills level whatever their content. */
+.pull-rev-group,
+.pull-ci-pill {
   display: inline-flex;
   align-items: center;
+  box-sizing: border-box;
+  height: 22px;
   gap: 6px;
-  padding: 2px 8px;
-  margin-left: 4px;
+  padding: 0 8px;
   border-radius: 999px;
   background: color-mix(in srgb, var(--text-dim) 14%, transparent);
   border: 1px solid color-mix(in srgb, var(--text-dim) 35%, transparent);
 }
+
+.pull-ci-label { color: var(--text-dim); font-size: 11px; font-weight: 600; }
 
 /* Bots recede: same pill, dimmed with a dashed outline so human feedback is read first. */
 .pull-rev-bot {
@@ -1053,7 +1063,7 @@ main { padding: 8px; position: relative; }
   .pulls-table, .pulls-table tbody { display: block; }
   .pulls-table .pull-row:has(.pull-reviews) {
     display: grid;
-    grid-template-columns: auto minmax(0, 1fr) auto auto auto;
+    grid-template-columns: auto minmax(0, 1fr) auto auto 32px;
     align-items: center;
     margin-bottom: 6px;
     border-radius: 6px;
@@ -1063,15 +1073,17 @@ main { padding: 8px; position: relative; }
   .pulls-table .pull-row:has(.pull-reviews) > td { background: none; border-radius: 0; }
   .pulls-table .pull-row td { grid-row: 1; width: auto; }
   .pulls-table .pull-row:has(.pull-reviews) > .pull-status { align-self: start; }
-  .pulls-table .pull-row .pull-reviews { grid-row: 2; grid-column: 1 / -1; width: auto; padding: 0 8px 6px; text-align: right; }
-  .pulls-table .pull-row .pull-reviews:empty { display: none; }
+  .pulls-table .pull-row:has(.pull-reviews) > .pull-title { grid-column: 2 / 5; }
+  .pulls-table .pull-row:has(.pull-reviews) > .row-action { grid-column: 5; }
+  .pulls-table .pull-row:has(.pull-reviews) .pull-title .pull-number { display: none; }
+  .pulls-table .pull-row .pull-num { display: block; grid-row: 2; grid-column: 2; padding: 0 8px 6px; color: var(--text-dim); }
+  .pulls-table .pull-row:has(.pull-reviews) > .pull-author { grid-row: 2; grid-column: 3; padding: 0 8px 6px; }
+  .pulls-table .pull-row .pull-reviews { grid-row: 2; grid-column: 4 / 6; justify-self: end; width: auto; padding: 0 8px 6px 4px; }
   /* The first cell only spans the title line here, so the SLA bar moves to the whole row. */
   .pulls-table .pull-row:has(.pull-reviews) > td:first-child { box-shadow: none; }
   .pulls-table .pull-row-sla-yellow:has(.pull-reviews) { box-shadow: inset 3px 0 0 var(--clr-waiting); }
   .pulls-table .pull-row-sla-orange:has(.pull-reviews) { box-shadow: inset 3px 0 0 var(--clr-permission); }
-  .pulls-table .pull-row-sla-red:has(.pull-reviews) { box-shadow: inset 3px 0 0 var(--clr-error); }
-  .pulls-table .pull-row .pull-rev-group:first-child { margin-left: 0; }
-}
+  .pulls-table .pull-row-sla-red:has(.pull-reviews) { box-shadow: inset 3px 0 0 var(--clr-error); }}
 
 .pull-deploy { white-space: nowrap; width: 1px; padding: 6px 4px; text-align: center; }
 

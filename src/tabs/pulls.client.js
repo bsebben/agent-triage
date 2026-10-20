@@ -274,11 +274,15 @@ function slaTooltip(pr, slaDays, now = Date.now()) {
   return `${ageDays.toFixed(1)}d old — ${pct}% of ${slaDays}d SLA`;
 }
 
+function ciPill(state, title, icon) {
+  return `<span class="ci-badge pull-ci-pill ci-${state}" title="${title}" aria-label="${title}"><span class="pull-ci-label">CI</span>${icon}</span>`;
+}
+
 function ciCell(ci) {
-  if (ci === "failing") return `<span class="ci-badge ci-failing" title="CI failing" aria-label="CI failing">${iconBlocked()}</span>`;
-  if (ci === "passing") return `<span class="ci-badge ci-passing" title="CI passing" aria-label="CI passing">${iconCheckCircle()}</span>`;
-  if (ci === "running") return `<span class="ci-badge ci-running" title="CI running" aria-label="CI running">${iconHalfCircle()}</span>`;
-  return `<span class="ci-badge ci-none" title="No CI" aria-label="No CI">${iconDash()}</span>`;
+  if (ci === "failing") return ciPill("failing", "CI failing", iconBlocked());
+  if (ci === "passing") return ciPill("passing", "CI passing", iconCheckCircle());
+  if (ci === "running") return ciPill("running", "CI running", iconHalfCircle());
+  return ciPill("none", "No CI", iconDash());
 }
 
 // Resolved at render time, not load time: pull-icons.js is a separate script.
@@ -287,6 +291,7 @@ function statusIcon(status) {
     case "open": return iconPullRequest();
     case "draft": return iconPullDraft();
     case "comments": return iconComment();
+    case "blocked": return iconCommentBlocked();
     case "approved": return iconCheckCircle();
     case "queued":
     case "queue_failed": return iconMergeQueue();
@@ -294,10 +299,17 @@ function statusIcon(status) {
   }
 }
 
-function statusCell(status) {
-  const label = STATUS_LABELS[status] || status;
-  const body = statusIcon(status) || escapeHtml(label);
-  return `<td class="pull-status"><span class="pull-status-icon status-${status}" title="${escapeHtml(label)}" aria-label="${escapeHtml(label)}">${body}</span></td>`;
+// pr.status stays "comments" so filters, sorting, and the nav badge keep working.
+function isBlocked(pr) {
+  const r = pr.reviewers;
+  return pr.status === "comments" && !!r && (r.human.blocked.length > 0 || r.bot.blocked.length > 0);
+}
+
+function statusCell(pr) {
+  const key = isBlocked(pr) ? "blocked" : pr.status;
+  const label = key === "blocked" ? "changes requested" : (STATUS_LABELS[key] || key);
+  const body = statusIcon(key) || escapeHtml(label);
+  return `<td class="pull-status"><span class="pull-status-icon status-${key}" title="${escapeHtml(label)}" aria-label="${escapeHtml(label)}">${body}</span></td>`;
 }
 
 const DEPLOY_LABELS = {
@@ -387,11 +399,16 @@ function reviewerGroup(kind, group, truncated, unknownThreads = false) {
   return `<span class="pull-rev-group pull-rev-${kind}" title="${kind === "bot" ? "Bots" : "People"}">${lead}${indicators.join("")}</span>`;
 }
 
-function reviewerGroupsCell(reviewers) {
-  if (!reviewers) return '<td class="pull-reviews"></td>';
+function reviewerGroupsHtml(reviewers) {
+  if (!reviewers) return "";
   const t = reviewers.threadsTruncated;
   const unknownThreads = t && reviewers.human.unresolvedThreads === 0 && reviewers.bot.unresolvedThreads === 0;
-  return `<td class="pull-reviews">${reviewerGroup("human", reviewers.human, t, unknownThreads)}${reviewerGroup("bot", reviewers.bot, t)}</td>`;
+  return reviewerGroup("human", reviewers.human, t, unknownThreads) + reviewerGroup("bot", reviewers.bot, t);
+}
+
+// One cell so the narrow layout keeps both on the bottom row without widening the action column.
+function reviewsCell(pr) {
+  return `<td class="pull-reviews"><span class="pull-pills">${reviewerGroupsHtml(pr.reviewers)}${ciCell(pr.ci)}</span></td>`;
 }
 
 function renderPullRow(pr, showAuthor, repo, subTab, slaDays) {
@@ -399,11 +416,11 @@ function renderPullRow(pr, showAuthor, repo, subTab, slaDays) {
   const actionBtn = atLimit
     ? `<button class="agent-btn" title="Workspace limit reached" disabled>${claudeIcon()}</button>`
     : `<button class="agent-btn" title="Actions" data-pr-url="${escapeHtml(pr.url)}" onclick="event.stopPropagation(); openActionDrawerFromBtn(this)">${claudeIcon()}</button>`;
-  const leadingCell = subTab === "merged" ? "" : statusCell(pr.status);
+  const leadingCell = subTab === "merged" ? "" : statusCell(pr);
   const statusCells = subTab === "merged"
     ? `<td class="pull-deploy">${deployDots(pr.deploy, pr.repoTracked, pr.deployLinks)}</td>`
-    : `<td class="pull-ci">${ciCell(pr.ci)}</td>
-    ${reviewerGroupsCell(pr.reviewers)}`;
+    : `<td class="pull-num">#${pr.number}</td>
+    ${reviewsCell(pr)}`;
   const level = slaLevel(pr, slaDays);
   const rowClass = level ? ` pull-row-sla-${level}` : "";
   const rowTitle = level ? ` title="${escapeHtml(slaTooltip(pr, slaDays))}"` : "";
