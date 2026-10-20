@@ -920,9 +920,10 @@ main { padding: 8px; position: relative; }
 
 .pulls-table {
   width: 100%;
-  border-collapse: collapse;
+  border-collapse: separate;
+  border-spacing: 0 6px;
   font-size: 12px;
-  margin: 6px 8px 0 0;
+  margin: 0 8px 0 0;
 }
 
 .pulls-table th {
@@ -944,27 +945,33 @@ main { padding: 8px; position: relative; }
   padding: 6px 4px;
 }
 .pull-ci { text-align: center; }
+.pulls-table .pull-status { padding: 9px 4px 6px 10px; vertical-align: top; }
 
 .pulls-table td {
   padding: 6px 8px;
-  border-bottom: 1px solid var(--border);
 }
 
 .pull-row { cursor: pointer; }
-.pull-row:hover { background: var(--surface); }
+
+/* Pull and ticket rows are cards; the background sits on the cells because a table row cannot round or tint itself. */
+.pulls-table .pull-row > td,
+.tickets-table .ticket-row > td { background: color-mix(in srgb, var(--text-dim) 9%, transparent); }
+.pulls-table .pull-row > td:first-child,
+.tickets-table .ticket-row > td:first-child { border-radius: 6px 0 0 6px; }
+.pulls-table .pull-row > td:last-child,
+.tickets-table .ticket-row > td:last-child { border-radius: 0 6px 6px 0; }
+.pulls-table .pull-row:hover > td,
+.tickets-table .ticket-row:hover > td { background: color-mix(in srgb, var(--text-dim) 16%, transparent); }
 
 /* box-shadow on <tr> doesn't paint in Chromium's table layout — apply it to
    the row's first cell instead, which renders it without shifting layout. */
-.pull-row-sla-yellow > .pull-title { box-shadow: inset 3px 0 0 var(--clr-waiting); }
-.pull-row-sla-orange > .pull-title { box-shadow: inset 3px 0 0 var(--clr-permission); }
-.pull-row-sla-red > .pull-title { box-shadow: inset 3px 0 0 var(--clr-error); }
+.pull-row-sla-yellow > td:first-child { box-shadow: inset 3px 0 0 var(--clr-waiting); }
+.pull-row-sla-orange > td:first-child { box-shadow: inset 3px 0 0 var(--clr-permission); }
+.pull-row-sla-red > td:first-child { box-shadow: inset 3px 0 0 var(--clr-error); }
 
 .pull-title {
   color: var(--text);
   font-weight: 500;
-  display: flex;
-  gap: 6px;
-  align-items: baseline;
 }
 
 /* Real <a href> (see renderPullRow() in pulls.client.js) so middle-click, right-click
@@ -1044,15 +1051,25 @@ main { padding: 8px; position: relative; }
 
 @container (max-width: 720px) {
   .pulls-table, .pulls-table tbody { display: block; }
-  .pulls-table .pull-row {
+  .pulls-table .pull-row:has(.pull-reviews) {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) auto auto auto auto;
+    grid-template-columns: auto minmax(0, 1fr) auto auto auto;
     align-items: center;
-    border-bottom: 1px solid var(--border);
+    margin-bottom: 6px;
+    border-radius: 6px;
+    background: color-mix(in srgb, var(--text-dim) 9%, transparent);
   }
-  .pulls-table .pull-row td { border-bottom: none; grid-row: 1; width: auto; }
-  .pulls-table .pull-row .pull-reviews { grid-row: 2; grid-column: 1 / -1; width: auto; padding: 0 8px 6px; }
+  .pulls-table .pull-row:has(.pull-reviews):hover { background: color-mix(in srgb, var(--text-dim) 16%, transparent); }
+  .pulls-table .pull-row:has(.pull-reviews) > td { background: none; border-radius: 0; }
+  .pulls-table .pull-row td { grid-row: 1; width: auto; }
+  .pulls-table .pull-row:has(.pull-reviews) > .pull-status { align-self: start; }
+  .pulls-table .pull-row .pull-reviews { grid-row: 2; grid-column: 1 / -1; width: auto; padding: 0 8px 6px; text-align: right; }
   .pulls-table .pull-row .pull-reviews:empty { display: none; }
+  /* The first cell only spans the title line here, so the SLA bar moves to the whole row. */
+  .pulls-table .pull-row:has(.pull-reviews) > td:first-child { box-shadow: none; }
+  .pulls-table .pull-row-sla-yellow:has(.pull-reviews) { box-shadow: inset 3px 0 0 var(--clr-waiting); }
+  .pulls-table .pull-row-sla-orange:has(.pull-reviews) { box-shadow: inset 3px 0 0 var(--clr-permission); }
+  .pulls-table .pull-row-sla-red:has(.pull-reviews) { box-shadow: inset 3px 0 0 var(--clr-error); }
   .pulls-table .pull-row .pull-rev-group:first-child { margin-left: 0; }
 }
 
@@ -1326,9 +1343,10 @@ a.deploy-dot:hover {
 
 .tickets-table {
   width: 100%;
-  border-collapse: collapse;
+  border-collapse: separate;
+  border-spacing: 0 6px;
   font-size: 12px;
-  margin: 6px 8px 0 0;
+  margin: 0 8px 0 0;
   table-layout: fixed;
 }
 
@@ -1358,18 +1376,13 @@ a.deploy-dot:hover {
 
 .tickets-table td {
   padding: 6px 8px;
-  border-bottom: 1px solid var(--border);
 }
 
 .ticket-row { cursor: pointer; }
-.ticket-row:hover { background: var(--surface); }
 
 .ticket-title {
   color: var(--text);
   font-weight: 500;
-  display: flex;
-  gap: 6px;
-  align-items: baseline;
 }
 
 /* Real <a href> (see renderTicketRow() in tickets.client.js) — same rationale as

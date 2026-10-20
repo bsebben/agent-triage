@@ -399,15 +399,16 @@ function renderPullRow(pr, showAuthor, repo, subTab, slaDays) {
   const actionBtn = atLimit
     ? `<button class="agent-btn" title="Workspace limit reached" disabled>${claudeIcon()}</button>`
     : `<button class="agent-btn" title="Actions" data-pr-url="${escapeHtml(pr.url)}" onclick="event.stopPropagation(); openActionDrawerFromBtn(this)">${claudeIcon()}</button>`;
+  const leadingCell = subTab === "merged" ? "" : statusCell(pr.status);
   const statusCells = subTab === "merged"
     ? `<td class="pull-deploy">${deployDots(pr.deploy, pr.repoTracked, pr.deployLinks)}</td>`
-    : `${statusCell(pr.status)}
-    <td class="pull-ci">${ciCell(pr.ci)}</td>
+    : `<td class="pull-ci">${ciCell(pr.ci)}</td>
     ${reviewerGroupsCell(pr.reviewers)}`;
   const level = slaLevel(pr, slaDays);
   const rowClass = level ? ` pull-row-sla-${level}` : "";
   const rowTitle = level ? ` title="${escapeHtml(slaTooltip(pr, slaDays))}"` : "";
   return `<tr class="pull-row${rowClass}"${rowTitle} onclick="openExternal('${escapeHtml(pr.url)}')">
+    ${leadingCell}
     <td class="pull-title"><a class="pull-title-link" href="${escapeHtml(pr.url)}" target="_blank" rel="noopener" onclick="openExternalClick(event, '${escapeHtml(pr.url)}')"><span class="pull-number">#${pr.number}</span> <span class="pull-title-text">${escapeHtml(pr.title)}</span></a></td>
     ${showAuthor ? `<td class="pull-author">${escapeHtml(pr.author)}</td>` : ""}
     ${statusCells}
