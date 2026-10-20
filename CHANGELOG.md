@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.62.0] - 2026-10-20
+
+### Added
+
+- Pull request rows show separate person and bot groups with unresolved-thread counts (capped at `9+`), approvals, and changes-requested, so human feedback stands out and bot noise recedes. Bots are detected from GitHub's account type; your own reviews and threads you or the PR author started are left out.
+
+### Changed
+
+- The Pulls tab status and CI columns use icons instead of text, with the status name as a tooltip. Narrow panels move the reviewer groups to a second line under the title.
+
 ## [1.61.0] - 2026-10-19
 
 ### Added
