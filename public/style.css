@@ -953,15 +953,11 @@ main { padding: 8px; position: relative; }
 
 .pull-row { cursor: pointer; }
 
-/* Pull and ticket rows are cards; the background sits on the cells because a table row cannot round or tint itself. */
-.pulls-table .pull-row > td,
-.tickets-table .ticket-row > td { background: color-mix(in srgb, var(--text-dim) 9%, transparent); }
-.pulls-table .pull-row > td:first-child,
-.tickets-table .ticket-row > td:first-child { border-radius: 6px 0 0 6px; }
-.pulls-table .pull-row > td:last-child,
-.tickets-table .ticket-row > td:last-child { border-radius: 0 6px 6px 0; }
-.pulls-table .pull-row:hover > td,
-.tickets-table .ticket-row:hover > td { background: color-mix(in srgb, var(--text-dim) 16%, transparent); }
+/* Rows are cards; the background sits on the cells because a table row cannot round or tint itself. */
+.pulls-table .pull-row > td { background: color-mix(in srgb, var(--text-dim) 9%, transparent); }
+.pulls-table .pull-row > td:first-child { border-radius: 6px 0 0 6px; }
+.pulls-table .pull-row > td:last-child { border-radius: 0 6px 6px 0; }
+.pulls-table .pull-row:hover > td { background: color-mix(in srgb, var(--text-dim) 16%, transparent); }
 
 /* box-shadow on <tr> doesn't paint in Chromium's table layout — apply it to
    the row's first cell instead, which renders it without shifting layout. */
@@ -1391,6 +1387,22 @@ a.deploy-dot:hover {
 }
 
 .ticket-row { cursor: pointer; }
+
+/* Ticket rows are grid cards: the description gets the full top row and the status sits below it. */
+.tickets-table, .tickets-table tbody { display: block; }
+.tickets-table .ticket-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 32px;
+  align-items: center;
+  margin-bottom: 6px;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--text-dim) 9%, transparent);
+}
+.tickets-table .ticket-row:hover { background: color-mix(in srgb, var(--text-dim) 16%, transparent); }
+.tickets-table .ticket-row > td { width: auto; text-align: left; }
+.tickets-table .ticket-row > .ticket-title { grid-row: 1; grid-column: 1; }
+.tickets-table .ticket-row > .row-action { grid-row: 1; grid-column: 2; padding: 6px 4px; text-align: center; }
+.tickets-table .ticket-row > .ticket-status { grid-row: 2; grid-column: 1 / 3; justify-self: end; padding: 0 8px 6px; }
 
 .ticket-title {
   color: var(--text);
