@@ -920,9 +920,10 @@ main { padding: 8px; position: relative; }
 
 .pulls-table {
   width: 100%;
-  border-collapse: collapse;
+  border-collapse: separate;
+  border-spacing: 0 6px;
   font-size: 12px;
-  margin: 6px 8px 0 0;
+  margin: 0 8px 0 0;
 }
 
 .pulls-table th {
@@ -944,27 +945,29 @@ main { padding: 8px; position: relative; }
   padding: 6px 4px;
 }
 .pull-ci { text-align: center; }
+.pulls-table .pull-status { padding: 9px 4px 6px 10px; vertical-align: top; }
 
 .pulls-table td {
   padding: 6px 8px;
-  border-bottom: 1px solid var(--border);
 }
 
 .pull-row { cursor: pointer; }
-.pull-row:hover { background: var(--surface); }
+
+/* Rows are cards; the background sits on the cells because a table row cannot round or tint itself. */
+.pulls-table .pull-row > td { background: color-mix(in srgb, var(--text-dim) 9%, transparent); }
+.pulls-table .pull-row > td:first-child { border-radius: 6px 0 0 6px; }
+.pulls-table .pull-row > td:last-child { border-radius: 0 6px 6px 0; }
+.pulls-table .pull-row:hover > td { background: color-mix(in srgb, var(--text-dim) 16%, transparent); }
 
 /* box-shadow on <tr> doesn't paint in Chromium's table layout — apply it to
    the row's first cell instead, which renders it without shifting layout. */
-.pull-row-sla-yellow > .pull-title { box-shadow: inset 3px 0 0 var(--clr-waiting); }
-.pull-row-sla-orange > .pull-title { box-shadow: inset 3px 0 0 var(--clr-permission); }
-.pull-row-sla-red > .pull-title { box-shadow: inset 3px 0 0 var(--clr-error); }
+.pull-row-sla-yellow > td:first-child { box-shadow: inset 3px 0 0 var(--clr-waiting); }
+.pull-row-sla-orange > td:first-child { box-shadow: inset 3px 0 0 var(--clr-permission); }
+.pull-row-sla-red > td:first-child { box-shadow: inset 3px 0 0 var(--clr-error); }
 
 .pull-title {
   color: var(--text);
   font-weight: 500;
-  display: flex;
-  gap: 6px;
-  align-items: baseline;
 }
 
 /* Real <a href> (see renderPullRow() in pulls.client.js) so middle-click, right-click
@@ -993,27 +996,91 @@ main { padding: 8px; position: relative; }
 
 .pull-age { color: var(--text-dim); white-space: nowrap; }
 
-.pull-badge {
-  display: inline-block;
-  padding: 1px 6px;
-  border-radius: 3px;
-  font-size: 11px;
-  font-weight: 600;
-  white-space: nowrap;
-}
+.pull-status-icon { display: inline-flex; align-items: center; font-size: 11px; font-weight: 600; white-space: nowrap; }
+.pull-status-icon .pull-icon { width: 16px; height: 16px; }
 
-.pull-badge.status-draft { background: color-mix(in srgb, var(--text-dim) 15%, var(--card)); color: var(--text-dim); }
-.pull-badge.status-open { background: color-mix(in srgb, var(--clr-running) 20%, var(--card)); color: var(--clr-running); }
-.pull-badge.status-comments { background: color-mix(in srgb, var(--clr-question) 20%, var(--card)); color: var(--clr-question); }
-.pull-badge.status-approved { background: color-mix(in srgb, var(--clr-completion) 20%, var(--card)); color: var(--clr-completion); }
-.pull-badge.status-queued { background: color-mix(in srgb, var(--clr-permission) 20%, var(--card)); color: var(--clr-permission); }
-.pull-badge.status-queue_failed { background: color-mix(in srgb, var(--clr-error) 20%, var(--card)); color: var(--clr-error); }
+.pull-status-icon.status-draft { color: var(--text-dim); }
+.pull-status-icon.status-open { color: var(--clr-running); }
+.pull-status-icon.status-comments { color: var(--clr-question); }
+.pull-status-icon.status-blocked { color: var(--clr-error); }
+.pull-status-icon.status-approved { color: var(--clr-completion); }
+.pull-status-icon.status-queued { color: var(--clr-permission); }
+.pull-status-icon.status-queue_failed { color: var(--clr-error); }
 
-.ci-badge { font-weight: bold; }
+.ci-badge { display: inline-flex; align-items: center; }
+.ci-badge .pull-icon { width: 16px; height: 16px; }
 .ci-badge.ci-passing { color: var(--clr-completion); }
 .ci-badge.ci-failing { color: var(--clr-error); }
 .ci-badge.ci-running { color: var(--clr-waiting); }
 .ci-badge.ci-none { color: var(--muted); }
+
+.pull-icon { width: 14px; height: 14px; flex: none; vertical-align: middle; }
+
+.pull-num { display: none; }
+
+.pull-reviews { white-space: nowrap; width: 1px; padding: 6px 4px; }
+.pull-reviews:empty { padding: 0; }
+
+.pull-pills { display: inline-flex; align-items: center; gap: 4px; vertical-align: middle; }
+
+/* One fixed height keeps the human, bot, and CI pills level whatever their content. */
+.pull-rev-group,
+.pull-ci-pill {
+  display: inline-flex;
+  align-items: center;
+  box-sizing: border-box;
+  height: 22px;
+  gap: 6px;
+  padding: 0 8px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--text-dim) 14%, transparent);
+  border: 1px solid color-mix(in srgb, var(--text-dim) 35%, transparent);
+}
+
+.pull-ci-label { color: var(--text-dim); font-size: 11px; font-weight: 600; }
+
+/* Bots recede: same pill, dimmed with a dashed outline so human feedback is read first. */
+.pull-rev-bot {
+  opacity: 0.65;
+  border-style: dashed;
+}
+
+.pull-rev-ind { display: inline-flex; align-items: center; gap: 2px; font-variant-numeric: tabular-nums; }
+.pull-rev-comments { color: var(--clr-question); }
+.pull-rev-unknown { color: var(--text-dim); }
+.pull-rev-approved { color: var(--clr-completion); }
+.pull-rev-blocked { color: var(--clr-error); }
+
+/* Below this container width the reviewer groups drop to a second line under the title.
+   The table rows become grids because a table row cannot wrap one of its own cells. */
+.pull-group-items { container-type: inline-size; }
+
+@container (max-width: 720px) {
+  .pulls-table, .pulls-table tbody { display: block; }
+  .pulls-table .pull-row:has(.pull-reviews) {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto auto 32px;
+    align-items: center;
+    margin-bottom: 6px;
+    border-radius: 6px;
+    background: color-mix(in srgb, var(--text-dim) 9%, transparent);
+  }
+  .pulls-table .pull-row:has(.pull-reviews):hover { background: color-mix(in srgb, var(--text-dim) 16%, transparent); }
+  .pulls-table .pull-row:has(.pull-reviews) > td { background: none; border-radius: 0; }
+  .pulls-table .pull-row td { grid-row: 1; width: auto; }
+  .pulls-table .pull-row:has(.pull-reviews) > .pull-status { align-self: center; padding: 9px 4px 0 10px; }
+  .pulls-table .pull-row:has(.pull-reviews) > .pull-title { grid-row: 2; grid-column: 2 / 5; padding-top: 4px; }
+  .pulls-table .pull-row:has(.pull-reviews) > .row-action { grid-row: 2; grid-column: 5; align-self: end; }
+  .pulls-table .pull-row:has(.pull-reviews) .pull-title .pull-number { display: none; }
+  .pulls-table .pull-row .pull-num { display: block; grid-row: 1; grid-column: 2; padding: 6px 8px 0; color: var(--text-dim); }
+  .pulls-table .pull-row:has(.pull-reviews) > .pull-author { grid-row: 1; grid-column: 3; padding: 6px 8px 0; }
+  .pulls-table .pull-row .pull-reviews { grid-row: 1; grid-column: 4 / 6; justify-self: end; width: auto; padding: 6px 8px 0 4px; }
+  /* The first cell only spans the title line here, so the SLA bar moves to the whole row. */
+  .pulls-table .pull-row:has(.pull-reviews) > td:first-child { box-shadow: none; }
+  .pulls-table .pull-row-sla-yellow:has(.pull-reviews) { box-shadow: inset 3px 0 0 var(--clr-waiting); }
+  .pulls-table .pull-row-sla-orange:has(.pull-reviews) { box-shadow: inset 3px 0 0 var(--clr-permission); }
+  .pulls-table .pull-row-sla-red:has(.pull-reviews) { box-shadow: inset 3px 0 0 var(--clr-error); }
+}
 
 .pull-deploy { white-space: nowrap; width: 1px; padding: 6px 4px; text-align: center; }
 
@@ -1285,9 +1352,10 @@ a.deploy-dot:hover {
 
 .tickets-table {
   width: 100%;
-  border-collapse: collapse;
+  border-collapse: separate;
+  border-spacing: 0 6px;
   font-size: 12px;
-  margin: 6px 8px 0 0;
+  margin: 0 8px 0 0;
   table-layout: fixed;
 }
 
@@ -1317,18 +1385,29 @@ a.deploy-dot:hover {
 
 .tickets-table td {
   padding: 6px 8px;
-  border-bottom: 1px solid var(--border);
 }
 
 .ticket-row { cursor: pointer; }
-.ticket-row:hover { background: var(--surface); }
+
+.tickets-table, .tickets-table tbody { display: block; }
+.tickets-table .ticket-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 32px;
+  align-items: center;
+  margin-bottom: 6px;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--text-dim) 9%, transparent);
+}
+.tickets-table .ticket-row:hover { background: color-mix(in srgb, var(--text-dim) 16%, transparent); }
+.tickets-table .ticket-row > td { width: auto; text-align: left; }
+.tickets-table .ticket-row > .ticket-num { grid-row: 1; grid-column: 1; padding: 6px 8px 0; }
+.tickets-table .ticket-row > .ticket-status { grid-row: 1; grid-column: 1 / 3; justify-self: end; padding: 6px 8px 0; }
+.tickets-table .ticket-row > .ticket-title { grid-row: 2; grid-column: 1; padding-top: 4px; }
+.tickets-table .ticket-row > .row-action { grid-row: 2; grid-column: 2; align-self: end; padding: 6px 4px; text-align: center; }
 
 .ticket-title {
   color: var(--text);
   font-weight: 500;
-  display: flex;
-  gap: 6px;
-  align-items: baseline;
 }
 
 /* Real <a href> (see renderTicketRow() in tickets.client.js) — same rationale as

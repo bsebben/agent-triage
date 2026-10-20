@@ -82,7 +82,7 @@ function renderTickets() {
     queue.innerHTML = `<div class="empty-state">${hint}</div>`;
     return;
   }
-  const allGroups = state.tickets || [];
+  const allGroups = typeof DEMO_TICKET_GROUPS === "undefined" ? (state.tickets || []) : [...DEMO_TICKET_GROUPS, ...(state.tickets || [])];
   const pillConfig = ticketStatus.pillStatuses || [];
   const activeGroups = filterTicketGroups(allGroups, pillConfig);
   const pills = collectTicketPills(allGroups, pillConfig);
@@ -156,8 +156,9 @@ function renderTicketRow(ticket) {
     ? `<button class="agent-btn" title="Workspace limit reached" disabled>${claudeIcon()}</button>`
     : `<button class="agent-btn" title="Actions" data-ticket-key="${escapeHtml(ticket.key)}" onclick="event.stopPropagation(); openActionDrawerFromBtn(this)">${claudeIcon()}</button>`;
   return `<tr class="ticket-row" onclick="openExternal('${escapeHtml(ticket.url)}')">
-    <td class="ticket-title"><a class="ticket-title-link" href="${escapeHtml(ticket.url)}" target="_blank" rel="noopener" onclick="openExternalClick(event, '${escapeHtml(ticket.url)}')"><span class="ticket-key">${escapeHtml(ticket.key)}</span> <span class="ticket-title-text">${escapeHtml(ticket.summary)}</span></a></td>
-    <td><span class="ticket-badge status-${ticketStatusClass(ticket.status)}">${escapeHtml(ticket.status)}</span></td>
+    <td class="ticket-num ticket-key">${escapeHtml(ticket.key)}</td>
+    <td class="ticket-title"><a class="ticket-title-link" href="${escapeHtml(ticket.url)}" target="_blank" rel="noopener" onclick="openExternalClick(event, '${escapeHtml(ticket.url)}')"><span class="ticket-title-text">${escapeHtml(ticket.summary)}</span></a></td>
+    <td class="ticket-status"><span class="ticket-badge status-${ticketStatusClass(ticket.status)}">${escapeHtml(ticket.status)}</span></td>
     <td class="row-action">${actionBtn}</td>
   </tr>`;
 }

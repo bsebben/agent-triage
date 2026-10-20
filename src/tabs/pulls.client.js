@@ -105,7 +105,8 @@ function renderPulls() {
   // "Assigned to me" is its own server-side search (requests addressed to me personally,
   // complete), not a filter over the team-inclusive list — so the toggle picks a bucket.
   const source = pullsDirectFilter ? (pulls.assigned || []) : pulls.reviews;
-  const mineCount = pulls.mine.reduce((n, g) => n + g.prs.length, 0);
+  const mineGroups = typeof DEMO_PULL_GROUPS === "undefined" ? pulls.mine : [...DEMO_PULL_GROUPS, ...pulls.mine];
+  const mineCount = mineGroups.reduce((n, g) => n + g.prs.length, 0);
   const reviewCount = source.reduce((n, g) => n + g.prs.length, 0);
   const mergedCount = (pulls.merged || []).reduce((n, g) => n + g.prs.length, 0);
 
@@ -121,11 +122,11 @@ function renderPulls() {
   </div>`;
 
   if (pullsSubTab === "mine") {
-    const statuses = collectStatuses(pulls.mine);
+    const statuses = collectStatuses(mineGroups);
     if (statuses.length > 1) {
       html += `<div class="pulls-filter-bar">${renderStatusFilter(statuses)}</div>`;
     }
-    const filtered = filterGroupsByStatus(pulls.mine, pullsStatusFilter);
+    const filtered = filterGroupsByStatus(mineGroups, pullsStatusFilter);
     const filteredCount = filtered.reduce((n, g) => n + g.prs.length, 0);
     if (filteredCount === 0) {
       html += `<div class="empty-state">No open pull requests</div>`;
@@ -241,7 +242,7 @@ function renderPullGroup(group, showAuthor, subTab, slaDays) {
       <span class="pulls-repo-count">(${group.prs.length})</span>
       ${subTab === "merged" ? repoMergedLink(group) : ""}
     </div>
-    <div class="group-items${isCollapsed ? " collapsed" : ""}">
+    <div class="group-items pull-group-items${isCollapsed ? " collapsed" : ""}">
       <table class="pulls-table">
         <tbody>${group.prs.map((pr) => renderPullRow(pr, showAuthor, group.repo, subTab, slaDays)).join("")}</tbody>
       </table>
@@ -273,11 +274,42 @@ function slaTooltip(pr, slaDays, now = Date.now()) {
   return `${ageDays.toFixed(1)}d old — ${pct}% of ${slaDays}d SLA`;
 }
 
+function ciPill(state, title, icon) {
+  return `<span class="ci-badge pull-ci-pill ci-${state}" title="${title}" aria-label="${title}"><span class="pull-ci-label">CI</span>${icon}</span>`;
+}
+
 function ciCell(ci) {
-  if (ci === "failing") return '<span class="ci-badge ci-failing">\u2717</span>';
-  if (ci === "passing") return '<span class="ci-badge ci-passing">\u2713</span>';
-  if (ci === "running") return '<span class="ci-badge ci-running">\u25CB</span>';
-  return '<span class="ci-badge ci-none">\u2014</span>';
+  if (ci === "failing") return ciPill("failing", "CI failing", iconBlocked());
+  if (ci === "passing") return ciPill("passing", "CI passing", iconCheckCircle());
+  if (ci === "running") return ciPill("running", "CI running", iconHalfCircle());
+  return ciPill("none", "No CI", iconDash());
+}
+
+// Resolved at render time, not load time: pull-icons.js is a separate script.
+function statusIcon(status) {
+  switch (status) {
+    case "open": return iconPullRequest();
+    case "draft": return iconPullDraft();
+    case "comments": return iconComment();
+    case "blocked": return iconCommentBlocked();
+    case "approved": return iconCheckCircle();
+    case "queued":
+    case "queue_failed": return iconMergeQueue();
+    default: return "";
+  }
+}
+
+// pr.status stays "comments" so filters, sorting, and the nav badge keep working.
+function isBlocked(pr) {
+  const r = pr.reviewers;
+  return pr.status === "comments" && !!r && (r.human.blocked.length > 0 || r.bot.blocked.length > 0);
+}
+
+function statusCell(pr) {
+  const key = isBlocked(pr) ? "blocked" : pr.status;
+  const label = key === "blocked" ? "changes requested" : (STATUS_LABELS[key] || key);
+  const body = statusIcon(key) || escapeHtml(label);
+  return `<td class="pull-status"><span class="pull-status-icon status-${key}" title="${escapeHtml(label)}" aria-label="${escapeHtml(label)}">${body}</span></td>`;
 }
 
 const DEPLOY_LABELS = {
@@ -333,19 +365,67 @@ function deployDots(deploy, repoTracked, links) {
   }${deployDot("S", "Staging", deploy.stage, links?.stage)}${deployDot("D", "Demo", deploy.demo, links?.demo)}</span>`;
 }
 
+// Mirror of formatThreadCount in src/tabs/pulls.js (kept in lockstep — that copy is the
+// unit-tested source of truth; this browser script has no build step to import it).
+function formatThreadCount(count, truncated) {
+  if (count > 9) return "9+";
+  return truncated ? `${count}+` : String(count);
+}
+
+// `unknownThreads`: only the first few threads were fetched and none of them were unresolved,
+// so an unresolved one may still be hiding past the cutoff. A muted 0+ says so instead of
+// showing nothing.
+function reviewerGroup(kind, group, truncated, unknownThreads = false) {
+  const indicators = [];
+  if (group.unresolvedThreads > 0) {
+    const text = formatThreadCount(group.unresolvedThreads, truncated);
+    const n = group.unresolvedThreads;
+    const title = `${text.endsWith("+") ? "At least " : ""}${n} unresolved thread${n === 1 ? "" : "s"}`;
+    indicators.push(`<span class="pull-rev-ind pull-rev-comments" title="${escapeHtml(title)}">${iconComment()}${text}</span>`);
+  } else if (unknownThreads) {
+    const title = "No unresolved threads among the first 10; there may be more";
+    indicators.push(`<span class="pull-rev-ind pull-rev-unknown" title="${escapeHtml(title)}" aria-label="${escapeHtml(title)}">${iconComment()}0+</span>`);
+  }
+  if (group.approved.length > 0) {
+    const title = `Approved by ${group.approved.join(", ")}`;
+    indicators.push(`<span class="pull-rev-ind pull-rev-approved" title="${escapeHtml(title)}">${iconCheck()}</span>`);
+  }
+  if (group.blocked.length > 0) {
+    const title = `Changes requested by ${group.blocked.join(", ")}`;
+    indicators.push(`<span class="pull-rev-ind pull-rev-blocked" title="${escapeHtml(title)}">${iconBlocked()}</span>`);
+  }
+  if (indicators.length === 0) return "";
+  const lead = kind === "bot" ? iconBot() : iconHuman();
+  return `<span class="pull-rev-group pull-rev-${kind}" title="${kind === "bot" ? "Bots" : "People"}">${lead}${indicators.join("")}</span>`;
+}
+
+function reviewerGroupsHtml(reviewers) {
+  if (!reviewers) return "";
+  const t = reviewers.threadsTruncated;
+  const unknownThreads = t && reviewers.human.unresolvedThreads === 0 && reviewers.bot.unresolvedThreads === 0;
+  return reviewerGroup("human", reviewers.human, t, unknownThreads) + reviewerGroup("bot", reviewers.bot, t);
+}
+
+// One cell so the narrow layout keeps both on the bottom row without widening the action column.
+function reviewsCell(pr) {
+  return `<td class="pull-reviews"><span class="pull-pills">${reviewerGroupsHtml(pr.reviewers)}${ciCell(pr.ci)}</span></td>`;
+}
+
 function renderPullRow(pr, showAuthor, repo, subTab, slaDays) {
   const atLimit = isAtWorkspaceLimit();
   const actionBtn = atLimit
     ? `<button class="agent-btn" title="Workspace limit reached" disabled>${claudeIcon()}</button>`
     : `<button class="agent-btn" title="Actions" data-pr-url="${escapeHtml(pr.url)}" onclick="event.stopPropagation(); openActionDrawerFromBtn(this)">${claudeIcon()}</button>`;
+  const leadingCell = subTab === "merged" ? "" : statusCell(pr);
   const statusCells = subTab === "merged"
     ? `<td class="pull-deploy">${deployDots(pr.deploy, pr.repoTracked, pr.deployLinks)}</td>`
-    : `<td class="pull-status"><span class="pull-badge status-${pr.status}">${STATUS_LABELS[pr.status] || pr.status}</span></td>
-    <td class="pull-ci">${ciCell(pr.ci)}</td>`;
+    : `<td class="pull-num">#${pr.number}</td>
+    ${reviewsCell(pr)}`;
   const level = slaLevel(pr, slaDays);
   const rowClass = level ? ` pull-row-sla-${level}` : "";
   const rowTitle = level ? ` title="${escapeHtml(slaTooltip(pr, slaDays))}"` : "";
   return `<tr class="pull-row${rowClass}"${rowTitle} onclick="openExternal('${escapeHtml(pr.url)}')">
+    ${leadingCell}
     <td class="pull-title"><a class="pull-title-link" href="${escapeHtml(pr.url)}" target="_blank" rel="noopener" onclick="openExternalClick(event, '${escapeHtml(pr.url)}')"><span class="pull-number">#${pr.number}</span> <span class="pull-title-text">${escapeHtml(pr.title)}</span></a></td>
     ${showAuthor ? `<td class="pull-author">${escapeHtml(pr.author)}</td>` : ""}
     ${statusCells}

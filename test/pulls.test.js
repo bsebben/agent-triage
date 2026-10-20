@@ -20,6 +20,10 @@ import {
   slaLevel,
   prSinceTimestamp,
   sortPrsByPriority,
+  isBotActor,
+  summarizeReviewers,
+  formatThreadCount,
+  resolveViewerLogin,
 } from "../src/tabs/pulls.js";
 
 const fulfilled = (value) => ({ status: "fulfilled", value });
@@ -645,5 +649,142 @@ describe("shouldShowDeployDots", () => {
 
   it("shows all-unknown dots for a tracked repo (API temporarily unreachable, but repo is known to deploy)", () => {
     assert.equal(shouldShowDeployDots({ prod: "unknown", stage: "unknown", demo: "unknown" }, true), true);
+  });
+});
+
+const actor = (login, type = "User") => ({ login, __typename: type });
+const review = (state, a) => ({ state, author: a });
+const thread = (isResolved, a, extra = {}) => ({ isResolved, isOutdated: false, comments: { nodes: a ? [{ author: a }] : [] }, ...extra });
+const prNode = ({ reviews, threads, hasNextPage = false, author = "carol" } = {}) => ({
+  author: { login: author },
+  latestReviews: reviews ? { nodes: reviews } : undefined,
+  reviewThreads: threads ? { pageInfo: { hasNextPage }, nodes: threads } : undefined,
+});
+
+describe("isBotActor", () => {
+  it("is true for a Bot-typed account", () => {
+    assert.equal(isBotActor(actor("example-bot", "Bot")), true);
+  });
+
+  it("is false for a User-typed account, even with [bot] in the login", () => {
+    assert.equal(isBotActor(actor("alice")), false);
+    assert.equal(isBotActor(actor("alice[bot]")), false);
+  });
+
+  it("is false for a missing actor", () => {
+    assert.equal(isBotActor(null), false);
+  });
+});
+
+describe("summarizeReviewers", () => {
+  const empty = { approved: [], blocked: [], unresolvedThreads: 0 };
+
+  it("returns empty groups for a PR with no reviews or threads", () => {
+    assert.deepEqual(summarizeReviewers({ author: { login: "carol" } }, { viewerLogin: null }), {
+      human: empty, bot: empty, threadsTruncated: false,
+    });
+  });
+
+  it("records a human changes-requested review as blocked", () => {
+    const r = summarizeReviewers(prNode({ reviews: [review("CHANGES_REQUESTED", actor("alice"))] }), { viewerLogin: null });
+    assert.deepEqual(r.human.blocked, ["alice"]);
+    assert.deepEqual(r.bot.blocked, []);
+  });
+
+  it("records a bot approval under bot, and two human approvals under human", () => {
+    const r = summarizeReviewers(prNode({ reviews: [
+      review("APPROVED", actor("example-bot", "Bot")),
+      review("APPROVED", actor("alice")),
+      review("APPROVED", actor("bob")),
+    ] }), { viewerLogin: null });
+    assert.deepEqual(r.bot.approved, ["example-bot"]);
+    assert.deepEqual(r.human.approved, ["alice", "bob"]);
+  });
+
+  it("ignores COMMENTED and DISMISSED reviews", () => {
+    const r = summarizeReviewers(prNode({ reviews: [
+      review("COMMENTED", actor("alice")),
+      review("DISMISSED", actor("bob")),
+    ] }), { viewerLogin: null });
+    assert.deepEqual(r.human, empty);
+  });
+
+  it("skips a review with a null author", () => {
+    const r = summarizeReviewers(prNode({ reviews: [review("APPROVED", null)] }), { viewerLogin: null });
+    assert.deepEqual(r.human, empty);
+    assert.deepEqual(r.bot, empty);
+  });
+
+  it("counts unresolved threads, including outdated ones, and skips resolved ones", () => {
+    const r = summarizeReviewers(prNode({ threads: [
+      thread(false, actor("alice")),
+      thread(false, actor("alice"), { isOutdated: true }),
+      thread(true, actor("alice")),
+    ] }), { viewerLogin: null });
+    assert.equal(r.human.unresolvedThreads, 2);
+  });
+
+  it("attributes a thread to its first comment's author", () => {
+    const r = summarizeReviewers(prNode({ threads: [thread(false, actor("example-bot", "Bot"))] }), { viewerLogin: null });
+    assert.equal(r.bot.unresolvedThreads, 1);
+    assert.equal(r.human.unresolvedThreads, 0);
+  });
+
+  it("skips a thread with no comments or a null first-comment author", () => {
+    const r = summarizeReviewers(prNode({ threads: [thread(false, null), { isResolved: false, comments: { nodes: [{ author: null }] } }] }), { viewerLogin: null });
+    assert.deepEqual(r.human, empty);
+    assert.deepEqual(r.bot, empty);
+  });
+
+  it("excludes the viewer's own reviews and threads, case-insensitively", () => {
+    const r = summarizeReviewers(prNode({
+      reviews: [review("APPROVED", actor("Alice")), review("APPROVED", actor("bob"))],
+      threads: [thread(false, actor("ALICE")), thread(false, actor("bob"))],
+    }), { viewerLogin: "alice" });
+    assert.deepEqual(r.human.approved, ["bob"]);
+    assert.equal(r.human.unresolvedThreads, 1);
+  });
+
+  it("excludes threads started by the PR author", () => {
+    const r = summarizeReviewers(prNode({ author: "carol", threads: [thread(false, actor("Carol")), thread(false, actor("alice"))] }), { viewerLogin: null });
+    assert.equal(r.human.unresolvedThreads, 1);
+  });
+
+  it("reports threadsTruncated from hasNextPage", () => {
+    assert.equal(summarizeReviewers(prNode({ threads: [], hasNextPage: true }), { viewerLogin: null }).threadsTruncated, true);
+    assert.equal(summarizeReviewers(prNode({ threads: [], hasNextPage: false }), { viewerLogin: null }).threadsTruncated, false);
+  });
+});
+
+describe("resolveViewerLogin", () => {
+  it("returns the trimmed login from gh", async () => {
+    const exec = async () => ({ stdout: "alice\n" });
+    assert.equal(await resolveViewerLogin(exec), "alice");
+  });
+
+  it("returns null when gh fails", async () => {
+    const exec = async () => { throw new Error("gh: not logged in"); };
+    assert.equal(await resolveViewerLogin(exec), null);
+  });
+
+  it("returns null for empty output", async () => {
+    const exec = async () => ({ stdout: "  \n" });
+    assert.equal(await resolveViewerLogin(exec), null);
+  });
+});
+
+describe("formatThreadCount", () => {
+  it("shows the exact count when not truncated and under 10", () => {
+    assert.equal(formatThreadCount(3, false), "3");
+    assert.equal(formatThreadCount(9, false), "9");
+  });
+
+  it("appends + when the thread list was truncated", () => {
+    assert.equal(formatThreadCount(3, true), "3+");
+  });
+
+  it("caps at 9+ above nine, truncated or not", () => {
+    assert.equal(formatThreadCount(10, true), "9+");
+    assert.equal(formatThreadCount(10, false), "9+");
   });
 });

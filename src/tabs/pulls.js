@@ -88,7 +88,16 @@ query($q: String!, $n: Int!, $after: String) {
             }
           }
         }
-        latestReviews { totalCount }
+        latestReviews(first: 50) {
+          totalCount
+          nodes { state author { login __typename } }
+        }
+        # GraphQL rate-limit cost multiplies nested lists by their maximum size, so this
+        # cap is a budget: first: 10 keeps a 50-PR page near 7 points, first: 100 is 53.
+        reviewThreads(first: 10) {
+          pageInfo { hasNextPage }
+          nodes { isResolved isOutdated comments(first: 1) { nodes { author { login __typename } } } }
+        }
       }
     }
   }
@@ -114,7 +123,22 @@ async function init(tabConfig, onUpdate) {
   tab.refresh = await startPolling("Pulls", poll, onUpdate, 2 * 60 * 1000);
 }
 
+// The signed-in user's login, used to leave their own reviews out of the reviewer groups.
+// Cached once resolved; null (lookup failed) means no exclusion is applied this poll and
+// the lookup is retried on the next one.
+let viewerLogin = null;
+
+export async function resolveViewerLogin(exec = execFileAsync) {
+  try {
+    const { stdout } = await exec("gh", ["api", "user", "--jq", ".login"], { timeout: 30000 });
+    return stdout.trim() || null;
+  } catch {
+    return null;
+  }
+}
+
 async function poll() {
+  viewerLogin ??= await resolveViewerLogin();
   const mergedSince = new Date(Date.now() - MERGED_WINDOW_DAYS * 24 * 60 * 60 * 1000)
     .toISOString().slice(0, 10);
   // allSettled keeps the queries independent: a single failing query (e.g. a GitHub 502)
@@ -473,6 +497,7 @@ function summarize(node) {
     author: node.author?.login || "",
     status: prStatus(node, trunk),
     ci: ciStatus(checks.filter((c) => !isTrunkQueueCheck(c))),
+    reviewers: summarizeReviewers(node, { viewerLogin }),
   };
 }
 
@@ -548,6 +573,51 @@ export function prStatus(node, trunk = null) {
   if (node.reviewDecision === "APPROVED") return "approved";
   if ((node.latestReviews?.totalCount || 0) > 0) return "comments";
   return "open";
+}
+
+// A reviewer is a bot only when GitHub says so (GraphQL __typename "Bot"); login
+// heuristics are deliberately not used.
+export function isBotActor(actor) {
+  return actor?.__typename === "Bot";
+}
+
+// Splits review activity into human and bot groups. `latestReviews` is already one
+// entry per reviewer. The viewer's own activity and threads started by the PR author
+// are excluded: neither is feedback the reader still has to act on. A thread belongs to
+// whoever wrote its first comment.
+export function summarizeReviewers(node, { viewerLogin = null } = {}) {
+  const groups = {
+    human: { approved: [], blocked: [], unresolvedThreads: 0 },
+    bot: { approved: [], blocked: [], unresolvedThreads: 0 },
+  };
+  const viewer = viewerLogin?.toLowerCase() ?? null;
+  const prAuthor = node.author?.login?.toLowerCase() ?? null;
+  const groupFor = (actor) => (isBotActor(actor) ? groups.bot : groups.human);
+
+  for (const review of node.latestReviews?.nodes || []) {
+    const login = review.author?.login;
+    if (!login || login.toLowerCase() === viewer) continue;
+    const group = groupFor(review.author);
+    if (review.state === "APPROVED") group.approved.push(login);
+    else if (review.state === "CHANGES_REQUESTED") group.blocked.push(login);
+  }
+
+  for (const t of node.reviewThreads?.nodes || []) {
+    if (t.isResolved) continue;
+    const author = t.comments?.nodes?.[0]?.author;
+    const login = author?.login?.toLowerCase();
+    if (!login || login === viewer || login === prAuthor) continue;
+    groupFor(author).unresolvedThreads++;
+  }
+
+  return { ...groups, threadsTruncated: node.reviewThreads?.pageInfo?.hasNextPage === true };
+}
+
+// Display text for the unresolved-thread count: capped at one digit, and marked when
+// the thread fetch itself was cut off so the real number may be higher.
+export function formatThreadCount(count, truncated) {
+  if (count > 9) return "9+";
+  return truncated ? `${count}+` : String(count);
 }
 
 function ciStatus(checks) {
