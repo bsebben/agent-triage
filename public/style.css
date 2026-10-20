@@ -1015,6 +1015,51 @@ main { padding: 8px; position: relative; }
 .ci-badge.ci-running { color: var(--clr-waiting); }
 .ci-badge.ci-none { color: var(--muted); }
 
+.pull-icon { width: 14px; height: 14px; flex: none; vertical-align: middle; }
+
+.pull-reviews { white-space: nowrap; width: 1px; padding: 6px 4px; }
+.pull-reviews:empty { padding: 0; }
+
+.pull-rev-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 8px;
+  margin-left: 4px;
+  border-radius: 999px;
+  background: var(--surface);
+}
+
+/* Bots recede: dimmed with a dashed outline so human feedback is the first thing read. */
+.pull-rev-bot {
+  opacity: 0.6;
+  background: transparent;
+  border: 1px dashed var(--border);
+}
+
+.pull-rev-ind { display: inline-flex; align-items: center; gap: 2px; font-variant-numeric: tabular-nums; }
+.pull-rev-comments { color: var(--clr-question); }
+.pull-rev-approved { color: var(--clr-completion); }
+.pull-rev-blocked { color: var(--clr-error); }
+
+/* Below this container width the reviewer groups drop to a second line under the title.
+   The table rows become grids because a table row cannot wrap one of its own cells. */
+.pull-group-items { container-type: inline-size; }
+
+@container (max-width: 720px) {
+  .pulls-table, .pulls-table tbody { display: block; }
+  .pulls-table .pull-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto auto auto auto;
+    align-items: center;
+    border-bottom: 1px solid var(--border);
+  }
+  .pulls-table .pull-row td { border-bottom: none; grid-row: 1; width: auto; }
+  .pulls-table .pull-row .pull-reviews { grid-row: 2; grid-column: 1 / -1; width: auto; padding: 0 8px 6px; }
+  .pulls-table .pull-row .pull-reviews:empty { display: none; }
+  .pulls-table .pull-row .pull-rev-group:first-child { margin-left: 0; }
+}
+
 .pull-deploy { white-space: nowrap; width: 1px; padding: 6px 4px; text-align: center; }
 
 .deploy-dots {

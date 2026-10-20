@@ -241,7 +241,7 @@ function renderPullGroup(group, showAuthor, subTab, slaDays) {
       <span class="pulls-repo-count">(${group.prs.length})</span>
       ${subTab === "merged" ? repoMergedLink(group) : ""}
     </div>
-    <div class="group-items${isCollapsed ? " collapsed" : ""}">
+    <div class="group-items pull-group-items${isCollapsed ? " collapsed" : ""}">
       <table class="pulls-table">
         <tbody>${group.prs.map((pr) => renderPullRow(pr, showAuthor, group.repo, subTab, slaDays)).join("")}</tbody>
       </table>
@@ -333,6 +333,40 @@ function deployDots(deploy, repoTracked, links) {
   }${deployDot("S", "Staging", deploy.stage, links?.stage)}${deployDot("D", "Demo", deploy.demo, links?.demo)}</span>`;
 }
 
+// Mirror of formatThreadCount in src/tabs/pulls.js (kept in lockstep — that copy is the
+// unit-tested source of truth; this browser script has no build step to import it).
+function formatThreadCount(count, truncated) {
+  if (count > 9) return "9+";
+  return truncated ? `${count}+` : String(count);
+}
+
+function reviewerGroup(kind, group, truncated) {
+  const indicators = [];
+  if (group.unresolvedThreads > 0) {
+    const text = formatThreadCount(group.unresolvedThreads, truncated);
+    const n = group.unresolvedThreads;
+    const title = `${text.endsWith("+") ? "At least " : ""}${n} unresolved thread${n === 1 ? "" : "s"}`;
+    indicators.push(`<span class="pull-rev-ind pull-rev-comments" title="${escapeHtml(title)}">${iconComment()}${text}</span>`);
+  }
+  if (group.approved.length > 0) {
+    const title = `Approved by ${group.approved.join(", ")}`;
+    indicators.push(`<span class="pull-rev-ind pull-rev-approved" title="${escapeHtml(title)}">${iconCheck()}</span>`);
+  }
+  if (group.blocked.length > 0) {
+    const title = `Changes requested by ${group.blocked.join(", ")}`;
+    indicators.push(`<span class="pull-rev-ind pull-rev-blocked" title="${escapeHtml(title)}">${iconBlocked()}</span>`);
+  }
+  if (indicators.length === 0) return "";
+  const lead = kind === "bot" ? iconBot() : iconHuman();
+  return `<span class="pull-rev-group pull-rev-${kind}" title="${kind === "bot" ? "Bots" : "People"}">${lead}${indicators.join("")}</span>`;
+}
+
+function reviewerGroupsCell(reviewers) {
+  if (!reviewers) return '<td class="pull-reviews"></td>';
+  const t = reviewers.threadsTruncated;
+  return `<td class="pull-reviews">${reviewerGroup("human", reviewers.human, t)}${reviewerGroup("bot", reviewers.bot, t)}</td>`;
+}
+
 function renderPullRow(pr, showAuthor, repo, subTab, slaDays) {
   const atLimit = isAtWorkspaceLimit();
   const actionBtn = atLimit
@@ -341,7 +375,8 @@ function renderPullRow(pr, showAuthor, repo, subTab, slaDays) {
   const statusCells = subTab === "merged"
     ? `<td class="pull-deploy">${deployDots(pr.deploy, pr.repoTracked, pr.deployLinks)}</td>`
     : `<td class="pull-status"><span class="pull-badge status-${pr.status}">${STATUS_LABELS[pr.status] || pr.status}</span></td>
-    <td class="pull-ci">${ciCell(pr.ci)}</td>`;
+    <td class="pull-ci">${ciCell(pr.ci)}</td>
+    ${reviewerGroupsCell(pr.reviewers)}`;
   const level = slaLevel(pr, slaDays);
   const rowClass = level ? ` pull-row-sla-${level}` : "";
   const rowTitle = level ? ` title="${escapeHtml(slaTooltip(pr, slaDays))}"` : "";
