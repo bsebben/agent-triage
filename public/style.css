@@ -1022,14 +1022,14 @@ main { padding: 8px; position: relative; }
   padding: 2px 8px;
   margin-left: 4px;
   border-radius: 999px;
-  background: var(--surface);
+  background: color-mix(in srgb, var(--text-dim) 14%, transparent);
+  border: 1px solid color-mix(in srgb, var(--text-dim) 35%, transparent);
 }
 
-/* Bots recede: dimmed with a dashed outline so human feedback is the first thing read. */
+/* Bots recede: same pill, dimmed with a dashed outline so human feedback is read first. */
 .pull-rev-bot {
-  opacity: 0.6;
-  background: transparent;
-  border: 1px dashed var(--border);
+  opacity: 0.65;
+  border-style: dashed;
 }
 
 .pull-rev-ind { display: inline-flex; align-items: center; gap: 2px; font-variant-numeric: tabular-nums; }
