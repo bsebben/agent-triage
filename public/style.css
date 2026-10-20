@@ -993,23 +993,18 @@ main { padding: 8px; position: relative; }
 
 .pull-age { color: var(--text-dim); white-space: nowrap; }
 
-.pull-badge {
-  display: inline-block;
-  padding: 1px 6px;
-  border-radius: 3px;
-  font-size: 11px;
-  font-weight: 600;
-  white-space: nowrap;
-}
+.pull-status-icon { display: inline-flex; align-items: center; font-size: 11px; font-weight: 600; white-space: nowrap; }
+.pull-status-icon .pull-icon { width: 16px; height: 16px; }
 
-.pull-badge.status-draft { background: color-mix(in srgb, var(--text-dim) 15%, var(--card)); color: var(--text-dim); }
-.pull-badge.status-open { background: color-mix(in srgb, var(--clr-running) 20%, var(--card)); color: var(--clr-running); }
-.pull-badge.status-comments { background: color-mix(in srgb, var(--clr-question) 20%, var(--card)); color: var(--clr-question); }
-.pull-badge.status-approved { background: color-mix(in srgb, var(--clr-completion) 20%, var(--card)); color: var(--clr-completion); }
-.pull-badge.status-queued { background: color-mix(in srgb, var(--clr-permission) 20%, var(--card)); color: var(--clr-permission); }
-.pull-badge.status-queue_failed { background: color-mix(in srgb, var(--clr-error) 20%, var(--card)); color: var(--clr-error); }
+.pull-status-icon.status-draft { color: var(--text-dim); }
+.pull-status-icon.status-open { color: var(--clr-running); }
+.pull-status-icon.status-comments { color: var(--clr-question); }
+.pull-status-icon.status-approved { color: var(--clr-completion); }
+.pull-status-icon.status-queued { color: var(--clr-permission); }
+.pull-status-icon.status-queue_failed { color: var(--clr-error); }
 
-.ci-badge { font-weight: bold; }
+.ci-badge { display: inline-flex; align-items: center; }
+.ci-badge .pull-icon { width: 16px; height: 16px; }
 .ci-badge.ci-passing { color: var(--clr-completion); }
 .ci-badge.ci-failing { color: var(--clr-error); }
 .ci-badge.ci-running { color: var(--clr-waiting); }

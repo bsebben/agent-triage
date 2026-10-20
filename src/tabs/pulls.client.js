@@ -274,10 +274,29 @@ function slaTooltip(pr, slaDays, now = Date.now()) {
 }
 
 function ciCell(ci) {
-  if (ci === "failing") return '<span class="ci-badge ci-failing">\u2717</span>';
-  if (ci === "passing") return '<span class="ci-badge ci-passing">\u2713</span>';
-  if (ci === "running") return '<span class="ci-badge ci-running">\u25CB</span>';
-  return '<span class="ci-badge ci-none">\u2014</span>';
+  if (ci === "failing") return `<span class="ci-badge ci-failing" title="CI failing" aria-label="CI failing">${iconBlocked()}</span>`;
+  if (ci === "passing") return `<span class="ci-badge ci-passing" title="CI passing" aria-label="CI passing">${iconCheckCircle()}</span>`;
+  if (ci === "running") return `<span class="ci-badge ci-running" title="CI running" aria-label="CI running">${iconHalfCircle()}</span>`;
+  return `<span class="ci-badge ci-none" title="No CI" aria-label="No CI">${iconDash()}</span>`;
+}
+
+// Resolved at render time, not load time: pull-icons.js is a separate script.
+function statusIcon(status) {
+  switch (status) {
+    case "open": return iconPullRequest();
+    case "draft": return iconPullDraft();
+    case "comments": return iconComment();
+    case "approved": return iconCheckCircle();
+    case "queued":
+    case "queue_failed": return iconMergeQueue();
+    default: return "";
+  }
+}
+
+function statusCell(status) {
+  const label = STATUS_LABELS[status] || status;
+  const body = statusIcon(status) || escapeHtml(label);
+  return `<td class="pull-status"><span class="pull-status-icon status-${status}" title="${escapeHtml(label)}" aria-label="${escapeHtml(label)}">${body}</span></td>`;
 }
 
 const DEPLOY_LABELS = {
@@ -374,7 +393,7 @@ function renderPullRow(pr, showAuthor, repo, subTab, slaDays) {
     : `<button class="agent-btn" title="Actions" data-pr-url="${escapeHtml(pr.url)}" onclick="event.stopPropagation(); openActionDrawerFromBtn(this)">${claudeIcon()}</button>`;
   const statusCells = subTab === "merged"
     ? `<td class="pull-deploy">${deployDots(pr.deploy, pr.repoTracked, pr.deployLinks)}</td>`
-    : `<td class="pull-status"><span class="pull-badge status-${pr.status}">${STATUS_LABELS[pr.status] || pr.status}</span></td>
+    : `${statusCell(pr.status)}
     <td class="pull-ci">${ciCell(pr.ci)}</td>
     ${reviewerGroupsCell(pr.reviewers)}`;
   const level = slaLevel(pr, slaDays);
