@@ -1389,7 +1389,6 @@ a.deploy-dot:hover {
 
 .ticket-row { cursor: pointer; }
 
-/* Ticket rows are grid cards: key and status on the top row, the description and action button below. */
 .tickets-table, .tickets-table tbody { display: block; }
 .tickets-table .ticket-row {
   display: grid;
