@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.63.0] - 2026-10-20
+
+### Changed
+
+- The Pulls tab's Mine and Merged lists now include PRs assigned to you, not just ones you authored, so PRs you took over from someone else show up.
+
 ## [1.62.1] - 2026-10-20
 
 ### Removed

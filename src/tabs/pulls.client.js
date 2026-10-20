@@ -223,11 +223,13 @@ function togglePullRepo(key, header) {
   toggleGroup(header);
 }
 
-// "more" link (merged tab only) → this repo's merged PRs for the author on GitHub.
+// "more" link (merged tab only) → this repo's merged PRs for the viewer on GitHub.
+// Searches for both authored and assigned PRs: merged groups include PRs the viewer
+// authored as well as those assigned to the viewer that someone else created.
 function repoMergedLink(group) {
   const pr = group.prs[0];
-  if (!pr || !pr.repoWithOwner || !pr.author) return "";
-  const q = encodeURIComponent(`is:pr is:merged author:${pr.author}`);
+  if (!pr || !pr.repoWithOwner) return "";
+  const q = encodeURIComponent("is:pr is:merged (author:@me OR assignee:@me)");
   const url = `https://github.com/${pr.repoWithOwner}/pulls?q=${q}`;
   return `<a class="pulls-repo-more" href="${escapeHtml(url)}" target="_blank" rel="noopener" title="View all merged PRs for this repo on GitHub" onclick="openExternalClick(event, '${escapeHtml(url)}')">more →</a>`;
 }

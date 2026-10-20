@@ -16,6 +16,8 @@ import {
   deployStateIsTracked,
   shouldShowDeployDots,
   collectSearchPages,
+  mergeSearchNodes,
+  mineQueries,
   RETRYABLE_ERROR,
   slaLevel,
   prSinceTimestamp,
@@ -495,6 +497,42 @@ describe("collectSearchPages", () => {
   it("tolerates a page with no nodes or pageInfo", async () => {
     const nodes = await collectSearchPages(async () => ({}));
     assert.deepEqual(nodes, []);
+  });
+});
+
+describe("mineQueries", () => {
+  it("splits a base query into authored and assigned variants", () => {
+    assert.deepEqual(mineQueries("is:pr is:open"), [
+      "is:pr is:open author:@me",
+      "is:pr is:open assignee:@me",
+    ]);
+  });
+});
+
+describe("mergeSearchNodes", () => {
+  const node = (repo, number, tag) => ({ number, tag, repository: { nameWithOwner: repo } });
+
+  it("concatenates result sets in order", () => {
+    const merged = mergeSearchNodes([[node("o/a", 1)], [node("o/b", 2)]]);
+    assert.deepEqual(merged.map((n) => `${n.repository.nameWithOwner}#${n.number}`), ["o/a#1", "o/b#2"]);
+  });
+
+  it("keeps a PR that is both authored and assigned only once, first occurrence wins", () => {
+    const merged = mergeSearchNodes([
+      [node("o/a", 1, "authored"), node("o/a", 2, "authored")],
+      [node("o/a", 1, "assigned"), node("o/a", 3, "assigned")],
+    ]);
+    assert.deepEqual(merged.map((n) => [n.number, n.tag]), [[1, "authored"], [2, "authored"], [3, "assigned"]]);
+  });
+
+  it("treats the same number in different repos as distinct PRs", () => {
+    const merged = mergeSearchNodes([[node("o/a", 1)], [node("o/b", 1)]]);
+    assert.equal(merged.length, 2);
+  });
+
+  it("handles empty result sets", () => {
+    assert.deepEqual(mergeSearchNodes([[], []]), []);
+    assert.deepEqual(mergeSearchNodes([]), []);
   });
 });
 
