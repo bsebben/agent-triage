@@ -88,7 +88,16 @@ query($q: String!, $n: Int!, $after: String) {
             }
           }
         }
-        latestReviews { totalCount }
+        latestReviews(first: 50) {
+          totalCount
+          nodes { state author { login __typename } }
+        }
+        # GraphQL rate-limit cost multiplies nested lists by their maximum size, so this
+        # cap is a budget: first: 10 keeps a 50-PR page near 7 points, first: 100 is 53.
+        reviewThreads(first: 10) {
+          pageInfo { hasNextPage }
+          nodes { isResolved isOutdated comments(first: 1) { nodes { author { login __typename } } } }
+        }
       }
     }
   }
@@ -114,7 +123,22 @@ async function init(tabConfig, onUpdate) {
   tab.refresh = await startPolling("Pulls", poll, onUpdate, 2 * 60 * 1000);
 }
 
+// The signed-in user's login, used to leave their own reviews out of the reviewer groups.
+// Cached once resolved; null (lookup failed) means no exclusion is applied this poll and
+// the lookup is retried on the next one.
+let viewerLogin = null;
+
+export async function resolveViewerLogin(exec = execFileAsync) {
+  try {
+    const { stdout } = await exec("gh", ["api", "user", "--jq", ".login"], { timeout: 30000 });
+    return stdout.trim() || null;
+  } catch {
+    return null;
+  }
+}
+
 async function poll() {
+  viewerLogin ??= await resolveViewerLogin();
   const mergedSince = new Date(Date.now() - MERGED_WINDOW_DAYS * 24 * 60 * 60 * 1000)
     .toISOString().slice(0, 10);
   // allSettled keeps the queries independent: a single failing query (e.g. a GitHub 502)
@@ -473,6 +497,7 @@ function summarize(node) {
     author: node.author?.login || "",
     status: prStatus(node, trunk),
     ci: ciStatus(checks.filter((c) => !isTrunkQueueCheck(c))),
+    reviewers: summarizeReviewers(node, { viewerLogin }),
   };
 }
 

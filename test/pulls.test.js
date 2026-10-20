@@ -23,6 +23,7 @@ import {
   isBotActor,
   summarizeReviewers,
   formatThreadCount,
+  resolveViewerLogin,
 } from "../src/tabs/pulls.js";
 
 const fulfilled = (value) => ({ status: "fulfilled", value });
@@ -752,6 +753,23 @@ describe("summarizeReviewers", () => {
   it("reports threadsTruncated from hasNextPage", () => {
     assert.equal(summarizeReviewers(prNode({ threads: [], hasNextPage: true }), { viewerLogin: null }).threadsTruncated, true);
     assert.equal(summarizeReviewers(prNode({ threads: [], hasNextPage: false }), { viewerLogin: null }).threadsTruncated, false);
+  });
+});
+
+describe("resolveViewerLogin", () => {
+  it("returns the trimmed login from gh", async () => {
+    const exec = async () => ({ stdout: "alice\n" });
+    assert.equal(await resolveViewerLogin(exec), "alice");
+  });
+
+  it("returns null when gh fails", async () => {
+    const exec = async () => { throw new Error("gh: not logged in"); };
+    assert.equal(await resolveViewerLogin(exec), null);
+  });
+
+  it("returns null for empty output", async () => {
+    const exec = async () => ({ stdout: "  \n" });
+    assert.equal(await resolveViewerLogin(exec), null);
   });
 });
 
