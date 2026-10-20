@@ -105,7 +105,7 @@ function renderPulls() {
   // "Assigned to me" is its own server-side search (requests addressed to me personally,
   // complete), not a filter over the team-inclusive list — so the toggle picks a bucket.
   const source = pullsDirectFilter ? (pulls.assigned || []) : pulls.reviews;
-  const mineGroups = typeof DEMO_PULL_GROUPS === "undefined" ? pulls.mine : [...DEMO_PULL_GROUPS, ...pulls.mine];
+  const mineGroups = pulls.mine;
   const mineCount = mineGroups.reduce((n, g) => n + g.prs.length, 0);
   const reviewCount = source.reduce((n, g) => n + g.prs.length, 0);
   const mergedCount = (pulls.merged || []).reduce((n, g) => n + g.prs.length, 0);
