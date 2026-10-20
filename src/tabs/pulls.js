@@ -550,6 +550,51 @@ export function prStatus(node, trunk = null) {
   return "open";
 }
 
+// A reviewer is a bot only when GitHub says so (GraphQL __typename "Bot"); login
+// heuristics are deliberately not used.
+export function isBotActor(actor) {
+  return actor?.__typename === "Bot";
+}
+
+// Splits review activity into human and bot groups. `latestReviews` is already one
+// entry per reviewer. The viewer's own activity and threads started by the PR author
+// are excluded: neither is feedback the reader still has to act on. A thread belongs to
+// whoever wrote its first comment.
+export function summarizeReviewers(node, { viewerLogin = null } = {}) {
+  const groups = {
+    human: { approved: [], blocked: [], unresolvedThreads: 0 },
+    bot: { approved: [], blocked: [], unresolvedThreads: 0 },
+  };
+  const viewer = viewerLogin?.toLowerCase() ?? null;
+  const prAuthor = node.author?.login?.toLowerCase() ?? null;
+  const groupFor = (actor) => (isBotActor(actor) ? groups.bot : groups.human);
+
+  for (const review of node.latestReviews?.nodes || []) {
+    const login = review.author?.login;
+    if (!login || login.toLowerCase() === viewer) continue;
+    const group = groupFor(review.author);
+    if (review.state === "APPROVED") group.approved.push(login);
+    else if (review.state === "CHANGES_REQUESTED") group.blocked.push(login);
+  }
+
+  for (const t of node.reviewThreads?.nodes || []) {
+    if (t.isResolved) continue;
+    const author = t.comments?.nodes?.[0]?.author;
+    const login = author?.login?.toLowerCase();
+    if (!login || login === viewer || login === prAuthor) continue;
+    groupFor(author).unresolvedThreads++;
+  }
+
+  return { ...groups, threadsTruncated: node.reviewThreads?.pageInfo?.hasNextPage === true };
+}
+
+// Display text for the unresolved-thread count: capped at one digit, and marked when
+// the thread fetch itself was cut off so the real number may be higher.
+export function formatThreadCount(count, truncated) {
+  if (count > 9) return "9+";
+  return truncated ? `${count}+` : String(count);
+}
+
 function ciStatus(checks) {
   if (checks.length === 0) return "none";
   const meaningful = checks.filter((c) =>
