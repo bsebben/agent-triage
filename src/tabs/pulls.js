@@ -145,7 +145,7 @@ async function poll() {
   // retains its last-known data while the others still update, instead of failing the
   // whole poll and letting the display go stale.
   const [mine, reviews, merged, assigned] = await Promise.allSettled([
-    searchPrs("is:pr is:open archived:false author:@me", () => true, prPriority),
+    searchPrs(mineQueries("is:pr is:open archived:false"), () => true, prPriority),
     // `review-requested:@me` includes requests routed via a team, so this matches far more
     // than fits in the row ceiling. `sort:updated-desc` makes the truncation deterministic
     // (most recently updated first) instead of an arbitrary slice of a drifting result set —
@@ -153,7 +153,7 @@ async function poll() {
     searchPrs("is:pr is:open archived:false review-requested:@me draft:false sort:updated-desc", (pr) => !pr.isDraft, reviewPriority),
     // GitHub search has no merged-date sort, so `sort:updated-desc` is the closest
     // proxy to skew the returned window toward the most recent merges.
-    searchMerged(`is:pr archived:false author:@me is:merged merged:>=${mergedSince} sort:updated-desc`),
+    searchMerged(mineQueries(`is:pr archived:false is:merged merged:>=${mergedSince} sort:updated-desc`)),
     // Requests addressed to me personally rather than to one of my teams. Every row is a
     // direct request by construction, so no client-side filtering is needed.
     searchPrs("is:pr is:open archived:false user-review-requested:@me draft:false", (pr) => !pr.isDraft, reviewPriority),
@@ -183,8 +183,14 @@ export function settlePollResults(results, prev) {
   return next;
 }
 
-async function searchMerged(query) {
-  const groups = await searchPrs(query, () => true, mergedPriority);
+// "Mine" covers PRs I authored and PRs I took over from someone else (assigned to me).
+// GitHub search can't OR the author/assignee qualifiers, so each becomes its own query.
+export function mineQueries(base) {
+  return [`${base} author:@me`, `${base} assignee:@me`];
+}
+
+async function searchMerged(queries) {
+  const groups = await searchPrs(queries, () => true, mergedPriority);
   capMergedGroups(groups);
   return groups;
 }
@@ -453,9 +459,29 @@ function fetchPrNodes(query) {
   return collectSearchPages((after) => fetchPrSearchPage(query, { first: SEARCH_PAGE_SIZE, after }));
 }
 
-async function searchPrs(query, filter, sortFn) {
-  console.log(`[pulls] polling: ${query}`);
-  const nodes = await fetchPrNodes(query);
+// Combines result sets from several queries, keeping the first occurrence of each PR
+// (keyed by repository + number) so one both authored by and assigned to me shows once.
+export function mergeSearchNodes(nodeLists) {
+  const seen = new Set();
+  const merged = [];
+  for (const nodes of nodeLists) {
+    for (const node of nodes) {
+      const key = `${node?.repository?.nameWithOwner}#${node?.number}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      merged.push(node);
+    }
+  }
+  return merged;
+}
+
+// Accepts one query or several. Several queries all have to succeed: a partial result
+// would silently drop PRs, so any failure rejects and settlePollResults keeps the
+// last-known data for this list instead.
+async function searchPrs(queries, filter, sortFn) {
+  const list = Array.isArray(queries) ? queries : [queries];
+  for (const query of list) console.log(`[pulls] polling: ${query}`);
+  const nodes = mergeSearchNodes(await Promise.all(list.map(fetchPrNodes)));
   console.log(`[pulls] got ${nodes.length} results`);
 
   const orgFilter = cfg.orgFilter;

@@ -71,7 +71,7 @@ bin/install.sh   # safe to re-run, idempotent
 |-----|---------------|
 | **Workspaces** | All cmux agent workspaces. Click to focus, dismiss, or close. |
 | **Loops** | Long-running Claude Loop tasks with schedule, run count, and status. |
-| **Pull Requests** | Your open PRs with CI status and incoming review requests, grouped by repo. |
+| **Pull Requests** | Your open PRs (authored by or assigned to you) with CI status and incoming review requests, grouped by repo. |
 | **Tickets** | Your assigned Jira tickets grouped by parent story. Auto-detected at startup. |
 | **Tasks** | Persistent todo list that survives server restarts. Disabled by default — enable in `config.json`. |
 
