@@ -105,7 +105,8 @@ function renderPulls() {
   // "Assigned to me" is its own server-side search (requests addressed to me personally,
   // complete), not a filter over the team-inclusive list — so the toggle picks a bucket.
   const source = pullsDirectFilter ? (pulls.assigned || []) : pulls.reviews;
-  const mineCount = pulls.mine.reduce((n, g) => n + g.prs.length, 0);
+  const mineGroups = typeof DEMO_PULL_GROUPS === "undefined" ? pulls.mine : [...DEMO_PULL_GROUPS, ...pulls.mine];
+  const mineCount = mineGroups.reduce((n, g) => n + g.prs.length, 0);
   const reviewCount = source.reduce((n, g) => n + g.prs.length, 0);
   const mergedCount = (pulls.merged || []).reduce((n, g) => n + g.prs.length, 0);
 
@@ -121,11 +122,11 @@ function renderPulls() {
   </div>`;
 
   if (pullsSubTab === "mine") {
-    const statuses = collectStatuses(pulls.mine);
+    const statuses = collectStatuses(mineGroups);
     if (statuses.length > 1) {
       html += `<div class="pulls-filter-bar">${renderStatusFilter(statuses)}</div>`;
     }
-    const filtered = filterGroupsByStatus(pulls.mine, pullsStatusFilter);
+    const filtered = filterGroupsByStatus(mineGroups, pullsStatusFilter);
     const filteredCount = filtered.reduce((n, g) => n + g.prs.length, 0);
     if (filteredCount === 0) {
       html += `<div class="empty-state">No open pull requests</div>`;
