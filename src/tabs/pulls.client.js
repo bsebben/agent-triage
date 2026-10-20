@@ -359,13 +359,19 @@ function formatThreadCount(count, truncated) {
   return truncated ? `${count}+` : String(count);
 }
 
-function reviewerGroup(kind, group, truncated) {
+// `unknownThreads`: only the first few threads were fetched and none of them were unresolved,
+// so an unresolved one may still be hiding past the cutoff. A muted 0+ says so instead of
+// showing nothing.
+function reviewerGroup(kind, group, truncated, unknownThreads = false) {
   const indicators = [];
   if (group.unresolvedThreads > 0) {
     const text = formatThreadCount(group.unresolvedThreads, truncated);
     const n = group.unresolvedThreads;
     const title = `${text.endsWith("+") ? "At least " : ""}${n} unresolved thread${n === 1 ? "" : "s"}`;
     indicators.push(`<span class="pull-rev-ind pull-rev-comments" title="${escapeHtml(title)}">${iconComment()}${text}</span>`);
+  } else if (unknownThreads) {
+    const title = "No unresolved threads among the first 10; there may be more";
+    indicators.push(`<span class="pull-rev-ind pull-rev-unknown" title="${escapeHtml(title)}" aria-label="${escapeHtml(title)}">${iconComment()}0+</span>`);
   }
   if (group.approved.length > 0) {
     const title = `Approved by ${group.approved.join(", ")}`;
@@ -383,7 +389,8 @@ function reviewerGroup(kind, group, truncated) {
 function reviewerGroupsCell(reviewers) {
   if (!reviewers) return '<td class="pull-reviews"></td>';
   const t = reviewers.threadsTruncated;
-  return `<td class="pull-reviews">${reviewerGroup("human", reviewers.human, t)}${reviewerGroup("bot", reviewers.bot, t)}</td>`;
+  const unknownThreads = t && reviewers.human.unresolvedThreads === 0 && reviewers.bot.unresolvedThreads === 0;
+  return `<td class="pull-reviews">${reviewerGroup("human", reviewers.human, t, unknownThreads)}${reviewerGroup("bot", reviewers.bot, t)}</td>`;
 }
 
 function renderPullRow(pr, showAuthor, repo, subTab, slaDays) {

@@ -1034,6 +1034,7 @@ main { padding: 8px; position: relative; }
 
 .pull-rev-ind { display: inline-flex; align-items: center; gap: 2px; font-variant-numeric: tabular-nums; }
 .pull-rev-comments { color: var(--clr-question); }
+.pull-rev-unknown { color: var(--text-dim); }
 .pull-rev-approved { color: var(--clr-completion); }
 .pull-rev-blocked { color: var(--clr-error); }
 
