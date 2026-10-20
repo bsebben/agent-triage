@@ -82,7 +82,7 @@ function renderTickets() {
     queue.innerHTML = `<div class="empty-state">${hint}</div>`;
     return;
   }
-  const allGroups = typeof DEMO_TICKET_GROUPS === "undefined" ? (state.tickets || []) : [...DEMO_TICKET_GROUPS, ...(state.tickets || [])];
+  const allGroups = state.tickets || [];
   const pillConfig = ticketStatus.pillStatuses || [];
   const activeGroups = filterTicketGroups(allGroups, pillConfig);
   const pills = collectTicketPills(allGroups, pillConfig);

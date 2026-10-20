@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.62.1] - 2026-10-20
+
+### Removed
+
+- Synthetic demo pull requests and tickets that were shown above the real ones on the Pulls and Tickets tabs.
+
 ## [1.62.0] - 2026-10-20
 
 ### Added
