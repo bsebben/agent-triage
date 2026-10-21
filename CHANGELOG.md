@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.63.1] - 2026-10-21
+
+### Changed
+
+- The Pulls tab shows the PR author on the left, next to the PR number, instead of in a right-hand column.
+
 ## [1.63.0] - 2026-10-20
 
 ### Changed
