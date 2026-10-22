@@ -142,18 +142,19 @@ describe("renderWorkspacePill", () => {
     assert.equal(renderWorkspacePill(null), "");
   });
 
-  it("renders a pill labelled with the workspace title", () => {
+  it("renders a pill labelled 'workspace' with the title as tooltip", () => {
     const html = renderWorkspacePill({ workspaceId: "w1", workspaceTitle: "MP-10: Fix the thing" });
     assert.match(html, /class="card-link row-workspace-link"/);
     assert.match(html, /data-workspace-id="w1"/);
     assert.match(html, /title="MP-10: Fix the thing"/);
-    assert.match(html, />MP-10: Fix the thing</);
+    assert.match(html, />workspace</);
+    assert.doesNotMatch(html, />MP-10: Fix the thing</);
   });
 
-  it("escapes the workspace title", () => {
+  it("escapes the workspace title in the tooltip", () => {
     const html = renderWorkspacePill({ workspaceId: "w1", workspaceTitle: '<b>"x"</b>' });
     assert.doesNotMatch(html, /<b>/);
-    assert.match(html, /&lt;b&gt;&quot;x&quot;&lt;\/b&gt;/);
+    assert.match(html, /title="&lt;b&gt;&quot;x&quot;&lt;\/b&gt;"/);
   });
 });
 

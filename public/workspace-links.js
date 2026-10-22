@@ -108,7 +108,7 @@ function workspaceForUrl(state, url) {
 function renderWorkspacePill(item) {
   if (!item) return "";
   const title = item.workspaceTitle || "Workspace";
-  return `<button class="card-link row-workspace-link" title="${escapeHtml(title)}" data-workspace-id="${escapeHtml(item.workspaceId)}" onclick="focusWorkspaceFromPill(event, this)">${escapeHtml(title)}</button>`;
+  return `<button class="card-link row-workspace-link" title="${escapeHtml(title)}" data-workspace-id="${escapeHtml(item.workspaceId)}" onclick="focusWorkspaceFromPill(event, this)">workspace</button>`;
 }
 
 function focusWorkspaceFromPill(event, el) {
