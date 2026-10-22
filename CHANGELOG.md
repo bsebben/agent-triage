@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.64.1] - 2026-10-22
+
+### Changed
+
+- The workspace pill on PR and ticket rows now reads "workspace" instead of the full workspace title, which moves to the tooltip.
+
 ## [1.64.0] - 2026-10-22
 
 ### Added
