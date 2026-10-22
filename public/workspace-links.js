@@ -79,3 +79,39 @@ function renderWorkspaceLinks(links) {
   ).join("");
   return `<span class="card-links">${pills}</span>`;
 }
+
+let workspaceByUrlCache = { state: null, groups: null, map: new Map() };
+
+// Keyed on both identities because closing a workspace swaps state.groups in place on the same state.
+function workspacesByLinkUrl(state) {
+  const groups = state?.groups;
+  if (workspaceByUrlCache.state === state && workspaceByUrlCache.groups === groups) return workspaceByUrlCache.map;
+
+  const map = new Map();
+  const sources = { pulls: state?.pulls, tickets: state?.tickets };
+  for (const group of groups || []) {
+    for (const item of group.items) {
+      if (item.isHost) continue;
+      for (const link of findWorkspaceLinks(item, sources)) {
+        if (!map.has(link.url)) map.set(link.url, item);
+      }
+    }
+  }
+  workspaceByUrlCache = { state, groups, map };
+  return map;
+}
+
+function workspaceForUrl(state, url) {
+  return workspacesByLinkUrl(state).get(url) || null;
+}
+
+function renderWorkspacePill(item) {
+  if (!item) return "";
+  const title = item.workspaceTitle || "Workspace";
+  return `<button class="card-link row-workspace-link" title="${escapeHtml(title)}" data-workspace-id="${escapeHtml(item.workspaceId)}" onclick="focusWorkspaceFromPill(event, this)">${escapeHtml(title)}</button>`;
+}
+
+function focusWorkspaceFromPill(event, el) {
+  event.stopPropagation();
+  apiPost("focus", { workspaceId: el.dataset.workspaceId, activate: true });
+}

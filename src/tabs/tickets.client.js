@@ -159,6 +159,6 @@ function renderTicketRow(ticket) {
     <td class="ticket-num ticket-key">${escapeHtml(ticket.key)}</td>
     <td class="ticket-title"><a class="ticket-title-link" href="${escapeHtml(ticket.url)}" target="_blank" rel="noopener" onclick="openExternalClick(event, '${escapeHtml(ticket.url)}')"><span class="ticket-title-text">${escapeHtml(ticket.summary)}</span></a></td>
     <td class="ticket-status"><span class="ticket-badge status-${ticketStatusClass(ticket.status)}">${escapeHtml(ticket.status)}</span></td>
-    <td class="row-action">${actionBtn}</td>
+    <td class="row-action">${renderWorkspacePill(workspaceForUrl(state, ticket.url))}${actionBtn}</td>
   </tr>`;
 }

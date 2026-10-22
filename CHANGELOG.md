@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.64.0] - 2026-10-22
+
+### Added
+
+- PR rows in the Pulls tab and ticket rows in the Tickets tab show a pill for the workspace working on them; clicking it switches to that workspace and brings cmux to the front.
+
 ## [1.63.1] - 2026-10-21
 
 ### Changed

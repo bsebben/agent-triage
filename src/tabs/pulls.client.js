@@ -431,7 +431,7 @@ function renderPullRow(pr, showAuthor, repo, subTab, slaDays) {
     ${showAuthor ? `<td class="pull-author">${escapeHtml(pr.author)}</td>` : ""}
     <td class="pull-title"><a class="pull-title-link" href="${escapeHtml(pr.url)}" target="_blank" rel="noopener" onclick="openExternalClick(event, '${escapeHtml(pr.url)}')"><span class="pull-number">#${pr.number}</span> <span class="pull-title-text">${escapeHtml(pr.title)}</span></a></td>
     ${statusCells}
-    <td class="row-action">${actionBtn}</td>
+    <td class="row-action">${renderWorkspacePill(workspaceForUrl(state, pr.url))}${actionBtn}</td>
   </tr>`;
 }
 
