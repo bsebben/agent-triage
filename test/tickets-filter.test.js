@@ -16,10 +16,9 @@ const sandbox = {
   claudeIcon: () => "",
 };
 createContext(sandbox);
-runInContext(
-  readFileSync(new URL("../src/tabs/tickets.client.js", import.meta.url), "utf-8"),
-  sandbox,
-);
+for (const file of ["../public/workspace-links.js", "../src/tabs/tickets.client.js"]) {
+  runInContext(readFileSync(new URL(file, import.meta.url), "utf-8"), sandbox);
+}
 const {
   collectTicketPills,
   collectTicketStatuses,

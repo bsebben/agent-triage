@@ -17,7 +17,7 @@ const sandbox = {
   slaTooltip: () => "",
 };
 createContext(sandbox);
-for (const file of ["../public/pull-icons.js", "../src/tabs/pulls.client.js"]) {
+for (const file of ["../public/workspace-links.js", "../public/pull-icons.js", "../src/tabs/pulls.client.js"]) {
   runInContext(readFileSync(new URL(file, import.meta.url), "utf-8"), sandbox);
 }
 const { renderPullRow } = sandbox;
