@@ -424,7 +424,8 @@ function renderPullRow(pr, showAuthor, repo, subTab, slaDays) {
     : `<td class="pull-num">#${pr.number}</td>
     ${reviewsCell(pr)}`;
   const level = slaLevel(pr, slaDays);
-  const rowClass = level ? ` pull-row-sla-${level}` : "";
+  const rowClass = (level ? ` pull-row-sla-${level}` : "")
+    + (subTab === "mine" && pr.mergeable && pr.status !== "queued" ? " pull-row-mergeable" : "");
   const rowTitle = level ? ` title="${escapeHtml(slaTooltip(pr, slaDays))}"` : "";
   return `<tr class="pull-row${rowClass}"${rowTitle} onclick="openExternal('${escapeHtml(pr.url)}')">
     ${leadingCell}
