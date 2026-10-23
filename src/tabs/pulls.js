@@ -68,6 +68,7 @@ query($q: String!, $n: Int!, $after: String) {
         mergedAt
         headRefName
         reviewDecision
+        mergeStateStatus
         mergeCommit { oid }
         author { login }
         repository { nameWithOwner }
@@ -520,6 +521,7 @@ function summarize(node) {
     mergeCommitOid: node.mergeCommit?.oid || null,
     repoWithOwner: node.repository?.nameWithOwner || "",
     isDraft: node.isDraft,
+    mergeable: isMergeable(node),
     author: node.author?.login || "",
     status: prStatus(node, trunk),
     ci: ciStatus(checks.filter((c) => !isTrunkQueueCheck(c))),
@@ -589,6 +591,12 @@ export function slaLevel(pr, slaDays, now = Date.now()) {
 // first. Mutates and returns `prs`, mirroring Array#sort.
 export function sortPrsByPriority(prs, sortFn) {
   return prs.sort((a, b) => sortFn(a) - sortFn(b) || prSinceTimestamp(a) - prSinceTimestamp(b));
+}
+
+// HAS_HOOKS is CLEAN plus pre-receive hooks, so it is still mergeable.
+export function isMergeable(node) {
+  if (node.merged || node.mergedAt || node.isDraft || node.isInMergeQueue) return false;
+  return node.mergeStateStatus === "CLEAN" || node.mergeStateStatus === "HAS_HOOKS";
 }
 
 export function prStatus(node, trunk = null) {

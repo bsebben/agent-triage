@@ -972,6 +972,8 @@ main { padding: 8px; position: relative; }
 .pulls-table .pull-row > td:first-child { border-radius: 6px 0 0 6px; }
 .pulls-table .pull-row > td:last-child { border-radius: 0 6px 6px 0; }
 .pulls-table .pull-row:hover > td { background: color-mix(in srgb, var(--text-dim) 16%, transparent); }
+.pulls-table .pull-row-mergeable > td { background: color-mix(in srgb, var(--clr-completion) 14%, transparent); }
+.pulls-table .pull-row-mergeable:hover > td { background: color-mix(in srgb, var(--clr-completion) 22%, transparent); }
 
 /* box-shadow on <tr> doesn't paint in Chromium's table layout — apply it to
    the row's first cell instead, which renders it without shifting layout. */

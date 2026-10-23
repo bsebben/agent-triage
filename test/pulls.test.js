@@ -4,6 +4,7 @@ import assert from "node:assert/strict";
 
 import {
   prStatus,
+  isMergeable,
   parseDeployments,
   parseDeployLinks,
   buildkiteUrlFromExecutionRef,
@@ -824,5 +825,24 @@ describe("formatThreadCount", () => {
   it("caps at 9+ above nine, truncated or not", () => {
     assert.equal(formatThreadCount(10, true), "9+");
     assert.equal(formatThreadCount(10, false), "9+");
+  });
+});
+
+describe("isMergeable", () => {
+  it("is true for CLEAN and HAS_HOOKS", () => {
+    assert.equal(isMergeable({ mergeStateStatus: "CLEAN" }), true);
+    assert.equal(isMergeable({ mergeStateStatus: "HAS_HOOKS" }), true);
+  });
+
+  it("is false for blocked, behind, dirty, or unstable PRs", () => {
+    for (const s of ["BLOCKED", "BEHIND", "DIRTY", "UNSTABLE", "UNKNOWN", undefined]) {
+      assert.equal(isMergeable({ mergeStateStatus: s }), false);
+    }
+  });
+
+  it("is false for drafts, queued, and merged PRs", () => {
+    assert.equal(isMergeable({ mergeStateStatus: "CLEAN", isDraft: true }), false);
+    assert.equal(isMergeable({ mergeStateStatus: "CLEAN", isInMergeQueue: true }), false);
+    assert.equal(isMergeable({ mergeStateStatus: "CLEAN", mergedAt: "2026-10-01T00:00:00Z" }), false);
   });
 });
