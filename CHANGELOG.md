@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.66.0] - 2026-11-03
+
+### Added
+
+- A green pill on the Pull Requests tab badge, left of the others, counts your PRs that are ready to merge.
+- PRs in repos behind a Trunk merge queue count as ready when approved with passing CI, since GitHub reports them as blocked until they are submitted to the queue.
+
+### Changed
+
+- PRs that are ready to merge no longer count toward the blue "needs action" pill.
+- Tabs use tighter spacing and wrap onto a second row instead of overflowing the header.
+
 ## [1.65.0] - 2026-10-23
 
 ### Added

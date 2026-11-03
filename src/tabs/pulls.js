@@ -510,6 +510,8 @@ async function searchPrs(queries, filter, sortFn) {
 function summarize(node) {
   const checks = node.commits?.nodes?.[0]?.commit?.statusCheckRollup?.contexts?.nodes || [];
   const trunk = trunkQueueState(checks);
+  const status = prStatus(node, trunk);
+  const ci = ciStatus(checks.filter((c) => !isTrunkQueueCheck(c)));
   return {
     number: node.number,
     title: node.title,
@@ -521,10 +523,10 @@ function summarize(node) {
     mergeCommitOid: node.mergeCommit?.oid || null,
     repoWithOwner: node.repository?.nameWithOwner || "",
     isDraft: node.isDraft,
-    mergeable: isMergeable(node),
+    mergeable: isMergeable(node, { status, ci }),
     author: node.author?.login || "",
-    status: prStatus(node, trunk),
-    ci: ciStatus(checks.filter((c) => !isTrunkQueueCheck(c))),
+    status,
+    ci,
     reviewers: summarizeReviewers(node, { viewerLogin }),
   };
 }
@@ -593,10 +595,13 @@ export function sortPrsByPriority(prs, sortFn) {
   return prs.sort((a, b) => sortFn(a) - sortFn(b) || prSinceTimestamp(a) - prSinceTimestamp(b));
 }
 
-// HAS_HOOKS is CLEAN plus pre-receive hooks, so it is still mergeable.
-export function isMergeable(node) {
+// HAS_HOOKS is CLEAN plus pre-receive hooks. The BLOCKED path covers repos behind a Trunk
+// queue, where GitHub reports BLOCKED until the PR is submitted to the queue.
+export function isMergeable(node, { status = null, ci = null } = {}) {
   if (node.merged || node.mergedAt || node.isDraft || node.isInMergeQueue) return false;
-  return node.mergeStateStatus === "CLEAN" || node.mergeStateStatus === "HAS_HOOKS";
+  if (status === "queued" || status === "queue_failed") return false;
+  if (node.mergeStateStatus === "CLEAN" || node.mergeStateStatus === "HAS_HOOKS") return true;
+  return node.mergeStateStatus === "BLOCKED" && node.reviewDecision === "APPROVED" && ci === "passing";
 }
 
 export function prStatus(node, trunk = null) {

@@ -296,14 +296,15 @@ body.shift-held [data-tip-dangerous]:hover::after {
 
 .tabs {
   display: flex;
-  gap: 2px;
+  flex-wrap: wrap;
+  gap: 0;
   margin-top: 8px;
   border-bottom: 1px solid var(--border);
 }
 
 .tab {
   flex: 1 1 auto;
-  padding: 6px 10px;
+  padding: 6px 6px;
   margin-bottom: -1px;
   white-space: nowrap;
   background: transparent;
@@ -330,8 +331,8 @@ body.shift-held [data-tip-dangerous]:hover::after {
 
 .tab-badge {
   display: inline-block;
-  margin-left: 4px;
-  padding: 0 5px;
+  margin-left: 3px;
+  padding: 0 4px;
   border-radius: 8px;
   background: var(--clr-running);
   color: #fff;
@@ -351,6 +352,7 @@ body.shift-held [data-tip-dangerous]:hover::after {
    reinforcement, not the only cue — each pill also has its own title tooltip. */
 .tab-badge-mine { background: var(--clr-running); color: #fff; }
 .tab-badge-reviews { background: var(--clr-question); color: #1a1a2e; }
+.tab-badge-ready { background: var(--clr-completion); color: #1a1a2e; }
 
 /* Tighter than the 4px that separates a pill from the tab label, so the pair reads as
    one unit belonging to the tab rather than two unrelated badges. */
