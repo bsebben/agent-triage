@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ### Changed
 
 - PRs that are ready to merge no longer count toward the blue "needs action" pill.
+- Tabs use tighter spacing and wrap onto a second row instead of overflowing the header.
 
 ## [1.65.0] - 2026-10-23
 
