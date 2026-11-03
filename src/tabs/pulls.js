@@ -595,11 +595,8 @@ export function sortPrsByPriority(prs, sortFn) {
   return prs.sort((a, b) => sortFn(a) - sortFn(b) || prSinceTimestamp(a) - prSinceTimestamp(b));
 }
 
-// A PR is ready to merge when it is open, not a draft, and not queued or failed in a
-// merge queue, and either GitHub reports it clean or it is approved with passing CI.
-// HAS_HOOKS is CLEAN plus pre-receive hooks. The approved-and-passing path covers repos
-// behind a Trunk queue, where GitHub reports BLOCKED until the PR is submitted to the
-// queue; conflicts and out-of-date branches (DIRTY, BEHIND) never qualify.
+// HAS_HOOKS is CLEAN plus pre-receive hooks. The BLOCKED path covers repos behind a Trunk
+// queue, where GitHub reports BLOCKED until the PR is submitted to the queue.
 export function isMergeable(node, { status = null, ci = null } = {}) {
   if (node.merged || node.mergedAt || node.isDraft || node.isInMergeQueue) return false;
   if (status === "queued" || status === "queue_failed") return false;
