@@ -42,7 +42,7 @@ function filterGroupsByStatus(groups, status) {
 }
 
 function prIsReady(pr) {
-  return Boolean(pr.mergeable) && pr.status !== "queued";
+  return Boolean(pr.mergeable) && pr.status !== "queued" && pr.status !== "queue_failed";
 }
 
 function prNeedsAction(pr) {
@@ -439,7 +439,7 @@ function renderPullRow(pr, showAuthor, repo, subTab, slaDays) {
     ${reviewsCell(pr)}`;
   const level = slaLevel(pr, slaDays);
   const rowClass = (level ? ` pull-row-sla-${level}` : "")
-    + (subTab === "mine" && pr.mergeable && pr.status !== "queued" ? " pull-row-mergeable" : "");
+    + (subTab === "mine" && prIsReady(pr) ? " pull-row-mergeable" : "");
   const rowTitle = level ? ` title="${escapeHtml(slaTooltip(pr, slaDays))}"` : "";
   return `<tr class="pull-row${rowClass}"${rowTitle} onclick="openExternal('${escapeHtml(pr.url)}')">
     ${leadingCell}

@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ### Added
 
 - A green pill on the Pull Requests tab badge, left of the others, counts your PRs that are ready to merge.
+- PRs in repos behind a Trunk merge queue count as ready when approved with passing CI, since GitHub reports them as blocked until they are submitted to the queue.
 
 ### Changed
 

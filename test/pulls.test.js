@@ -840,6 +840,27 @@ describe("isMergeable", () => {
     }
   });
 
+  it("treats BLOCKED as ready only when approved with passing CI", () => {
+    const blocked = { mergeStateStatus: "BLOCKED", reviewDecision: "APPROVED" };
+    assert.equal(isMergeable(blocked, { status: "approved", ci: "passing" }), true);
+    assert.equal(isMergeable(blocked, { status: "approved", ci: "failing" }), false);
+    assert.equal(isMergeable(blocked, { status: "approved", ci: "running" }), false);
+    assert.equal(isMergeable({ ...blocked, reviewDecision: "REVIEW_REQUIRED" }, { ci: "passing" }), false);
+    assert.equal(isMergeable(blocked), false);
+  });
+
+  it("never treats conflicting or out-of-date PRs as ready", () => {
+    for (const s of ["DIRTY", "BEHIND"]) {
+      assert.equal(isMergeable({ mergeStateStatus: s, reviewDecision: "APPROVED" }, { ci: "passing" }), false);
+    }
+  });
+
+  it("is false when queued or failed in a merge queue", () => {
+    for (const status of ["queued", "queue_failed"]) {
+      assert.equal(isMergeable({ mergeStateStatus: "CLEAN" }, { status, ci: "passing" }), false);
+    }
+  });
+
   it("is false for drafts, queued, and merged PRs", () => {
     assert.equal(isMergeable({ mergeStateStatus: "CLEAN", isDraft: true }), false);
     assert.equal(isMergeable({ mergeStateStatus: "CLEAN", isInMergeQueue: true }), false);

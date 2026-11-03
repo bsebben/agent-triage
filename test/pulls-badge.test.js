@@ -133,6 +133,12 @@ describe("pullsBadge", () => {
     assert.equal(pullsBadge(queued).parts.length, 0);
   });
 
+  it("leaves a queue-failed PR in needs-action rather than ready", () => {
+    const failed = { mine: [group("a", [pr("https://x/a/1", { status: "queue_failed", mergeable: true })])], reviews: [], assigned: [] };
+    const b = pullsBadge(failed);
+    assert.deepEqual(variants(b), ["mine"]);
+  });
+
   it("uses singular copy for a count of one", () => {
     const one = {
       mine: [group("a", [pr("https://x/a/1", { status: "approved" })])],
