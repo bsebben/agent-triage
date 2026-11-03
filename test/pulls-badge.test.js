@@ -106,6 +106,33 @@ describe("pullsBadge", () => {
     assert.match(t, / \u00b7 /);
   });
 
+  it("puts ready-to-merge PRs in a leftmost ready pill and out of the needs-action pill", () => {
+    const withReady = {
+      mine: [group("a", [
+        pr("https://x/a/1", { status: "approved", mergeable: true }),
+        pr("https://x/a/2", { status: "comments", mergeable: true }),
+        pr("https://x/a/3", { status: "approved" }),
+      ])],
+      reviews: [],
+      assigned: [group("b", [pr("https://x/b/3")])],
+    };
+    const b = pullsBadge(withReady);
+    assert.deepEqual(variants(b), ["ready", "mine", "reviews"]);
+    assert.deepEqual(texts(b), ["2", "1", "1"]);
+    assert.equal(b.total, 4);
+    assert.match(b.parts[0].title, /2 of your PRs are ready to merge/);
+  });
+
+  it("uses singular copy for one ready PR", () => {
+    const one = { mine: [group("a", [pr("https://x/a/1", { mergeable: true })])], reviews: [], assigned: [] };
+    assert.equal(pullsBadge(one).parts[0].title, "1 of your PRs is ready to merge");
+  });
+
+  it("does not count a queued PR as ready", () => {
+    const queued = { mine: [group("a", [pr("https://x/a/1", { status: "queued", mergeable: true })])], reviews: [], assigned: [] };
+    assert.equal(pullsBadge(queued).parts.length, 0);
+  });
+
   it("uses singular copy for a count of one", () => {
     const one = {
       mine: [group("a", [pr("https://x/a/1", { status: "approved" })])],

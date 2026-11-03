@@ -41,7 +41,12 @@ function filterGroupsByStatus(groups, status) {
     .filter((g) => g.prs.length > 0);
 }
 
+function prIsReady(pr) {
+  return Boolean(pr.mergeable) && pr.status !== "queued";
+}
+
 function prNeedsAction(pr) {
+  if (prIsReady(pr)) return false;
   return pr.status === "approved" || pr.status === "comments"
     || pr.status === "queue_failed" || pr.ci === "failing";
 }
@@ -54,8 +59,9 @@ function countUrls(groups, predicate) {
   return urls.size;
 }
 
-// The nav badge: up to two pills, your own PRs needing action then review requests
-// addressed to you personally. A pill is omitted entirely when its count is zero.
+// The nav badge: up to three pills, your own PRs ready to merge, your own PRs needing
+// action, then review requests addressed to you personally. A ready PR is counted only
+// in the ready pill. A pill is omitted entirely when its count is zero.
 //
 // Both counts come from searches that fit inside the fetch row ceiling, so both are
 // exact. The team-inclusive `reviews` search is deliberately excluded: it matches
@@ -66,10 +72,18 @@ function countUrls(groups, predicate) {
 // re-adds it if that review is later dismissed, so that pill tracks what is genuinely
 // outstanding without extra filtering.
 function pullsBadge(pulls) {
+  const ready = countUrls(pulls.mine, prIsReady);
   const mine = countUrls(pulls.mine, prNeedsAction);
   const reviews = countUrls(pulls.assigned, () => true);
   const parts = [];
 
+  if (ready) {
+    parts.push({
+      text: String(ready),
+      variant: "ready",
+      title: ready === 1 ? "1 of your PRs is ready to merge" : `${ready} of your PRs are ready to merge`,
+    });
+  }
   if (mine) {
     parts.push({
       text: String(mine),
@@ -88,7 +102,7 @@ function pullsBadge(pulls) {
   }
 
   return {
-    total: mine + reviews,
+    total: ready + mine + reviews,
     title: parts.map((part) => part.title).join(" \u00b7 "),
     parts,
   };

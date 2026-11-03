@@ -351,6 +351,7 @@ body.shift-held [data-tip-dangerous]:hover::after {
    reinforcement, not the only cue — each pill also has its own title tooltip. */
 .tab-badge-mine { background: var(--clr-running); color: #fff; }
 .tab-badge-reviews { background: var(--clr-question); color: #1a1a2e; }
+.tab-badge-ready { background: var(--clr-completion); color: #1a1a2e; }
 
 /* Tighter than the 4px that separates a pill from the tab label, so the pair reads as
    one unit belonging to the tab rather than two unrelated badges. */
