@@ -531,10 +531,14 @@ function summarize(node) {
   };
 }
 
-const PRIORITY = { queue_failed: 0, queued: 1, approved: 2, comments: 3, open: 5, draft: 6 };
-function prPriority(pr) {
-  if (pr.ci === "failing" && pr.status !== "approved" && pr.status !== "comments" && pr.status !== "queue_failed") return 4;
-  return PRIORITY[pr.status] ?? 6;
+// Ready-to-merge mirrors prIsReady in pulls.client.js so the top of the Mine tab
+// matches the green badge pill. Drafts sink below everything, even with failing CI.
+const PRIORITY = { ready: 0, queue_failed: 1, queued: 2, approved: 3, comments: 4, failing: 5, open: 6, draft: 7 };
+export function prPriority(pr) {
+  if (pr.status === "draft") return PRIORITY.draft;
+  if (pr.mergeable && pr.status !== "queued" && pr.status !== "queue_failed") return PRIORITY.ready;
+  if (pr.ci === "failing" && pr.status !== "approved" && pr.status !== "comments" && pr.status !== "queue_failed") return PRIORITY.failing;
+  return PRIORITY[pr.status] ?? PRIORITY.draft;
 }
 
 const CI_ORDER = { passing: 0, running: 1, none: 2, failing: 3 };
