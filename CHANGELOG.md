@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.66.1] - 2026-11-09
+
+### Fixed
+
+- The Mine tab on Pull Requests always lists draft PRs last, even when their CI is failing, with open PRs directly above them.
+- Ready-to-merge PRs now sort to the very top of the Mine tab.
+
 ## [1.66.0] - 2026-11-03
 
 ### Added
