@@ -23,6 +23,7 @@ import {
   slaLevel,
   prSinceTimestamp,
   sortPrsByPriority,
+  prPriority,
   isBotActor,
   summarizeReviewers,
   formatThreadCount,
@@ -176,6 +177,52 @@ describe("sortPrsByPriority", () => {
     ];
     const sorted = sortPrsByPriority(prs, (p) => p.priority);
     assert.deepEqual(sorted.map((p) => p.name), ["high-priority-newer", "low-priority-older"]);
+  });
+});
+
+describe("prPriority", () => {
+  const pr = (name, fields) => ({ name, createdAt: "2026-09-01", ci: "passing", mergeable: false, ...fields });
+  const order = (prs) => sortPrsByPriority(prs, prPriority).map((p) => p.name);
+
+  it("ranks ready-to-merge PRs above every other bucket", () => {
+    const prs = [
+      pr("queue-failed", { status: "queue_failed" }),
+      pr("approved", { status: "approved" }),
+      pr("ready", { status: "open", mergeable: true, createdAt: "2026-09-10" }),
+    ];
+    assert.deepEqual(order(prs), ["ready", "queue-failed", "approved"]);
+  });
+
+  it("does not treat queued PRs as ready even when mergeable is set", () => {
+    assert.notEqual(prPriority(pr("q", { status: "queued", mergeable: true })), prPriority(pr("r", { status: "open", mergeable: true })));
+  });
+
+  it("ranks drafts last even when their CI is failing", () => {
+    const prs = [
+      pr("draft-failing", { status: "draft", ci: "failing", createdAt: "2026-08-01" }),
+      pr("open", { status: "open" }),
+      pr("open-failing", { status: "open", ci: "failing" }),
+    ];
+    assert.deepEqual(order(prs), ["open-failing", "open", "draft-failing"]);
+  });
+
+  it("keeps open PRs directly above drafts", () => {
+    const prs = [
+      pr("draft", { status: "draft", createdAt: "2026-08-01" }),
+      pr("open", { status: "open" }),
+      pr("comments", { status: "comments" }),
+    ];
+    assert.deepEqual(order(prs), ["comments", "open", "draft"]);
+  });
+
+  it("orders each bucket oldest first", () => {
+    const prs = [
+      pr("draft-newer", { status: "draft", createdAt: "2026-09-10" }),
+      pr("open-newer", { status: "open", createdAt: "2026-09-10" }),
+      pr("draft-older", { status: "draft", createdAt: "2026-08-01" }),
+      pr("open-older", { status: "open", createdAt: "2026-08-01" }),
+    ];
+    assert.deepEqual(order(prs), ["open-older", "open-newer", "draft-older", "draft-newer"]);
   });
 });
 
