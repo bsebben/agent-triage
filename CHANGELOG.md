@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.66.2] - 2026-11-09
+
+### Fixed
+
+- A pull request's status icon shows comments only when it lacks its required approvals and has an unresolved thread from someone who has not approved; otherwise it shows the open icon.
+
 ## [1.66.1] - 2026-11-09
 
 ### Fixed

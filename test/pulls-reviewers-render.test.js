@@ -17,8 +17,8 @@ for (const file of ["../public/pull-icons.js", "../src/tabs/pulls.client.js"]) {
 const { reviewerGroupsHtml, reviewsCell, statusCell } = sandbox;
 
 const group = (extra = {}) => ({ approved: [], blocked: [], unresolvedThreads: 0, ...extra });
-const reviewers = (human = {}, bot = {}, threadsTruncated = false) => ({
-  human: group(human), bot: group(bot), threadsTruncated,
+const reviewers = (human = {}, bot = {}, threadsTruncated = false, blockingThreads = 0) => ({
+  human: group(human), bot: group(bot), blockingThreads, threadsTruncated,
 });
 
 describe("reviewerGroupsHtml", () => {
@@ -65,10 +65,23 @@ describe("statusCell", () => {
     assert.match(statusCell(prWith("comments", reviewers({}, { blocked: ["example-bot"] }))), /status-blocked/);
   });
 
-  it("keeps the comments icon when nothing blocks", () => {
-    const html = statusCell(prWith("comments", reviewers({ unresolvedThreads: 2 })));
+  it("keeps the comments icon when an unresolved thread is from someone who has not approved", () => {
+    const html = statusCell(prWith("comments", reviewers({ unresolvedThreads: 2 }, {}, false, 2)));
     assert.match(html, /status-comments/);
     assert.doesNotMatch(html, /status-blocked/);
+  });
+
+  it("shows the open icon for a comments PR whose only review is a bot approval", () => {
+    assert.match(statusCell(prWith("comments", reviewers({}, { approved: ["example-bot"] }))), /status-open/);
+  });
+
+  it("shows the open icon for a comments PR with no reviewer feedback", () => {
+    assert.match(statusCell(prWith("comments", reviewers())), /status-open/);
+  });
+
+  it("shows the open icon when every unresolved thread is from an approver", () => {
+    const rev = reviewers({ approved: ["alice"], unresolvedThreads: 1 }, {}, false, 0);
+    assert.match(statusCell(prWith("comments", rev)), /status-open/);
   });
 
   it("leaves other statuses alone even if reviewer data says blocked", () => {

@@ -321,8 +321,15 @@ function isBlocked(pr) {
   return pr.status === "comments" && !!r && (r.human.blocked.length > 0 || r.bot.blocked.length > 0);
 }
 
+// "comments" also covers approvals that don't satisfy review rules and bare reviews; it only
+// stays when an unresolved thread comes from someone who hasn't approved.
+function hasNoBlockingComments(pr) {
+  const r = pr.reviewers;
+  return pr.status === "comments" && !!r && !(r.blockingThreads > 0);
+}
+
 function statusCell(pr) {
-  const key = isBlocked(pr) ? "blocked" : pr.status;
+  const key = isBlocked(pr) ? "blocked" : hasNoBlockingComments(pr) ? "open" : pr.status;
   const label = key === "blocked" ? "changes requested" : (STATUS_LABELS[key] || key);
   const body = statusIcon(key) || escapeHtml(label);
   return `<td class="pull-status"><span class="pull-status-icon status-${key}" title="${escapeHtml(label)}" aria-label="${escapeHtml(label)}">${body}</span></td>`;
