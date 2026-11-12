@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.66.2] - 2026-11-09
+
+### Fixed
+
+- Pull requests whose only reviews left no human or bot feedback now show the open PR icon instead of the comment icon.
+
 ## [1.66.1] - 2026-11-09
 
 ### Fixed
