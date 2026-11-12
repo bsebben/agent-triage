@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
-- Pull requests whose only reviews left no human or bot feedback now show the open PR icon instead of the comment icon.
+- A pull request's status icon shows comments only when it lacks its required approvals and has an unresolved thread from someone who has not approved; otherwise it shows the open icon.
 
 ## [1.66.1] - 2026-11-09
 

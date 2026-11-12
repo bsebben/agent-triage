@@ -627,7 +627,8 @@ export function isBotActor(actor) {
 // Splits review activity into human and bot groups. `latestReviews` is already one
 // entry per reviewer. The viewer's own activity and threads started by the PR author
 // are excluded: neither is feedback the reader still has to act on. A thread belongs to
-// whoever wrote its first comment.
+// whoever wrote its first comment. `blockingThreads` counts the unresolved ones whose author
+// has not approved.
 export function summarizeReviewers(node, { viewerLogin = null } = {}) {
   const groups = {
     human: { approved: [], blocked: [], unresolvedThreads: 0 },
@@ -636,13 +637,17 @@ export function summarizeReviewers(node, { viewerLogin = null } = {}) {
   const viewer = viewerLogin?.toLowerCase() ?? null;
   const prAuthor = node.author?.login?.toLowerCase() ?? null;
   const groupFor = (actor) => (isBotActor(actor) ? groups.bot : groups.human);
+  const approvers = new Set();
+  let blockingThreads = 0;
 
   for (const review of node.latestReviews?.nodes || []) {
     const login = review.author?.login;
     if (!login || login.toLowerCase() === viewer) continue;
     const group = groupFor(review.author);
-    if (review.state === "APPROVED") group.approved.push(login);
-    else if (review.state === "CHANGES_REQUESTED") group.blocked.push(login);
+    if (review.state === "APPROVED") {
+      group.approved.push(login);
+      approvers.add(login.toLowerCase());
+    } else if (review.state === "CHANGES_REQUESTED") group.blocked.push(login);
   }
 
   for (const t of node.reviewThreads?.nodes || []) {
@@ -651,9 +656,10 @@ export function summarizeReviewers(node, { viewerLogin = null } = {}) {
     const login = author?.login?.toLowerCase();
     if (!login || login === viewer || login === prAuthor) continue;
     groupFor(author).unresolvedThreads++;
+    if (!approvers.has(login)) blockingThreads++;
   }
 
-  return { ...groups, threadsTruncated: node.reviewThreads?.pageInfo?.hasNextPage === true };
+  return { ...groups, blockingThreads, threadsTruncated: node.reviewThreads?.pageInfo?.hasNextPage === true };
 }
 
 // Display text for the unresolved-thread count: capped at one digit, and marked when

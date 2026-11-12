@@ -767,8 +767,23 @@ describe("summarizeReviewers", () => {
 
   it("returns empty groups for a PR with no reviews or threads", () => {
     assert.deepEqual(summarizeReviewers({ author: { login: "carol" } }, { viewerLogin: null }), {
-      human: empty, bot: empty, threadsTruncated: false,
+      human: empty, bot: empty, blockingThreads: 0, threadsTruncated: false,
     });
+  });
+
+  it("counts an unresolved thread as blocking only when its author has not approved", () => {
+    const r = summarizeReviewers(prNode({
+      reviews: [review("APPROVED", actor("alice")), review("APPROVED", actor("example-bot", "Bot"))],
+      threads: [
+        thread(false, actor("Alice")),
+        thread(false, actor("example-bot", "Bot")),
+        thread(false, actor("bob")),
+        thread(true, actor("dave")),
+      ],
+    }), { viewerLogin: null });
+    assert.equal(r.blockingThreads, 1);
+    assert.equal(r.human.unresolvedThreads, 2);
+    assert.equal(r.bot.unresolvedThreads, 1);
   });
 
   it("records a human changes-requested review as blocked", () => {

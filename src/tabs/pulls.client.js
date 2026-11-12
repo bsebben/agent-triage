@@ -321,15 +321,15 @@ function isBlocked(pr) {
   return pr.status === "comments" && !!r && (r.human.blocked.length > 0 || r.bot.blocked.length > 0);
 }
 
-// "comments" also covers bare or self-authored reviews; a truncated thread fetch may hide real feedback.
-function hasNoReviewFeedback(pr) {
+// "comments" also covers approvals that don't satisfy review rules and bare reviews; it only
+// stays when an unresolved thread comes from someone who hasn't approved.
+function hasNoBlockingComments(pr) {
   const r = pr.reviewers;
-  if (pr.status !== "comments" || !r || r.threadsTruncated) return false;
-  return [r.human, r.bot].every((g) => g.approved.length === 0 && g.blocked.length === 0 && g.unresolvedThreads === 0);
+  return pr.status === "comments" && !!r && !(r.blockingThreads > 0);
 }
 
 function statusCell(pr) {
-  const key = isBlocked(pr) ? "blocked" : hasNoReviewFeedback(pr) ? "open" : pr.status;
+  const key = isBlocked(pr) ? "blocked" : hasNoBlockingComments(pr) ? "open" : pr.status;
   const label = key === "blocked" ? "changes requested" : (STATUS_LABELS[key] || key);
   const body = statusIcon(key) || escapeHtml(label);
   return `<td class="pull-status"><span class="pull-status-icon status-${key}" title="${escapeHtml(label)}" aria-label="${escapeHtml(label)}">${body}</span></td>`;
