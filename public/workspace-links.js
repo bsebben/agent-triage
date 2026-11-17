@@ -108,10 +108,18 @@ function workspaceForUrl(state, url) {
 function renderWorkspacePill(item) {
   if (!item) return "";
   const title = item.workspaceTitle || "Workspace";
-  return `<button class="card-link row-workspace-link" title="${escapeHtml(title)}" data-workspace-id="${escapeHtml(item.workspaceId)}" onclick="focusWorkspaceFromPill(event, this)">workspace</button>`;
+  const label = item.isHost
+    ? "workspace"
+    : `<span class="pill-label">workspace</span><span class="pill-label-dangerous">close workspace</span>`;
+  return `<button class="card-link row-workspace-link${item.isHost ? "" : " closable"}" title="${escapeHtml(title)}" data-workspace-id="${escapeHtml(item.workspaceId)}" onclick="focusWorkspaceFromPill(event, this)">${label}</button>`;
 }
 
 function focusWorkspaceFromPill(event, el) {
   event.stopPropagation();
-  apiPost("focus", { workspaceId: el.dataset.workspaceId, activate: true });
+  const workspaceId = el.dataset.workspaceId;
+  if (event.shiftKey && el.classList.contains("closable")) {
+    closeWorkspace(workspaceId);
+    return;
+  }
+  apiPost("focus", { workspaceId, activate: true });
 }

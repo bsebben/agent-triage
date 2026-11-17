@@ -651,6 +651,16 @@ main { padding: 8px; position: relative; }
   transform: translateY(0);
 }
 
+.row-workspace-link .pill-label-dangerous { display: none; }
+
+body.shift-held .row-workspace-link.closable {
+  color: var(--clr-error);
+  border-color: var(--clr-error);
+}
+
+body.shift-held .row-workspace-link.closable .pill-label { display: none; }
+body.shift-held .row-workspace-link.closable .pill-label-dangerous { display: inline; }
+
 .row-workspace-link {
   display: inline-block;
   max-width: 160px;
