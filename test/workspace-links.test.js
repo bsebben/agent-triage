@@ -144,7 +144,7 @@ describe("renderWorkspacePill", () => {
 
   it("renders a pill labelled 'workspace' with the title as tooltip", () => {
     const html = renderWorkspacePill({ workspaceId: "w1", workspaceTitle: "MP-10: Fix the thing" });
-    assert.match(html, /class="card-link row-workspace-link"/);
+    assert.match(html, /class="card-link row-workspace-link closable"/);
     assert.match(html, /data-workspace-id="w1"/);
     assert.match(html, /title="MP-10: Fix the thing"/);
     assert.match(html, />workspace</);
@@ -155,6 +155,43 @@ describe("renderWorkspacePill", () => {
     const html = renderWorkspacePill({ workspaceId: "w1", workspaceTitle: '<b>"x"</b>' });
     assert.doesNotMatch(html, /<b>/);
     assert.match(html, /title="&lt;b&gt;&quot;x&quot;&lt;\/b&gt;"/);
+  });
+});
+
+describe("workspace pill shift-to-close", () => {
+  const el = (closable) => ({
+    dataset: { workspaceId: "w1" },
+    classList: { contains: (c) => c === "closable" && closable },
+  });
+
+  it("renders a normal and a 'close workspace' label on closable pills", () => {
+    const html = renderWorkspacePill({ workspaceId: "w1", workspaceTitle: "t" });
+    assert.match(html, /row-workspace-link closable/);
+    assert.match(html, /pill-label">workspace</);
+    assert.match(html, /pill-label-dangerous">close workspace</);
+  });
+
+  it("keeps the host workspace pill plain and non-closable", () => {
+    const html = renderWorkspacePill({ workspaceId: "w1", workspaceTitle: "t", isHost: true });
+    assert.doesNotMatch(html, /closable|close workspace/);
+  });
+
+  it("closes the workspace on shift-click", () => {
+    const closed = [];
+    posts.length = 0;
+    sandbox.closeWorkspace = (id) => closed.push(id);
+    focusWorkspaceFromPill({ shiftKey: true, stopPropagation() {} }, el(true));
+    assert.deepEqual(closed, ["w1"]);
+    assert.deepEqual(plain(posts), []);
+  });
+
+  it("only focuses on shift-click for a non-closable pill", () => {
+    const closed = [];
+    posts.length = 0;
+    sandbox.closeWorkspace = (id) => closed.push(id);
+    focusWorkspaceFromPill({ shiftKey: true, stopPropagation() {} }, el(false));
+    assert.deepEqual(closed, []);
+    assert.equal(posts.length, 1);
   });
 });
 

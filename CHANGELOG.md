@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.67.0] - 2026-11-17
+
+### Added
+
+- Holding Shift turns the workspace button on pull request and ticket rows into a red "close workspace" button, so a workspace can be closed in one click without focusing it first.
+
 ## [1.66.2] - 2026-11-09
 
 ### Fixed

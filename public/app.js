@@ -381,6 +381,7 @@ function syncShiftKey(e) {
 }
 document.addEventListener("keydown", syncShiftKey);
 document.addEventListener("keyup", syncShiftKey);
+document.addEventListener("mouseover", syncShiftKey);
 window.addEventListener("blur", () => {
   document.body.classList.remove("shift-held");
 });
