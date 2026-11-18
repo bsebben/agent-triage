@@ -11,6 +11,31 @@ function worktreeFields(worktree) {
   };
 }
 
+// cmux can hold several notifications for one workspace (a "completed" followed by a
+// "waiting", for instance), but the dashboard shows one card per workspace. cmux lists
+// notifications newest-first, which decides the winner when timestamps are missing.
+export function latestNotificationPerWorkspace(notifications) {
+  const byWorkspace = new Map();
+  for (const n of notifications) {
+    const group = byWorkspace.get(n.workspaceId);
+    if (group) group.push(n);
+    else byWorkspace.set(n.workspaceId, [n]);
+  }
+
+  return [...byWorkspace.values()].map((group) => {
+    const newestFirst = group.every((n) => n.createdAt != null)
+      ? [...group].sort((a, b) => b.createdAt - a.createdAt)
+      : group;
+    const latest = newestFirst[0];
+    if (latest.category !== "waiting") return latest;
+
+    // A bare "waiting" notification only says the agent is idle; the reply text lives on
+    // the completion that preceded it.
+    const completion = newestFirst.find((n) => n.category === "completion" && n.body);
+    return completion ? { ...latest, body: completion.body } : latest;
+  });
+}
+
 export async function enrichNotification(notification, workspaces, terminals, resolveWorktreeFn = defaultResolveWorktree) {
   const workspace = workspaces.find((w) => w.id === notification.workspaceId);
   const terminal = terminals?.find((t) => t.workspaceId === notification.workspaceId);
@@ -166,7 +191,9 @@ export class Monitor {
       // (on a cold or expired worktree cache) — resolve all of a poll cycle's
       // items concurrently rather than serializing N round-trips through a
       // sequential await in the loop.
-      const relevantNotifications = notifications.filter((n) => knownWorkspaceIds.has(n.workspaceId));
+      const relevantNotifications = latestNotificationPerWorkspace(
+        notifications.filter((n) => knownWorkspaceIds.has(n.workspaceId))
+      );
       for (const n of relevantNotifications) currentIds.add(n.id);
       const enrichedNotifications = await Promise.all(
         relevantNotifications.map(async (n) => {
