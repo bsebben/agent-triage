@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.67.2] - 2026-11-18
+
+### Changed
+
+- The cmux update pill's download and release links now come from an exact release tag instead of the supported range's maximum, so a hotfix release such as `0.65.2.2` can be recommended while the range stays three-part.
+
 ## [1.67.1] - 2026-11-18
 
 ### Fixed
