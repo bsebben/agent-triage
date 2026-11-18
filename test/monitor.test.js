@@ -1,7 +1,60 @@
 import { describe, it, mock, beforeEach } from "node:test";
 import assert from "node:assert/strict";
-import { enrichNotification, Monitor } from "../src/monitor.js";
+import { enrichNotification, latestNotificationPerWorkspace, Monitor } from "../src/monitor.js";
 import { Queue } from "../src/queue.js";
+
+describe("latestNotificationPerWorkspace", () => {
+  const completion = { id: "N1", workspaceId: "W1", category: "completion", body: "Here is the reply", createdAt: 1000 };
+  const waiting = { id: "N2", workspaceId: "W1", category: "waiting", body: "Claude is waiting for your input", createdAt: 2000 };
+
+  it("passes a lone notification through unchanged", () => {
+    assert.deepEqual(latestNotificationPerWorkspace([completion]), [completion]);
+  });
+
+  it("keeps the newest notification for a workspace", () => {
+    const permission = { id: "N3", workspaceId: "W1", category: "permission", body: "approve?", createdAt: 3000 };
+    const result = latestNotificationPerWorkspace([completion, permission, waiting]);
+    assert.equal(result.length, 1);
+    assert.equal(result[0].id, "N3");
+    assert.equal(result[0].body, "approve?");
+  });
+
+  it("carries the completion's reply text onto a newer waiting notification", () => {
+    const [result] = latestNotificationPerWorkspace([waiting, completion]);
+    assert.equal(result.id, "N2");
+    assert.equal(result.category, "waiting");
+    assert.equal(result.body, "Here is the reply");
+  });
+
+  it("keeps the waiting body when there is no completion to borrow from", () => {
+    const [result] = latestNotificationPerWorkspace([waiting]);
+    assert.equal(result.body, "Claude is waiting for your input");
+  });
+
+  it("does not borrow a body when the newest notification is a completion", () => {
+    const olderWaiting = { ...waiting, createdAt: 500 };
+    const [result] = latestNotificationPerWorkspace([completion, olderWaiting]);
+    assert.equal(result.id, "N1");
+    assert.equal(result.body, "Here is the reply");
+  });
+
+  it("keeps each workspace's own latest notification", () => {
+    const other = { id: "N9", workspaceId: "W2", category: "waiting", body: "idle", createdAt: 10 };
+    const result = latestNotificationPerWorkspace([waiting, completion, other]);
+    assert.deepEqual(result.map((n) => n.id).sort(), ["N2", "N9"]);
+  });
+
+  it("falls back to list order (newest first) when timestamps are missing", () => {
+    const first = { id: "N1", workspaceId: "W1", category: "permission", body: "a", createdAt: null };
+    const second = { id: "N2", workspaceId: "W1", category: "completion", body: "b", createdAt: null };
+    const [result] = latestNotificationPerWorkspace([first, second]);
+    assert.equal(result.id, "N1");
+  });
+
+  it("returns an empty list for no notifications", () => {
+    assert.deepEqual(latestNotificationPerWorkspace([]), []);
+  });
+});
 
 describe("enrichNotification", () => {
   it("adds workspace and terminal info to a notification", async () => {
@@ -495,6 +548,32 @@ describe("Monitor terminal detection", () => {
     assert.equal(queue.items().length, 1, "notification should be the only active entry");
     assert.equal(queue.items()[0].id, "notif-abc");
     assert.equal(queue.dismissedItems().length, 0, "stale dismissed synthetic should be evicted");
+  });
+
+  it("shows one card per workspace when cmux holds a completion and a newer waiting notification", async () => {
+    const state = {
+      notifications: [
+        { id: "notif-waiting", category: "waiting", workspaceId: "W1", surfaceId: "S1", body: "waiting", createdAt: 2000 },
+        { id: "notif-done", category: "completion", workspaceId: "W1", surfaceId: "S1", body: "the reply", createdAt: 1000 },
+      ],
+      workspaces: [{ id: "W1", title: "claude-session", directory: "/home/user/project" }],
+    };
+    const cmuxApi = {
+      listNotifications: async () => state.notifications,
+      listWorkspaces: async () => state.workspaces,
+      listTerminals: async () => [],
+      listAgentWorkspaceIds: async () => new Set(),
+      listBypassWorkspaceIds: async () => new Set(),
+      readScreen: async () => null,
+    };
+    const monitor = new Monitor(queue, { cmuxApi });
+
+    await monitor.poll();
+
+    const items = queue.items();
+    assert.equal(items.length, 1);
+    assert.equal(items[0].id, "notif-waiting");
+    assert.equal(items[0].body, "the reply");
   });
 
   it("excludes and reaps notifications for workspaces outside the hosting window", async () => {

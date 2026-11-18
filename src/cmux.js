@@ -223,16 +223,20 @@ export async function listNotifications() {
 }
 
 export function parseNotifications(raw) {
-  return (raw.notifications || []).map((n) => ({
-    id: n.id,
-    workspaceId: n.workspace_id,
-    surfaceId: n.surface_id,
-    isRead: n.is_read,
-    title: n.title,
-    subtitle: n.subtitle,
-    body: n.body,
-    category: categorizeNotification(n),
-  }));
+  return (raw.notifications || []).map((n) => {
+    const createdAt = Date.parse(n.created_at);
+    return {
+      id: n.id,
+      workspaceId: n.workspace_id,
+      surfaceId: n.surface_id,
+      isRead: n.is_read,
+      title: n.title,
+      subtitle: n.subtitle,
+      body: n.body,
+      category: categorizeNotification(n),
+      createdAt: Number.isNaN(createdAt) ? null : createdAt,
+    };
+  });
 }
 
 export function categorizeNotification(n) {

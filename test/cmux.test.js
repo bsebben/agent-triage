@@ -34,6 +34,23 @@ describe("parseNotifications", () => {
     assert.equal(result[0].isRead, false);
     assert.equal(result[0].subtitle, "Waiting");
   });
+
+  it("parses created_at into epoch milliseconds", () => {
+    const raw = { notifications: [{ id: "A", workspace_id: "WS-1", created_at: "2026-11-18T18:49:49Z" }] };
+    assert.equal(parseNotifications(raw)[0].createdAt, Date.parse("2026-11-18T18:49:49Z"));
+  });
+
+  it("leaves createdAt null when created_at is missing or malformed", () => {
+    const raw = {
+      notifications: [
+        { id: "A", workspace_id: "WS-1" },
+        { id: "B", workspace_id: "WS-1", created_at: "not a date" },
+      ],
+    };
+    const result = parseNotifications(raw);
+    assert.equal(result[0].createdAt, null);
+    assert.equal(result[1].createdAt, null);
+  });
 });
 
 describe("categorizeNotification", () => {

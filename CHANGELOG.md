@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.67.1] - 2026-11-18
+
+### Fixed
+
+- A workspace no longer shows two cards when cmux holds both a "completed" and a newer "waiting" notification for it (as cmux 0.65 does); the card follows the newest notification and keeps the completed reply's text.
+
 ## [1.67.0] - 2026-11-17
 
 ### Added
