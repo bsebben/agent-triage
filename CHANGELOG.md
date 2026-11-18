@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.67.3] - 2026-11-18
+
+### Changed
+
+- Raised the supported cmux version range to 0.65.2 (from 0.64.22), and the update pill now recommends 0.65.2.2. Tested with the dashboard running on cmux 0.65.2; the one regression found there (duplicate cards from paired notifications) was fixed in 1.67.1.
+
 ## [1.67.2] - 2026-11-18
 
 ### Changed

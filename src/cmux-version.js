@@ -3,12 +3,12 @@ import { promisify } from "node:util";
 
 const execFileAsync = promisify(execFile);
 
-export const CMUX_VERSION_RANGE = { min: "0.64.0", max: "0.64.22" };
+export const CMUX_VERSION_RANGE = { min: "0.64.0", max: "0.65.2" };
 
 // Exact release tag (without the "v") the update pill installs. cmux ships hotfixes as a
 // fourth component (0.65.2.2) that still report the three-part version, so this can be
 // newer than range.max while sharing its first three parts.
-export const CMUX_RECOMMENDED_RELEASE = "0.64.22";
+export const CMUX_RECOMMENDED_RELEASE = "0.65.2.2";
 
 const GITHUB_REPO = "manaflow-ai/cmux";
 
