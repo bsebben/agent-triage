@@ -9,7 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
-- Raised the supported cmux version range to 0.65.2 (from 0.64.22), and the update pill now recommends 0.65.2.2. Tested with the dashboard running on cmux 0.65.2; the one regression found there (duplicate cards from paired notifications) was fixed in 1.67.1.
+- Raised the supported cmux version range to 0.65.2.2 (from 0.64.22), and the update pill recommends that release. Tested with the dashboard running on cmux 0.65.2; the one regression found there (duplicate cards from paired notifications) was fixed in 1.67.1.
+- The supported range's max is now the single source for the update pill's download and release links, replacing the separate recommended-release constant from 1.67.2.
+
+### Added
+
+- cmux versions with a fourth component (hotfix releases such as `0.65.2.2`) are parsed and compared correctly; a missing fourth part counts as 0.
 
 ## [1.67.2] - 2026-11-18
 

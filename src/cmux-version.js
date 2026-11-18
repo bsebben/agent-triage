@@ -3,33 +3,32 @@ import { promisify } from "node:util";
 
 const execFileAsync = promisify(execFile);
 
-export const CMUX_VERSION_RANGE = { min: "0.64.0", max: "0.65.2" };
-
-// Exact release tag (without the "v") the update pill installs. cmux ships hotfixes as a
-// fourth component (0.65.2.2) that still report the three-part version, so this can be
-// newer than range.max while sharing its first three parts.
-export const CMUX_RECOMMENDED_RELEASE = "0.65.2.2";
+// max is also the release the update pill installs, so it must be an exact release tag.
+// cmux ships hotfixes as a fourth component (0.65.2.2), which is why versions may have 3 or 4 parts.
+export const CMUX_VERSION_RANGE = { min: "0.64.0", max: "0.65.2.2" };
 
 const GITHUB_REPO = "manaflow-ai/cmux";
 
-export function downloadUrl(release) {
-  return `https://github.com/${GITHUB_REPO}/releases/download/v${release}/cmux-macos.dmg`;
+export function downloadUrl(version) {
+  return `https://github.com/${GITHUB_REPO}/releases/download/v${version}/cmux-macos.dmg`;
 }
 
-export function releaseUrl(release) {
-  return `https://github.com/${GITHUB_REPO}/releases/tag/v${release}`;
+export function releaseUrl(version) {
+  return `https://github.com/${GITHUB_REPO}/releases/tag/v${version}`;
 }
 
 export function parseCmuxVersion(raw) {
   if (!raw) return null;
-  const m = String(raw).match(/^cmux\s+(\d+\.\d+\.\d+)/);
+  const m = String(raw).match(/^cmux\s+(\d+(?:\.\d+){2,3})/);
   return m ? m[1] : null;
 }
 
+// A missing trailing part counts as 0, so 0.65.2 equals 0.65.2.0 and sorts below 0.65.2.2.
 function compareSemver(a, b) {
   const pa = a.split(".").map(Number);
   const pb = b.split(".").map(Number);
-  for (let i = 0; i < 3; i++) {
+  const length = Math.max(pa.length, pb.length);
+  for (let i = 0; i < length; i++) {
     const diff = (pa[i] || 0) - (pb[i] || 0);
     if (diff !== 0) return diff;
   }
@@ -47,8 +46,8 @@ export async function detectCmuxVersion(binaryPath) {
   const range = CMUX_VERSION_RANGE;
   const base = {
     range,
-    downloadUrl: downloadUrl(CMUX_RECOMMENDED_RELEASE),
-    releaseUrl: releaseUrl(CMUX_RECOMMENDED_RELEASE),
+    downloadUrl: downloadUrl(range.max),
+    releaseUrl: releaseUrl(range.max),
   };
 
   let version = null;
