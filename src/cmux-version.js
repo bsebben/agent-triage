@@ -5,14 +5,19 @@ const execFileAsync = promisify(execFile);
 
 export const CMUX_VERSION_RANGE = { min: "0.64.0", max: "0.64.22" };
 
+// Exact release tag (without the "v") the update pill installs. cmux ships hotfixes as a
+// fourth component (0.65.2.2) that still report the three-part version, so this can be
+// newer than range.max while sharing its first three parts.
+export const CMUX_RECOMMENDED_RELEASE = "0.64.22";
+
 const GITHUB_REPO = "manaflow-ai/cmux";
 
-function downloadUrl(version) {
-  return `https://github.com/${GITHUB_REPO}/releases/download/v${version}/cmux-macos.dmg`;
+export function downloadUrl(release) {
+  return `https://github.com/${GITHUB_REPO}/releases/download/v${release}/cmux-macos.dmg`;
 }
 
-function releaseUrl(version) {
-  return `https://github.com/${GITHUB_REPO}/releases/tag/v${version}`;
+export function releaseUrl(release) {
+  return `https://github.com/${GITHUB_REPO}/releases/tag/v${release}`;
 }
 
 export function parseCmuxVersion(raw) {
@@ -42,8 +47,8 @@ export async function detectCmuxVersion(binaryPath) {
   const range = CMUX_VERSION_RANGE;
   const base = {
     range,
-    downloadUrl: downloadUrl(range.max),
-    releaseUrl: releaseUrl(range.max),
+    downloadUrl: downloadUrl(CMUX_RECOMMENDED_RELEASE),
+    releaseUrl: releaseUrl(CMUX_RECOMMENDED_RELEASE),
   };
 
   let version = null;

@@ -1,6 +1,13 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { parseCmuxVersion, inRange } from "../src/cmux-version.js";
+import {
+  parseCmuxVersion,
+  inRange,
+  downloadUrl,
+  releaseUrl,
+  CMUX_RECOMMENDED_RELEASE,
+  CMUX_VERSION_RANGE,
+} from "../src/cmux-version.js";
 
 describe("parseCmuxVersion", () => {
   it("parses standard cmux output", () => {
@@ -71,5 +78,25 @@ describe("inRange", () => {
   it("works when min equals max", () => {
     assert.equal(inRange("0.64.7", { min: "0.64.7", max: "0.64.7" }), true);
     assert.equal(inRange("0.64.6", { min: "0.64.7", max: "0.64.7" }), false);
+  });
+});
+
+describe("release links", () => {
+  it("builds download and release URLs from an exact tag, including a fourth component", () => {
+    assert.equal(
+      downloadUrl("0.65.2.2"),
+      "https://github.com/manaflow-ai/cmux/releases/download/v0.65.2.2/cmux-macos.dmg",
+    );
+    assert.equal(releaseUrl("0.65.2.2"), "https://github.com/manaflow-ai/cmux/releases/tag/v0.65.2.2");
+  });
+
+  it("recommended release shares its first three parts with the range max", () => {
+    const base = CMUX_RECOMMENDED_RELEASE.split(".").slice(0, 3).join(".");
+    assert.equal(base, CMUX_VERSION_RANGE.max);
+  });
+
+  it("recommended release is a valid in-range target", () => {
+    const base = CMUX_RECOMMENDED_RELEASE.split(".").slice(0, 3).join(".");
+    assert.equal(inRange(base, CMUX_VERSION_RANGE), true);
   });
 });
