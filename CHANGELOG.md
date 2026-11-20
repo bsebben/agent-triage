@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.67.7] - 2026-11-20
+
+### Fixed
+
+- A workspace running a Claude session no longer flips to a plain terminal card for a poll or two when cmux briefly drops its `claude_code` tag (as cmux 0.65 does); it stays an agent for 15 seconds after the tag was last seen.
+
 ## [1.67.6] - 2026-11-20
 
 ### Fixed
