@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.67.9] - 2026-11-20
+
+### Changed
+
+- Closing a Claude session that is idle no longer asks "Close it anyway?". The confirm still appears when the session is running, waiting for input, has a background process, or when anything else in the workspace is running. Work an idle session runs inside Claude itself, such as a background agent, can't be detected, so it is closed without asking.
+
 ## [1.67.8] - 2026-11-20
 
 ### Changed
