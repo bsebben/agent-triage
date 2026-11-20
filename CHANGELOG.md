@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.67.4] - 2026-11-20
+
+### Added
+
+- README "Tips for cmux" section: jumping back and forth through cmux's focus history, binding Focus Last, and mapping mouse back/forward buttons to those shortcuts.
+
 ## [1.67.3] - 2026-11-18
 
 ### Changed

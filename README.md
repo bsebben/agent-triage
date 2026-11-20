@@ -103,6 +103,37 @@ To close that gap, enable **Worktree indicator hook** under Settings → Integra
 
 **Best practice:** `cd` is only reliably tracked before a session starts (open the pane there, or `cd` before launching the agent) — treat it as a launch-time decision, not a mid-session one. Once a session is running, use `EnterWorktree`/`ExitWorktree` to switch worktrees, not `cd`. A `cd` run through the agent's shell tool only moves that tool's own subprocess; it doesn't relocate the session's actual working context (file resolution, memory/plans, and worktree registration all stay where they were), so the dashboard correctly ignores it rather than showing a move that didn't really happen. If the goal is working in a different, unrelated directory rather than isolating within the same repo, open a new pane or session there instead of asking a running one to relocate.
 
+## Tips for cmux
+
+Small cmux settings that pair well with the dashboard. These are cmux features, not Agent Triage's — check `cmux version` if one isn't available.
+
+### Jump back to the workspace you just left
+
+The dashboard is great for jumping *to* an agent; cmux's focus history gets you back.
+
+- **Cmd+[** and **Cmd+]** move back and forward through recently focused workspaces, like a browser's back and forward buttons. Inside a cmux browser pane the same keys drive that page's history instead.
+- **Focus Last** (`focusHistoryLast`, cmux 0.65.0+) toggles between the current workspace and the one before it, which is what you want when flipping between two agents. It has no default shortcut. Bind one in `~/.config/cmux/cmux.json`:
+
+  ```json
+  {
+    "shortcuts": {
+      "bindings": {
+        "focusHistoryLast": "cmd+;"
+      }
+    }
+  }
+  ```
+
+- History covers workspaces only by default. Set `app.focusHistoryIncludesPanesAndTabs` to `true` to include panes and tabs.
+
+After editing, run `cmux config validate` to check the file and `cmux reload-config` to apply it without restarting cmux.
+
+### Back and forward with your mouse buttons
+
+cmux shortcuts are keyboard-only, so there's no native mouse binding. Any tool that maps mouse buttons to keystrokes can supply one: map your mouse's back button to **Cmd+[** and forward to **Cmd+]** (or to your Focus Last shortcut), limited to cmux if the tool supports per-app rules. [Karabiner-Elements](https://karabiner-elements.pqrs.org/), BetterMouse, and most mice's own software can do this.
+
+This only works while cmux is the frontmost app. The dashboard is a browser page, where those buttons already mean back and forward, so they keep that meaning there.
+
 ## Configuration
 
 Open the Settings panel in the dashboard to customize config, view live server logs, manage plugin settings, and enable/disable integrations — no file editing required.
