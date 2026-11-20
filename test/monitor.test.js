@@ -253,19 +253,79 @@ describe("Monitor terminal detection", () => {
     assert.equal(items[0].category, "running");
   });
 
-  it("reverts to terminal when claude_code tag disappears", async () => {
-    const agentIds = new Set(["W1"]);
-    const cmuxApi = makeCmux({
-      workspaces: [{ id: "W1", title: "claude-session", directory: "/home/user/project" }],
-      agentWorkspaceIds: agentIds,
-    });
-    const monitor = new Monitor(queue, { cmuxApi });
-    await monitor.poll();
-    assert.equal(queue.items()[0].category, "running");
+  describe("agent grace period", () => {
+    const workspaces = [{ id: "W1", title: "claude-session", directory: "/home/user/project" }];
 
-    agentIds.clear();
-    await monitor.poll();
-    assert.equal(queue.items()[0].category, "terminal");
+    function setup() {
+      const agentIds = new Set(["W1"]);
+      const clock = { t: 1_000_000 };
+      const monitor = new Monitor(queue, {
+        cmuxApi: makeCmux({ workspaces, agentWorkspaceIds: agentIds }),
+        agentGraceMs: 15000,
+        nowFn: () => clock.t,
+      });
+      return { agentIds, clock, monitor };
+    }
+
+    it("stays an agent through a brief gap in the claude_code tag", async () => {
+      const { agentIds, clock, monitor } = setup();
+      await monitor.poll();
+      assert.equal(queue.items()[0].category, "running");
+
+      agentIds.clear();
+      clock.t += 6000;
+      await monitor.poll();
+      assert.equal(queue.items()[0].category, "running");
+    });
+
+    it("reverts to terminal once the tag has been gone longer than the grace period", async () => {
+      const { agentIds, clock, monitor } = setup();
+      await monitor.poll();
+
+      agentIds.clear();
+      clock.t += 16000;
+      await monitor.poll();
+      assert.equal(queue.items()[0].category, "terminal");
+    });
+
+    it("measures the grace from the last time the tag was seen, not from the first miss", async () => {
+      const { agentIds, clock, monitor } = setup();
+      await monitor.poll();
+
+      agentIds.clear();
+      clock.t += 10000;
+      await monitor.poll();
+      assert.equal(queue.items()[0].category, "running");
+
+      clock.t += 6000;
+      await monitor.poll();
+      assert.equal(queue.items()[0].category, "terminal");
+    });
+
+    it("renews the grace each time the tag comes back", async () => {
+      const { agentIds, clock, monitor } = setup();
+      await monitor.poll();
+
+      agentIds.clear();
+      clock.t += 10000;
+      await monitor.poll();
+
+      agentIds.add("W1");
+      clock.t += 1000;
+      await monitor.poll();
+
+      agentIds.clear();
+      clock.t += 14000;
+      await monitor.poll();
+      assert.equal(queue.items()[0].category, "running");
+    });
+
+    it("never treats a workspace as an agent that was not seen as one", async () => {
+      const { agentIds, monitor } = setup();
+      agentIds.clear();
+      await monitor.poll();
+      assert.equal(queue.items()[0].category, "terminal");
+    });
   });
 
   it("distinguishes terminal and agent workspaces in same poll", async () => {

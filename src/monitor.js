@@ -59,7 +59,9 @@ export class Monitor {
   #interval = null;
   #onUpdate = null;
   #pollIntervalMs;
-  #knownAgentWorkspaces = new Set();
+  #agentLastSeen = new Map();
+  #agentGraceMs;
+  #now;
   #cmux;
   #resolveWorktree;
   #subscribeWorkspaceEvents;
@@ -78,7 +80,11 @@ export class Monitor {
     resolveWorktreeFn = null,
     subscribeWorkspaceEventsFn = null,
     immediatePollDebounceMs = 150,
+    agentGraceMs = 15000,
+    nowFn = Date.now,
   } = {}) {
+    this.#agentGraceMs = agentGraceMs;
+    this.#now = nowFn;
     this.#queue = queue;
     this.#pollIntervalMs = pollIntervalMs;
     this.#onUpdate = onUpdate;
@@ -167,9 +173,14 @@ export class Monitor {
       ]);
       this.#windowCount = windowCount;
 
-      for (const id of agentWsIds) this.#knownAgentWorkspaces.add(id);
-      for (const id of this.#knownAgentWorkspaces) {
-        if (!agentWsIds.has(id)) this.#knownAgentWorkspaces.delete(id);
+      // cmux adds and removes the claude_code tag while a session is alive, so a workspace stays
+      // an agent for a grace period after its signal drops. Otherwise its card flips to
+      // "terminal" for a poll or two. The same grace covers a failed system.top read, which
+      // comes back as an empty set.
+      const now = this.#now();
+      for (const id of agentWsIds) this.#agentLastSeen.set(id, now);
+      for (const [id, seenAt] of this.#agentLastSeen) {
+        if (!agentWsIds.has(id) && now - seenAt > this.#agentGraceMs) this.#agentLastSeen.delete(id);
       }
 
       // Computed once per poll and reused everywhere a "is this the host"
@@ -209,7 +220,7 @@ export class Monitor {
       for (const ws of syntheticWorkspaces) currentIds.add(`synthetic-${ws.id}`);
       const syntheticItems = await Promise.all(
         syntheticWorkspaces.map(async (ws) => {
-          const category = this.#knownAgentWorkspaces.has(ws.id) ? "running" : "terminal";
+          const category = this.#agentLastSeen.has(ws.id) ? "running" : "terminal";
           const terminal = terminals?.find((t) => t.workspaceId === ws.id);
           const directory = terminal?.directory || ws.directory || null;
           const worktree = await this.#resolveWorktree(directory);
