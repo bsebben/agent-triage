@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.67.8] - 2026-11-20
+
+### Changed
+
+- README "Tips for cmux": notes the cmux version each focus-history tip needs, uses `cmux config doctor` (available across the supported range), and warns that remapping tools such as Karabiner-Elements ignore a mouse until it is enabled for that device.
+
 ## [1.67.7] - 2026-11-20
 
 ### Fixed
