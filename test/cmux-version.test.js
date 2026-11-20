@@ -115,6 +115,19 @@ describe("four-part versions", () => {
   });
 });
 
+describe("shipped range", () => {
+  it("excludes releases before batch reorder-workspaces and reorder events", () => {
+    assert.equal(inRange("0.64.9", CMUX_VERSION_RANGE), false);
+    assert.equal(inRange("0.64.0", CMUX_VERSION_RANGE), false);
+  });
+
+  it("includes the first release with them, and the releases after it", () => {
+    assert.equal(inRange("0.64.10", CMUX_VERSION_RANGE), true);
+    assert.equal(inRange("0.64.22", CMUX_VERSION_RANGE), true);
+    assert.equal(inRange("0.65.2", CMUX_VERSION_RANGE), true);
+  });
+});
+
 describe("release links", () => {
   it("builds download and release URLs from an exact tag, including a fourth component", () => {
     assert.equal(
