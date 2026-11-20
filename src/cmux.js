@@ -463,6 +463,46 @@ export function isRunningProcessRefusal(err) {
   return /running process/i.test(err?.message || "");
 }
 
+// A process the agent spawned (a shell, a dev server) is attributed "child-process"; MCP servers
+// and cmux helpers are "cmux-environment". An exited-but-unreaped child has no threads left, so
+// it can't lose work. Any node without the expected tree shape counts as busy.
+function hasLiveChildProcess(proc) {
+  if (!proc || typeof proc !== "object") return true;
+  if (proc.attribution_reason === "child-process" && proc.thread_count !== 0) return true;
+  if (proc.children === undefined) return false;
+  if (!Array.isArray(proc.children)) return true;
+  return proc.children.some(hasLiveChildProcess);
+}
+
+/**
+ * Whether a `system.top` workspace entry (read with `include_processes`) is a Claude session
+ * that is safe to close without asking: its `claude_code` tag is exactly `Idle`, nothing it
+ * spawned is still running, and every foreground process group in the workspace is the agent's
+ * own (so another pane isn't running something either). Anything unexpected returns false.
+ */
+export function workspaceIsIdleAgent(ws) {
+  if (!ws || !Array.isArray(ws.tags) || !Array.isArray(ws.foreground_pgids)) return false;
+  const tag = ws.tags.find((t) => t?.key === "claude_code");
+  if (tag?.value !== "Idle" || !Array.isArray(tag.processes) || tag.processes.length === 0) return false;
+  if (tag.processes.some(hasLiveChildProcess)) return false;
+  const agentPgids = new Set(tag.processes.map((p) => p.pgid).filter((pgid) => pgid != null));
+  if (ws.foreground_pgids.length === 0) return false;
+  return ws.foreground_pgids.every((pgid) => agentPgids.has(pgid));
+}
+
+export async function isIdleAgentWorkspace(workspaceId) {
+  if (!workspaceId) return false;
+  try {
+    const raw = await rpc("system.top", { workspace_id: workspaceId, include_processes: true });
+    for (const win of raw?.windows || []) {
+      for (const ws of win.workspaces || []) {
+        if (ws.id === workspaceId) return workspaceIsIdleAgent(ws);
+      }
+    }
+  } catch {}
+  return false;
+}
+
 export async function closeWorkspace(workspaceId, { force = false } = {}) {
   await socketRpc("workspace.close", workspaceCloseParams(workspaceId, force));
 }

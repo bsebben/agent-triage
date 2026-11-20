@@ -417,10 +417,13 @@ const server = createServer(async (req, res) => {
       try {
         await cmux.closeWorkspace(workspaceId, { force: force === true });
       } catch (err) {
-        if (cmux.isRunningProcessRefusal(err)) {
+        if (!cmux.isRunningProcessRefusal(err)) throw err;
+        // cmux counts any Claude session as a running process, so an idle one with nothing
+        // else running closes without the confirm.
+        if (!(await cmux.isIdleAgentWorkspace(workspaceId))) {
           return jsonResponse(res, { error: err.message, code: "running_process" }, 409);
         }
-        throw err;
+        await cmux.closeWorkspace(workspaceId, { force: true });
       }
       return jsonResponse(res, { ok: true });
     }

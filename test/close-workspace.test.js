@@ -2,7 +2,7 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { createContext, runInContext } from "node:vm";
-import { workspaceCloseParams, isRunningProcessRefusal } from "../src/cmux.js";
+import { workspaceCloseParams, isRunningProcessRefusal, workspaceIsIdleAgent } from "../src/cmux.js";
 
 describe("workspaceCloseParams", () => {
   it("sends only the workspace id for a plain close", () => {
@@ -29,6 +29,68 @@ describe("isRunningProcessRefusal", () => {
   it("tolerates a missing error or message", () => {
     assert.equal(isRunningProcessRefusal(undefined), false);
     assert.equal(isRunningProcessRefusal({}), false);
+  });
+});
+
+// Shaped like a system.top workspace entry read with include_processes.
+function agentWorkspace({ value = "Idle", children, foreground = [100] } = {}) {
+  const proc = (pid, name, reason, extra = {}) => ({ pid, pgid: pid, name, attribution_reason: reason, thread_count: 2, children: [], ...extra });
+  return {
+    id: "W1",
+    foreground_pgids: foreground,
+    tags: [
+      { key: "program_status", value: "claude-code · Done", processes: [] },
+      {
+        key: "claude_code",
+        value,
+        processes: [
+          proc(100, "claude", "cmux-environment", {
+            children: children ?? [proc(101, "node", "cmux-environment", { children: [proc(102, "node", "cmux-environment")] }), proc(103, "cmux", "cmux-environment")],
+          }),
+        ],
+      },
+    ],
+  };
+}
+
+describe("workspaceIsIdleAgent", () => {
+  it("is true for an idle session with only cmux-environment helpers", () => {
+    assert.equal(workspaceIsIdleAgent(agentWorkspace()), true);
+  });
+
+  it("is false while the session is running or waiting for input", () => {
+    assert.equal(workspaceIsIdleAgent(agentWorkspace({ value: "Running" })), false);
+    assert.equal(workspaceIsIdleAgent(agentWorkspace({ value: "Needs input" })), false);
+  });
+
+  it("is false when the session has a child process still running", () => {
+    const children = [{ pid: 200, pgid: 200, name: "bash", attribution_reason: "cmux-environment", thread_count: 1, children: [{ pid: 201, pgid: 200, name: "sleep", attribution_reason: "child-process", thread_count: 1, children: [] }] }];
+    assert.equal(workspaceIsIdleAgent(agentWorkspace({ children })), false);
+  });
+
+  it("ignores a child that has already exited but not been reaped", () => {
+    const children = [{ pid: 200, pgid: 200, name: "cmux", path: null, attribution_reason: "child-process", thread_count: 0, children: [] }];
+    assert.equal(workspaceIsIdleAgent(agentWorkspace({ children })), true);
+  });
+
+  it("is false when another process group is in the foreground", () => {
+    assert.equal(workspaceIsIdleAgent(agentWorkspace({ foreground: [100, 300] })), false);
+    assert.equal(workspaceIsIdleAgent(agentWorkspace({ foreground: [] })), false);
+  });
+
+  it("is false without a claude_code tag", () => {
+    const ws = agentWorkspace();
+    ws.tags = ws.tags.filter((t) => t.key !== "claude_code");
+    assert.equal(workspaceIsIdleAgent(ws), false);
+  });
+
+  it("is false for malformed input", () => {
+    assert.equal(workspaceIsIdleAgent(undefined), false);
+    assert.equal(workspaceIsIdleAgent({}), false);
+    assert.equal(workspaceIsIdleAgent({ tags: "nope", foreground_pgids: [100] }), false);
+    assert.equal(workspaceIsIdleAgent({ tags: [{ key: "claude_code", value: "Idle" }], foreground_pgids: [100] }), false);
+    assert.equal(workspaceIsIdleAgent(agentWorkspace({ children: 2 })), false);
+    assert.equal(workspaceIsIdleAgent(agentWorkspace({ children: [null] })), false);
   });
 });
 
