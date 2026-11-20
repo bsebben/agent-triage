@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.67.5] - 2026-11-20
+
+### Changed
+
+- Raised the minimum supported cmux version to 0.64.10, the first release with batch `reorder-workspaces --order` and `workspace.reordered` events that tab-order sync relies on; older installs now see the "too old" update pill.
+
 ## [1.67.4] - 2026-11-20
 
 ### Added

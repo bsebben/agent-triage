@@ -5,7 +5,9 @@ const execFileAsync = promisify(execFile);
 
 // max is also the release the update pill installs, so it must be an exact release tag.
 // cmux ships hotfixes as a fourth component (0.65.2.2), which is why versions may have 3 or 4 parts.
-export const CMUX_VERSION_RANGE = { min: "0.64.0", max: "0.65.2.2" };
+// min is the first release with batch `reorder-workspaces --order` and `workspace.reordered` events,
+// which tab-order sync depends on.
+export const CMUX_VERSION_RANGE = { min: "0.64.10", max: "0.65.2.2" };
 
 const GITHUB_REPO = "manaflow-ai/cmux";
 
