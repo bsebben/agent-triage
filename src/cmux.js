@@ -452,8 +452,19 @@ export async function reorderWorkspaces(windowId, orderedWorkspaceIds) {
   await runCli(["reorder-workspaces", "--window", windowId, "--order", orderedWorkspaceIds.join(",")]);
 }
 
-export async function closeWorkspace(workspaceId) {
-  await socketRpc("workspace.close", { workspace_id: workspaceId });
+// `force` is only sent when asked for: a cmux that doesn't refuse closes never needs it, and
+// older builds shouldn't be handed a parameter they have no use for.
+export function workspaceCloseParams(workspaceId, force = false) {
+  return force ? { workspace_id: workspaceId, force: true } : { workspace_id: workspaceId };
+}
+
+// cmux refuses to close a workspace that has a running process unless the close is forced.
+export function isRunningProcessRefusal(err) {
+  return /running process/i.test(err?.message || "");
+}
+
+export async function closeWorkspace(workspaceId, { force = false } = {}) {
+  await socketRpc("workspace.close", workspaceCloseParams(workspaceId, force));
 }
 
 // The single rename path for every caller (card edit, dispatch, session refresh). The
