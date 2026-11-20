@@ -5,7 +5,6 @@ import {
   inRange,
   downloadUrl,
   releaseUrl,
-  CMUX_RECOMMENDED_RELEASE,
   CMUX_VERSION_RANGE,
 } from "../src/cmux-version.js";
 
@@ -81,6 +80,41 @@ describe("inRange", () => {
   });
 });
 
+describe("four-part versions", () => {
+  const range = { min: "0.64.0", max: "0.65.2.2" };
+
+  it("parses a fourth component", () => {
+    assert.equal(parseCmuxVersion("cmux 0.65.2.2 (114) [abc]"), "0.65.2.2");
+  });
+
+  it("still parses three-part output followed by a build number", () => {
+    assert.equal(parseCmuxVersion("cmux 0.65.2 (113) [abc]"), "0.65.2");
+  });
+
+  it("treats a three-part version as the hotfix-less release, below its hotfixes", () => {
+    assert.equal(inRange("0.65.2", range), true);
+    assert.equal(inRange("0.65.2.1", range), true);
+    assert.equal(inRange("0.65.2.2", range), true);
+  });
+
+  it("rejects versions above a four-part max", () => {
+    assert.equal(inRange("0.65.2.3", range), false);
+    assert.equal(inRange("0.65.3", range), false);
+  });
+
+  it("rejects a four-part version below a three-part min", () => {
+    assert.equal(inRange("0.63.9.9", range), false);
+  });
+
+  it("rejects a hotfix above a three-part max", () => {
+    assert.equal(inRange("0.65.2.1", { min: "0.64.0", max: "0.65.2" }), false);
+  });
+
+  it("keeps the shipped range's max as a valid in-range version", () => {
+    assert.equal(inRange(CMUX_VERSION_RANGE.max, CMUX_VERSION_RANGE), true);
+  });
+});
+
 describe("release links", () => {
   it("builds download and release URLs from an exact tag, including a fourth component", () => {
     assert.equal(
@@ -88,15 +122,5 @@ describe("release links", () => {
       "https://github.com/manaflow-ai/cmux/releases/download/v0.65.2.2/cmux-macos.dmg",
     );
     assert.equal(releaseUrl("0.65.2.2"), "https://github.com/manaflow-ai/cmux/releases/tag/v0.65.2.2");
-  });
-
-  it("recommended release shares its first three parts with the range max", () => {
-    const base = CMUX_RECOMMENDED_RELEASE.split(".").slice(0, 3).join(".");
-    assert.equal(base, CMUX_VERSION_RANGE.max);
-  });
-
-  it("recommended release is a valid in-range target", () => {
-    const base = CMUX_RECOMMENDED_RELEASE.split(".").slice(0, 3).join(".");
-    assert.equal(inRange(base, CMUX_VERSION_RANGE), true);
   });
 });
