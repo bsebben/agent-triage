@@ -406,7 +406,7 @@ const server = createServer(async (req, res) => {
     }
 
     if (req.url === "/api/close" && req.method === "POST") {
-      const { workspaceId } = await readBody(req);
+      const { workspaceId, force } = await readBody(req);
       // The UI hides the close button on the host's own card, but that's
       // just a rendering choice — nothing stops a stale page or a direct
       // request from reaching this endpoint with the host's id, and closing
@@ -414,7 +414,14 @@ const server = createServer(async (req, res) => {
       if (workspaceId && workspaceId === monitor.hostWorkspaceId) {
         return jsonResponse(res, { error: "Cannot close the dashboard's own host workspace" }, 400);
       }
-      await cmux.closeWorkspace(workspaceId);
+      try {
+        await cmux.closeWorkspace(workspaceId, { force: force === true });
+      } catch (err) {
+        if (cmux.isRunningProcessRefusal(err)) {
+          return jsonResponse(res, { error: err.message, code: "running_process" }, 409);
+        }
+        throw err;
+      }
       return jsonResponse(res, { ok: true });
     }
 

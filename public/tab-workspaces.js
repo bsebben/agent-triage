@@ -208,11 +208,31 @@ function renderCard(item, { isDismissed = false } = {}) {
   </div>`;
 }
 
-async function closeWorkspace(workspaceId) {
+// The card is only hidden once cmux has actually closed the workspace. Hiding it first made a
+// refused close look successful, then the card came back on the next poll.
+async function closeWorkspace(workspaceId, { force = false } = {}) {
+  let res;
+  try {
+    res = await apiPost("close", force ? { workspaceId, force: true } : { workspaceId });
+  } catch {
+    showToast("Couldn't close the workspace: the dashboard server didn't respond", 5000);
+    return;
+  }
+
+  if (res.code === "running_process") {
+    if (confirm("This workspace has a running process.\n\nClose it anyway? Anything running in it will be stopped.")) {
+      await closeWorkspace(workspaceId, { force: true });
+    }
+    return;
+  }
+  if (res.error) {
+    showToast(`Couldn't close the workspace: ${res.error}`, 5000);
+    return;
+  }
+
   recentCloses.set(workspaceId, Date.now() + 15000);
   applyCloses();
   render();
-  await apiPost("close", { workspaceId });
 }
 
 async function focusAgent(workspaceId) {

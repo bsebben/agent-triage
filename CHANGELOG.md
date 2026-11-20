@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.67.6] - 2026-11-20
+
+### Fixed
+
+- Closing a workspace that has a running process (which cmux 0.65 refuses to close) no longer hides the card and then brings it back: the card stays until cmux has actually closed it, you're asked to confirm closing anyway, and any other failure shows an error instead of failing silently.
+
 ## [1.67.5] - 2026-11-20
 
 ### Changed
