@@ -1,7 +1,11 @@
 import { describe, it, mock, beforeEach } from "node:test";
 import assert from "node:assert/strict";
-import { enrichNotification, latestNotificationPerWorkspace, Monitor } from "../src/monitor.js";
+import { categoryForAgent, enrichNotification, latestNotificationPerWorkspace, Monitor } from "../src/monitor.js";
 import { Queue } from "../src/queue.js";
+
+// A bare set of workspace ids is an agent whose live state cmux doesn't report.
+const toAgentStates = (agents) =>
+  agents instanceof Map ? agents : new Map([...agents].map((id) => [id, { state: null }]));
 
 describe("latestNotificationPerWorkspace", () => {
   const completion = { id: "N1", workspaceId: "W1", category: "completion", body: "Here is the reply", createdAt: 1000 };
@@ -114,7 +118,7 @@ describe("Monitor terminal detection", () => {
       listNotifications: async () => notifications,
       listWorkspaces: async () => workspaces,
       listTerminals: async () => terminals,
-      listAgentWorkspaceIds: async () => agentWorkspaceIds,
+      listAgentStates: async () => toAgentStates(agentWorkspaceIds),
       listBypassWorkspaceIds: async () => bypassWorkspaceIds,
       readScreen: async () => null,
       reorderWorkspaces,
@@ -358,7 +362,7 @@ describe("Monitor terminal detection", () => {
       listNotifications: async () => state.notifications,
       listWorkspaces: async () => state.workspaces,
       listTerminals: async () => [],
-      listAgentWorkspaceIds: async () => new Set(),
+      listAgentStates: async () => toAgentStates(new Set(["W1"])),
       listBypassWorkspaceIds: async () => new Set(),
       readScreen: async () => null,
     };
@@ -389,7 +393,7 @@ describe("Monitor terminal detection", () => {
       listNotifications: async () => state.notifications,
       listWorkspaces: async () => state.workspaces,
       listTerminals: async () => [],
-      listAgentWorkspaceIds: async () => state.agentWorkspaceIds,
+      listAgentStates: async () => toAgentStates(state.agentWorkspaceIds),
       listBypassWorkspaceIds: async () => new Set(),
       readScreen: async () => null,
     };
@@ -416,7 +420,7 @@ describe("Monitor terminal detection", () => {
       listNotifications: async () => state.notifications,
       listWorkspaces: async () => state.workspaces,
       listTerminals: async () => [],
-      listAgentWorkspaceIds: async () => state.agentWorkspaceIds,
+      listAgentStates: async () => toAgentStates(state.agentWorkspaceIds),
       listBypassWorkspaceIds: async () => new Set(),
       readScreen: async () => null,
     };
@@ -486,7 +490,7 @@ describe("Monitor terminal detection", () => {
       listNotifications: async () => [],
       listWorkspaces: async () => [{ id: "W1", title: "claude-session", directory: "/home/user/project" }],
       listTerminals: async () => [],
-      listAgentWorkspaceIds: async () => new Set(["W1"]),
+      listAgentStates: async () => toAgentStates(new Set(["W1"])),
       listBypassWorkspaceIds: async () => state.bypassWorkspaceIds,
       readScreen: async () => null,
     };
@@ -509,7 +513,7 @@ describe("Monitor terminal detection", () => {
       listNotifications: async () => [],
       listWorkspaces: async () => state.workspaces,
       listTerminals: async () => [],
-      listAgentWorkspaceIds: async () => state.agentWorkspaceIds,
+      listAgentStates: async () => toAgentStates(state.agentWorkspaceIds),
       listBypassWorkspaceIds: async () => new Set(),
       readScreen: async () => null,
     };
@@ -589,7 +593,7 @@ describe("Monitor terminal detection", () => {
       listNotifications: async () => state.notifications,
       listWorkspaces: async () => state.workspaces,
       listTerminals: async () => [],
-      listAgentWorkspaceIds: async () => state.agentWorkspaceIds,
+      listAgentStates: async () => toAgentStates(state.agentWorkspaceIds),
       listBypassWorkspaceIds: async () => new Set(),
       readScreen: async () => null,
     };
@@ -622,7 +626,7 @@ describe("Monitor terminal detection", () => {
       listNotifications: async () => state.notifications,
       listWorkspaces: async () => state.workspaces,
       listTerminals: async () => [],
-      listAgentWorkspaceIds: async () => new Set(),
+      listAgentStates: async () => toAgentStates(new Set(["W1"])),
       listBypassWorkspaceIds: async () => new Set(),
       readScreen: async () => null,
     };
@@ -652,7 +656,7 @@ describe("Monitor terminal detection", () => {
       listNotifications: async () => state.notifications,
       listWorkspaces: async () => state.workspaces,
       listTerminals: async () => [],
-      listAgentWorkspaceIds: async () => new Set(),
+      listAgentStates: async () => toAgentStates(new Set(["W1"])),
       listBypassWorkspaceIds: async () => new Set(),
       readScreen: async () => null,
     };
@@ -703,7 +707,7 @@ describe("Monitor tab order sync", () => {
       listNotifications: async () => notifications,
       listWorkspaces: async () => state.map((w) => ({ ...w })),
       listTerminals: async () => terminals,
-      listAgentWorkspaceIds: async () => agentWorkspaceIds,
+      listAgentStates: async () => toAgentStates(agentWorkspaceIds),
       listBypassWorkspaceIds: async () => bypassWorkspaceIds,
       readScreen: async () => null,
       reorderWorkspaces: async (windowId, order) => {
@@ -969,7 +973,7 @@ describe("Monitor tab order sync", () => {
         { id: "W2", windowId: "WIN1", title: "a-project", directory: "/home/user/a" },
       ],
       listTerminals: async () => [],
-      listAgentWorkspaceIds: async () => new Set(["W1", "W2"]),
+      listAgentStates: async () => toAgentStates(new Set(["W1", "W2"])),
       listBypassWorkspaceIds: async () => new Set(),
       readScreen: async () => null,
       reorderWorkspaces: async (windowId, order) => calls.push({ windowId, order }),
@@ -1008,7 +1012,7 @@ describe("Monitor reentrancy and dependency injection", () => {
         return [];
       },
       listTerminals: async () => [],
-      listAgentWorkspaceIds: async () => new Set(),
+      listAgentStates: async () => toAgentStates(new Set()),
       listBypassWorkspaceIds: async () => new Set(),
       readScreen: async () => null,
     };
@@ -1031,7 +1035,7 @@ describe("Monitor reentrancy and dependency injection", () => {
       listNotifications: async () => [],
       listWorkspaces: async () => [],
       listTerminals: async () => [],
-      listAgentWorkspaceIds: async () => new Set(),
+      listAgentStates: async () => toAgentStates(new Set()),
       listBypassWorkspaceIds: async () => new Set(),
       readScreen: async () => null,
       subscribeWorkspaceEvents: () => {
@@ -1048,5 +1052,118 @@ describe("Monitor reentrancy and dependency injection", () => {
 
     assert.equal(subscribed, true);
     monitor.stop();
+  });
+});
+
+describe("categoryForAgent", () => {
+  it("uses the live state when cmux reports one", () => {
+    for (const state of ["permission", "running", "idle"]) {
+      assert.equal(categoryForAgent(state, { category: "completion" }), state);
+    }
+  });
+
+  it("maps the newest notification when there is no live state", () => {
+    assert.equal(categoryForAgent(null, { category: "permission" }), "permission");
+    assert.equal(categoryForAgent(null, { category: "waiting" }), "idle");
+    assert.equal(categoryForAgent(null, { category: "completion" }), "idle");
+  });
+
+  it("assumes running with neither a live state nor a usable notification", () => {
+    assert.equal(categoryForAgent(null, undefined), "running");
+    assert.equal(categoryForAgent(null, { category: "unknown" }), "running");
+  });
+});
+
+describe("Monitor live-state statuses", () => {
+  const workspaces = [{ id: "W1", title: "claude-session", directory: "/home/user/project" }];
+  const completion = { id: "N-done", category: "completion", workspaceId: "W1", surfaceId: "S1", body: "the reply", createdAt: 1000 };
+  const idlePing = { id: "N-idle", category: "waiting", workspaceId: "W1", surfaceId: "S1", body: "Claude is waiting for your input", createdAt: 2000 };
+
+  async function pollOnce({ notifications = [], agents }) {
+    const queue = new Queue();
+    const cmuxApi = {
+      listNotifications: async () => notifications,
+      listWorkspaces: async () => workspaces,
+      listTerminals: async () => [],
+      listAgentStates: async () => toAgentStates(agents),
+      listBypassWorkspaceIds: async () => new Set(),
+      readScreen: async () => null,
+    };
+    await new Monitor(queue, { cmuxApi, resolveWorktreeFn: async () => ({ isWorktree: false }) }).poll();
+    return queue;
+  }
+
+  it("shows an idle card, not waiting, when the idle ping follows a completion", async () => {
+    const queue = await pollOnce({
+      notifications: [idlePing, completion],
+      agents: new Map([["W1", { state: "idle" }]]),
+    });
+    const [item] = queue.items();
+    assert.equal(item.category, "idle");
+    assert.equal(item.body, "the reply");
+  });
+
+  it("lets a running agent override a stale notification and drops its old reply", async () => {
+    const queue = await pollOnce({
+      notifications: [idlePing, completion],
+      agents: new Map([["W1", { state: "running" }]]),
+    });
+    const [item] = queue.items();
+    assert.equal(item.category, "running");
+    assert.equal(item.body, "");
+  });
+
+  it("lets live permission state override a notification that says completed", async () => {
+    const queue = await pollOnce({
+      notifications: [completion],
+      agents: new Map([["W1", { state: "permission" }]]),
+    });
+    assert.equal(queue.items()[0].category, "permission");
+  });
+
+  it("shows a terminal card for a workspace whose agent has exited, whatever its notifications say", async () => {
+    const queue = await pollOnce({ notifications: [idlePing, completion], agents: new Map() });
+    const items = queue.items();
+    assert.equal(items.length, 1);
+    assert.equal(items[0].category, "terminal");
+    assert.equal(items[0].body, "");
+  });
+
+  it("derives the state of a notification-less agent from its live state", async () => {
+    const idle = await pollOnce({ agents: new Map([["W1", { state: "idle" }]]) });
+    assert.equal(idle.items()[0].category, "idle");
+    const asking = await pollOnce({ agents: new Map([["W1", { state: "permission" }]]) });
+    assert.equal(asking.items()[0].category, "permission");
+  });
+
+  it("falls back to the notification when the agent is known only by its title glyph", async () => {
+    const queue = await pollOnce({
+      notifications: [idlePing, completion],
+      agents: new Map([["W1", { state: null }]]),
+    });
+    assert.equal(queue.items()[0].category, "idle");
+  });
+
+  it("resurfaces a dismissed running card once the agent goes idle", async () => {
+    const queue = new Queue();
+    const state = { agents: new Map([["W1", { state: "running" }]]) };
+    const cmuxApi = {
+      listNotifications: async () => [],
+      listWorkspaces: async () => workspaces,
+      listTerminals: async () => [],
+      listAgentStates: async () => state.agents,
+      listBypassWorkspaceIds: async () => new Set(),
+      readScreen: async () => null,
+    };
+    const monitor = new Monitor(queue, { cmuxApi, resolveWorktreeFn: async () => ({ isWorktree: false }) });
+
+    await monitor.poll();
+    queue.dismiss("synthetic-W1");
+    state.agents = new Map([["W1", { state: "idle" }]]);
+    await monitor.poll();
+
+    assert.equal(queue.items().length, 1);
+    assert.equal(queue.items()[0].category, "idle");
+    assert.equal(queue.dismissedItems().length, 0);
   });
 });

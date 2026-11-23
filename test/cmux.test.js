@@ -1,6 +1,48 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { parseNotifications, categorizeNotification, AGENT_TITLE_PREFIX, findWindowIdForWorkspace } from "../src/cmux.js";
+import { parseNotifications, categorizeNotification, agentStateFromTags, AGENT_TITLE_PREFIX, findWindowIdForWorkspace } from "../src/cmux.js";
+
+describe("agentStateFromTags", () => {
+  const tags = (values) => Object.entries(values).map(([key, value]) => ({ key, value }));
+
+  it("reads Idle as the user's turn", () => {
+    assert.equal(agentStateFromTags(tags({ claude_code: "Idle" })), "idle");
+  });
+
+  it("reads Running, Running subagents and Waiting as the agent's turn", () => {
+    for (const value of ["Running", "Running subagents", "Waiting"]) {
+      assert.equal(agentStateFromTags(tags({ claude_code: value })), "running", value);
+    }
+  });
+
+  it("reads Needs input on either tag as a permission request", () => {
+    assert.equal(agentStateFromTags(tags({ claude_code: "Needs input" })), "permission");
+    assert.equal(
+      agentStateFromTags(tags({ claude_code: "Running", "cmux.feed.attention:claude_code": "Needs input" })),
+      "permission"
+    );
+  });
+
+  it("falls back to program_status when the claude_code tag is missing", () => {
+    assert.equal(agentStateFromTags(tags({ program_status: "claude-code · Working" })), "running");
+    assert.equal(agentStateFromTags(tags({ program_status: "claude-code · Done" })), "idle");
+    assert.equal(agentStateFromTags(tags({ program_status: "claude-code · approve Bash: ls" })), "permission");
+  });
+
+  it("treats a tool description in program_status as the agent working", () => {
+    assert.equal(agentStateFromTags(tags({ program_status: "claude-code · Reading the log" })), "running");
+  });
+
+  it("prefers claude_code over program_status when they disagree", () => {
+    assert.equal(agentStateFromTags(tags({ claude_code: "Idle", program_status: "claude-code · Working" })), "idle");
+  });
+
+  it("returns null when no tag identifies a Claude session", () => {
+    assert.equal(agentStateFromTags([]), null);
+    assert.equal(agentStateFromTags(undefined), null);
+    assert.equal(agentStateFromTags(tags({ program_status: "vim · editing" })), null);
+  });
+});
 
 describe("parseNotifications", () => {
   it("parses cmux notification JSON into structured items", () => {
