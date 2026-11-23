@@ -145,7 +145,7 @@ function renderWorkspaces() {
 }
 
 function categoryIcon(cat) {
-  const icons = { error: "!", permission: "\u{1f512}", waiting: "\u{26a1}", completion: "\u{2713}", running: "\u{27f3}", refreshing: "\u{21bb}", terminal: ">_" };
+  const icons = { permission: "\u{1f512}", idle: "\u{2713}", running: "\u{27f3}", refreshing: "\u{21bb}", terminal: ">_" };
   return icons[cat] || "?";
 }
 

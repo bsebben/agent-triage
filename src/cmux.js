@@ -325,24 +325,70 @@ async function systemTopScopedToOwnWindow() {
   return rpc("system.top", ownWindowId ? { window_id: ownWindowId } : { all_windows: true });
 }
 
-export async function listAgentWorkspaceIds() {
+const PROGRAM_STATUS_PREFIX = "claude-code · ";
+
+/**
+ * Reads the turn state off a workspace's cmux status tags.
+ *
+ * Three tags carry it: `claude_code` and `cmux.feed.attention:claude_code`
+ * (set by cmux's Claude hooks) and `program_status` (reported by Claude Code
+ * itself, so it exists even when the hooks aren't injected). `claude_code`
+ * stays `Waiting` rather than `Idle` while a background subagent is
+ * outstanding, so only a real `Idle` means it's the user's turn.
+ *
+ * @returns {"permission"|"running"|"idle"|null} null when no tag identifies
+ *   a Claude session.
+ */
+export function agentStateFromTags(tags = []) {
+  const values = new Map();
+  for (const tag of tags) values.set(tag.key, String(tag.value ?? ""));
+
+  const live = values.get("claude_code") ?? values.get("cmux.feed.attention:claude_code");
+  const programRaw = values.get("program_status");
+  const program = programRaw?.startsWith(PROGRAM_STATUS_PREFIX)
+    ? programRaw.slice(PROGRAM_STATUS_PREFIX.length)
+    : null;
+
+  if (live === undefined && program === null) return null;
+
+  const needsInput =
+    values.get("cmux.feed.attention:claude_code") === "Needs input" ||
+    live === "Needs input" ||
+    program?.startsWith("approve ");
+  if (needsInput) return "permission";
+
+  if (live !== undefined) return live === "Idle" ? "idle" : "running";
+  return program === "Done" ? "idle" : "running";
+}
+
+function* agentWorkspaces(raw) {
+  for (const win of raw.windows || []) {
+    for (const ws of win.workspaces || []) {
+      const state = agentStateFromTags(ws.tags);
+      if (state) yield { ws, state };
+      else if (AGENT_TITLE_PREFIX.test(ws.title || "")) yield { ws, state: null };
+    }
+  }
+}
+
+/**
+ * Workspaces running a Claude session, with the turn state cmux reports for
+ * each. A workspace recognised only by its title glyph has a null state: it
+ * is an agent, but nothing says whose turn it is.
+ *
+ * @returns {Promise<Map<string, {state: "permission"|"running"|"idle"|null}>>}
+ */
+export async function listAgentStates() {
   try {
     const raw = await systemTopScopedToOwnWindow();
-    const ids = new Set();
-    for (const win of raw.windows || []) {
-      for (const ws of win.workspaces || []) {
-        for (const tag of ws.tags || []) {
-          if (tag.key === "claude_code") ids.add(ws.id);
-        }
-        if (!ids.has(ws.id) && AGENT_TITLE_PREFIX.test(ws.title || "")) {
-          ids.add(ws.id);
-        }
-      }
-    }
-    return ids;
+    return new Map([...agentWorkspaces(raw)].map(({ ws, state }) => [ws.id, { state }]));
   } catch {
-    return new Set();
+    return new Map();
   }
+}
+
+export async function listAgentWorkspaceIds() {
+  return new Set((await listAgentStates()).keys());
 }
 
 /**
@@ -361,20 +407,11 @@ export async function listBypassWorkspaceIds() {
   try {
     const raw = await systemTopScopedToOwnWindow();
     const ttyByWsId = new Map();
-    for (const win of raw.windows || []) {
-      for (const ws of win.workspaces || []) {
-        let isAgent = false;
-        for (const tag of ws.tags || []) {
-          if (tag.key === "claude_code") isAgent = true;
-        }
-        if (!isAgent && AGENT_TITLE_PREFIX.test(ws.title || "")) isAgent = true;
-        if (!isAgent) continue;
-
-        for (const pane of ws.panes || []) {
-          for (const surface of pane.surfaces || []) {
-            if (surface.type === "terminal" && surface.tty) {
-              ttyByWsId.set(ws.id, surface.tty);
-            }
+    for (const { ws } of agentWorkspaces(raw)) {
+      for (const pane of ws.panes || []) {
+        for (const surface of pane.surfaces || []) {
+          if (surface.type === "terminal" && surface.tty) {
+            ttyByWsId.set(ws.id, surface.tty);
           }
         }
       }
