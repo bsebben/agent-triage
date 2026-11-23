@@ -18,11 +18,38 @@ const prActions = [
     id: "explain",
     label: "Explain it",
     prompt: (pr) =>
-      `Give me a high-level overview of what this PR does and why: ${pr.url}\n\n` +
-      `Load context first: \`gh pr view ${pr.number}\` and \`gh pr diff ${pr.number}\`. ` +
-      `Summarize the overall change in plain language — don't critique it, don't list ` +
-      `action items. After the overview, offer to walk me through the files in more ` +
-      `detail if I want.`,
+      `Explain this PR to me as a starting point for a review: ${pr.url}\n\n` +
+      `Assume I'm new to this codebase. Define any unusual terms or acronyms the ` +
+      `first time they appear.\n\n` +
+      `Load context first: \`gh pr view ${pr.number}\` and \`gh pr diff ${pr.number}\`, ` +
+      `plus the commits, CI status, and review comments. If there's a linked ticket, ` +
+      `read it and its parent story or epic with whichever issue-tracker tool is ` +
+      `available. Read the surrounding code, README, CLAUDE.md, and AGENTS.md when ` +
+      `you need them to understand or define something. If you can't reach the ticket, ` +
+      `say so rather than guessing at the motivation.\n\n` +
+      `Cover these under short headings:\n` +
+      `- What it does: the behavior change, in plain language.\n` +
+      `- Why: the motivation, from the description, ticket, and commits. If it isn't ` +
+      `stated anywhere, say "not stated".\n` +
+      `- How: the approach and key files. Call out anything non-obvious.\n` +
+      `- Impact: what this touches and what could break.\n` +
+      `- Description vs. code: does the PR text match the diff? Note anything in the ` +
+      `diff the description doesn't mention.\n` +
+      `- Evidence it works: manual testing the author reports, tests added or changed ` +
+      `(unit, system, etc.), CI, and what looks untested. Name specific gaps; don't ` +
+      `give a rating.\n` +
+      `- Open questions: only if there are obvious ones, such as something the code ` +
+      `silently drops or skips, or an obvious alternative the diff or description hints ` +
+      `at. Omit this section otherwise.\n\n` +
+      `Check each claim against the code and word it by what the code actually does. ` +
+      `Report what you find; don't review line by line or give a verdict.\n\n` +
+      `Writing rules: aim for one screen (about 200 words) and never more than two. ` +
+      `Cut true but minor detail rather than being exhaustive. Lead with what matters; ` +
+      `the first sentence must carry new information, not restate the request. Write ` +
+      `for a reader with none of your context. Use bullets only for parallel items, and ` +
+      `bold sparingly. No closing summary that repeats what was just said. Trim your ` +
+      `draft once before showing it.\n\n` +
+      `Afterward, offer to walk me through the files in more detail.`,
   },
   {
     id: "status",
