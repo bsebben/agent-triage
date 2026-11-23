@@ -3,6 +3,9 @@ import { resolveWorktree as defaultResolveWorktree } from "./worktree.js";
 
 const DASHBOARD_WS_NAME = "Agent Triage Dashboard Host";
 
+// Statuses where the workspace is waiting on the user.
+const ATTENTION = new Set(["permission", "idle"]);
+
 function worktreeFields(worktree) {
   return {
     isWorktree: worktree?.isWorktree || false,
@@ -34,6 +37,21 @@ export function latestNotificationPerWorkspace(notifications) {
     const completion = newestFirst.find((n) => n.category === "completion" && n.body);
     return completion ? { ...latest, body: completion.body } : latest;
   });
+}
+
+// Used only when cmux gives no live turn state for an agent workspace (it is
+// recognised by its title glyph alone). Both the idle ping and a completion
+// mean the agent has stopped.
+const NOTIFICATION_STATE = { permission: "permission", waiting: "idle", completion: "idle" };
+
+/**
+ * Card status for a workspace running a Claude session. The live cmux state
+ * decides it; the newest notification only stands in when that state is
+ * missing, because notifications go stale: an idle ping lands a minute after
+ * every finished turn and none of them expire.
+ */
+export function categoryForAgent(state, notification) {
+  return state ?? NOTIFICATION_STATE[notification?.category] ?? "running";
 }
 
 export async function enrichNotification(notification, workspaces, terminals, resolveWorktreeFn = defaultResolveWorktree) {
@@ -127,6 +145,19 @@ export class Monitor {
     this.#unsubscribeWorkspaceEvents?.();
   }
 
+  // A dismissed card whose ID is unchanged comes back when its workspace turns
+  // to the user (running → idle or permission). Without notifications to
+  // rotate the ID, nothing else would surface it.
+  #upsertAll(items) {
+    for (const item of items) {
+      const existing = this.#queue.get(item.id);
+      this.#queue.upsert(item);
+      if (existing?.dismissed && ATTENTION.has(item.category) && !ATTENTION.has(existing.category)) {
+        this.#queue.restore(item.id);
+      }
+    }
+  }
+
   // Debounces bursts of workspace events (e.g. holding cmd+↓ to cycle
   // through several workspaces) into a single out-of-cycle poll.
   #scheduleImmediatePoll() {
@@ -163,11 +194,11 @@ export class Monitor {
 
   async #doPoll() {
     try {
-      const [notifications, workspaces, terminals, agentWsIds, bypassWsIds, windowCount] = await Promise.all([
+      const [notifications, workspaces, terminals, agentStates, bypassWsIds, windowCount] = await Promise.all([
         this.#cmux.listNotifications(),
         this.#cmux.listWorkspaces(),
         this.#cmux.listTerminals(),
-        this.#cmux.listAgentWorkspaceIds(),
+        this.#cmux.listAgentStates(),
         this.#cmux.listBypassWorkspaceIds(),
         this.#cmux.getWindowCount ? this.#cmux.getWindowCount() : 1,
       ]);
@@ -178,9 +209,9 @@ export class Monitor {
       // "terminal" for a poll or two. The same grace covers a failed system.top read, which
       // comes back as an empty set.
       const now = this.#now();
-      for (const id of agentWsIds) this.#agentLastSeen.set(id, now);
+      for (const id of agentStates.keys()) this.#agentLastSeen.set(id, now);
       for (const [id, seenAt] of this.#agentLastSeen) {
-        if (!agentWsIds.has(id) && now - seenAt > this.#agentGraceMs) this.#agentLastSeen.delete(id);
+        if (!agentStates.has(id) && now - seenAt > this.#agentGraceMs) this.#agentLastSeen.delete(id);
       }
 
       // Computed once per poll and reused everywhere a "is this the host"
@@ -202,25 +233,32 @@ export class Monitor {
       // (on a cold or expired worktree cache) — resolve all of a poll cycle's
       // items concurrently rather than serializing N round-trips through a
       // sequential await in the loop.
+      // A notification only describes a workspace that still has a live
+      // agent; for anything else it is a leftover, so the workspace falls
+      // through to a synthetic card.
+      const isAgent = (workspaceId) => this.#agentLastSeen.has(workspaceId);
       const relevantNotifications = latestNotificationPerWorkspace(
-        notifications.filter((n) => knownWorkspaceIds.has(n.workspaceId))
+        notifications.filter((n) => knownWorkspaceIds.has(n.workspaceId) && isAgent(n.workspaceId))
       );
       for (const n of relevantNotifications) currentIds.add(n.id);
       const enrichedNotifications = await Promise.all(
         relevantNotifications.map(async (n) => {
           const enriched = await enrichNotification(n, workspaces, terminals, this.#resolveWorktree);
+          enriched.category = categoryForAgent(agentStates.get(n.workspaceId)?.state, n);
+          // A running agent's last reply is already out of date.
+          if (enriched.category === "running") enriched.body = "";
           enriched.bypassPermissions = bypassWsIds.has(n.workspaceId);
           return enriched;
         })
       );
-      for (const enriched of enrichedNotifications) this.#queue.upsert(enriched);
+      this.#upsertAll(enrichedNotifications);
 
-      const notifiedWorkspaceIds = new Set(notifications.map((n) => n.workspaceId));
+      const notifiedWorkspaceIds = new Set(relevantNotifications.map((n) => n.workspaceId));
       const syntheticWorkspaces = workspaces.filter((ws) => !notifiedWorkspaceIds.has(ws.id));
       for (const ws of syntheticWorkspaces) currentIds.add(`synthetic-${ws.id}`);
       const syntheticItems = await Promise.all(
         syntheticWorkspaces.map(async (ws) => {
-          const category = this.#agentLastSeen.has(ws.id) ? "running" : "terminal";
+          const category = isAgent(ws.id) ? categoryForAgent(agentStates.get(ws.id)?.state, null) : "terminal";
           const terminal = terminals?.find((t) => t.workspaceId === ws.id);
           const directory = terminal?.directory || ws.directory || null;
           const worktree = await this.#resolveWorktree(directory);
@@ -240,13 +278,12 @@ export class Monitor {
           };
         })
       );
-      for (const item of syntheticItems) this.#queue.upsert(item);
+      this.#upsertAll(syntheticItems);
 
       // When a workspace's representation rotates IDs (synthetic ↔ notification,
       // or notification ID changes), carry the dismissed state forward to the new
       // ID — unless the new item escalated to an attention-required category
       // (e.g. running → permission), which should surface for the user.
-      const ATTENTION = new Set(["error", "permission", "waiting"]);
       const dismissedByWs = new Map();
       for (const item of this.#queue.dismissedItems()) {
         if (item.workspaceId) dismissedByWs.set(item.workspaceId, item);

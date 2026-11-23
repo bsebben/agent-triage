@@ -13,7 +13,7 @@ const RECONNECT_DELAY_MS = 2000;
 // even if the browser hasn't noticed.
 const STALE_AFTER_MS = 60000;
 const LIVENESS_CHECK_MS = 10000;
-let state = { groups: [], recentGroups: [], dismissed: [], stats: { total: 0, pending: 0, completed: 0, dismissed: 0 } };
+let state = { groups: [], recentGroups: [], dismissed: [], stats: { total: 0, pending: 0, idle: 0, dismissed: 0 } };
 let renaming = false;
 let pendingReload = false;
 let serverBootId = null;

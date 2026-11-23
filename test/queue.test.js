@@ -16,26 +16,24 @@ describe("Queue", () => {
   });
 
   it("upserts items by notification id", () => {
-    queue.upsert({ id: "A", category: "waiting", workspaceId: "W1", subtitle: "Waiting", body: "test" });
-    queue.upsert({ id: "A", category: "waiting", workspaceId: "W1", subtitle: "Waiting", body: "updated" });
+    queue.upsert({ id: "A", category: "idle", workspaceId: "W1", subtitle: "Waiting", body: "test" });
+    queue.upsert({ id: "A", category: "idle", workspaceId: "W1", subtitle: "Waiting", body: "updated" });
     assert.equal(queue.items().length, 1);
     assert.equal(queue.items()[0].body, "updated");
   });
 
   it("dismisses items", () => {
-    queue.upsert({ id: "A", category: "waiting", workspaceId: "W1", subtitle: "Waiting", body: "test" });
+    queue.upsert({ id: "A", category: "idle", workspaceId: "W1", subtitle: "Waiting", body: "test" });
     queue.dismiss("A");
     assert.equal(queue.items().length, 0);
   });
 
   it("returns items sorted by priority", () => {
-    queue.upsert({ id: "A", category: "completion", workspaceId: "W1", subtitle: "Completed", body: "done" });
-    queue.upsert({ id: "B", category: "permission", workspaceId: "W1", subtitle: "Permission", body: "approve?" });
-    queue.upsert({ id: "C", category: "error", workspaceId: "W1", subtitle: "Error", body: "failed" });
-    const items = queue.items();
-    assert.equal(items[0].category, "error");
-    assert.equal(items[1].category, "permission");
-    assert.equal(items[2].category, "completion");
+    queue.upsert({ id: "A", category: "terminal", workspaceId: "W1", body: "" });
+    queue.upsert({ id: "B", category: "running", workspaceId: "W2", body: "" });
+    queue.upsert({ id: "C", category: "idle", workspaceId: "W3", body: "done" });
+    queue.upsert({ id: "D", category: "permission", workspaceId: "W4", body: "approve?" });
+    assert.deepEqual(queue.items().map((i) => i.category), ["permission", "idle", "running", "terminal"]);
   });
 
   it("sorts terminal items below running", () => {
@@ -65,22 +63,22 @@ describe("Queue", () => {
   });
 
   it("breaks priority ties by workspaceId, not insertion order", () => {
-    queue.upsert({ id: "A", category: "waiting", workspaceId: "W2", body: "" });
-    queue.upsert({ id: "B", category: "waiting", workspaceId: "W1", body: "" });
-    queue.upsert({ id: "C", category: "waiting", workspaceId: "W3", body: "" });
+    queue.upsert({ id: "A", category: "idle", workspaceId: "W2", body: "" });
+    queue.upsert({ id: "B", category: "idle", workspaceId: "W1", body: "" });
+    queue.upsert({ id: "C", category: "idle", workspaceId: "W3", body: "" });
     assert.deepEqual(queue.items().map((i) => i.workspaceId), ["W1", "W2", "W3"]);
   });
 
   it("keeps a stable order across an item ID rotation for the same workspace", () => {
-    queue.upsert({ id: "A", category: "waiting", workspaceId: "W2", body: "" });
-    queue.upsert({ id: "B", category: "waiting", workspaceId: "W1", body: "" });
+    queue.upsert({ id: "A", category: "idle", workspaceId: "W2", body: "" });
+    queue.upsert({ id: "B", category: "idle", workspaceId: "W1", body: "" });
     const before = queue.items().map((i) => i.workspaceId);
 
     // Simulate a notification ID rotation for W1: remove the old entry and
     // upsert under a new id, as Monitor does when cmux's notification ID
     // changes — the workspace itself hasn't changed, so order shouldn't either.
     queue.remove("B");
-    queue.upsert({ id: "B2", category: "waiting", workspaceId: "W1", body: "" });
+    queue.upsert({ id: "B2", category: "idle", workspaceId: "W1", body: "" });
 
     assert.deepEqual(queue.items().map((i) => i.workspaceId), before);
   });
@@ -90,8 +88,8 @@ describe("Queue", () => {
     const realNow = Date.now;
     Date.now = () => fakeNow;
     try {
-      queue.upsert({ id: "A", category: "waiting", workspaceId: "W2", body: "" });
-      queue.upsert({ id: "B", category: "waiting", workspaceId: "W1", body: "" });
+      queue.upsert({ id: "A", category: "idle", workspaceId: "W2", body: "" });
+      queue.upsert({ id: "B", category: "idle", workspaceId: "W1", body: "" });
       queue.dismiss("A");
       queue.dismiss("B");
       assert.deepEqual(queue.dismissedItems().map((i) => i.workspaceId), ["W1", "W2"]);
@@ -100,20 +98,21 @@ describe("Queue", () => {
     }
   });
 
-  it("excludes running and terminal from pending count", () => {
+  it("counts permission and idle as pending, and idle separately", () => {
     queue.upsert({ id: "T1", category: "terminal", workspaceId: "W1", body: "" });
     queue.upsert({ id: "R1", category: "running", workspaceId: "W2", body: "" });
     queue.upsert({ id: "P1", category: "permission", workspaceId: "W3", body: "approve?" });
-    queue.upsert({ id: "C1", category: "completion", workspaceId: "W4", body: "done" });
+    queue.upsert({ id: "C1", category: "idle", workspaceId: "W4", body: "done" });
     const stats = queue.stats();
-    assert.equal(stats.pending, 1);
+    assert.equal(stats.pending, 2);
+    assert.equal(stats.idle, 1);
     assert.equal(stats.total, 4);
   });
 
   it("groups items by directory path", () => {
-    queue.upsert({ id: "A", category: "waiting", workspaceId: "W1", workspaceDir: `${HOME}/workspace/my-project`, body: "q1" });
-    queue.upsert({ id: "B", category: "waiting", workspaceId: "W2", workspaceDir: `${HOME}/workspace/web`, body: "q2" });
-    queue.upsert({ id: "C", category: "waiting", workspaceId: "W3", workspaceDir: `${HOME}/workspace/my-project`, body: "q3" });
+    queue.upsert({ id: "A", category: "idle", workspaceId: "W1", workspaceDir: `${HOME}/workspace/my-project`, body: "q1" });
+    queue.upsert({ id: "B", category: "idle", workspaceId: "W2", workspaceDir: `${HOME}/workspace/web`, body: "q2" });
+    queue.upsert({ id: "C", category: "idle", workspaceId: "W3", workspaceDir: `${HOME}/workspace/my-project`, body: "q3" });
     const { groups: grouped } = queue.grouped();
     assert.equal(grouped.length, 2);
     const zp = grouped.find((g) => g.title === "~/workspace/my-project");
@@ -123,7 +122,7 @@ describe("Queue", () => {
   it("groups worktrees of the same repo with the main checkout", () => {
     queue.upsert({
       id: "A",
-      category: "waiting",
+      category: "idle",
       workspaceId: "W1",
       workspaceDir: `${HOME}/workspace/my-project`,
       repoRoot: `${HOME}/workspace/my-project`,
@@ -131,7 +130,7 @@ describe("Queue", () => {
     });
     queue.upsert({
       id: "B",
-      category: "waiting",
+      category: "idle",
       workspaceId: "W2",
       workspaceDir: `${HOME}/workspace/my-project-worktrees/wt-a`,
       repoRoot: `${HOME}/workspace/my-project`,
@@ -141,7 +140,7 @@ describe("Queue", () => {
     });
     queue.upsert({
       id: "C",
-      category: "waiting",
+      category: "idle",
       workspaceId: "W3",
       workspaceDir: `${HOME}/workspace/my-project-worktrees/wt-b`,
       repoRoot: `${HOME}/workspace/my-project`,
@@ -159,7 +158,7 @@ describe("Queue", () => {
   it("targets new-session/new-terminal at a worktree, not the repo root, when no item is in the main checkout", () => {
     queue.upsert({
       id: "A",
-      category: "waiting",
+      category: "idle",
       workspaceId: "W1",
       workspaceDir: `${HOME}/workspace/my-project-worktrees/wt-a`,
       repoRoot: `${HOME}/workspace/my-project`,
@@ -169,7 +168,7 @@ describe("Queue", () => {
     });
     queue.upsert({
       id: "B",
-      category: "waiting",
+      category: "idle",
       workspaceId: "W2",
       workspaceDir: `${HOME}/workspace/my-project-worktrees/wt-b`,
       repoRoot: `${HOME}/workspace/my-project`,
@@ -184,7 +183,7 @@ describe("Queue", () => {
   });
 
   it("keeps grouping plain non-repo folders by directory", () => {
-    queue.upsert({ id: "A", category: "waiting", workspaceId: "W1", workspaceDir: `${HOME}/workspace`, body: "plain shell" });
+    queue.upsert({ id: "A", category: "idle", workspaceId: "W1", workspaceDir: `${HOME}/workspace`, body: "plain shell" });
     const { groups } = queue.grouped();
     assert.equal(groups.length, 1);
     assert.equal(groups[0].title, "~/workspace");
@@ -193,7 +192,7 @@ describe("Queue", () => {
 
   it("counts unique workspace IDs from active items", () => {
     queue.upsert({ id: "A", category: "running", workspaceId: "W1", body: "" });
-    queue.upsert({ id: "B", category: "waiting", workspaceId: "W1", body: "q" });
+    queue.upsert({ id: "B", category: "idle", workspaceId: "W1", body: "q" });
     queue.upsert({ id: "C", category: "terminal", workspaceId: "W2", body: "" });
     queue.upsert({ id: "D", category: "running", workspaceId: "W3", body: "" });
     const ids = new Set(queue.items().map((i) => i.workspaceId));
@@ -211,11 +210,11 @@ describe("Queue", () => {
   it("sorts groups alphabetically regardless of item priority", () => {
     queue.upsert({ id: "Z1", category: "running", workspaceId: "W1", workspaceDir: `${HOME}/workspace/my-project`, body: "" });
     queue.upsert({ id: "A1", category: "terminal", workspaceId: "W2", workspaceDir: `${HOME}/workspace/agent-triage`, body: "" });
-    queue.upsert({ id: "M1", category: "error", workspaceId: "W3", workspaceDir: `${HOME}/workspace/middle`, body: "boom" });
+    queue.upsert({ id: "M1", category: "permission", workspaceId: "W3", workspaceDir: `${HOME}/workspace/middle`, body: "boom" });
     const { groups: initial } = queue.grouped();
     assert.deepEqual(initial.map((g) => g.title), ["~/workspace/agent-triage", "~/workspace/middle", "~/workspace/my-project"]);
 
-    queue.upsert({ id: "M1", category: "completion", workspaceId: "W3", workspaceDir: `${HOME}/workspace/middle`, body: "done" });
+    queue.upsert({ id: "M1", category: "idle", workspaceId: "W3", workspaceDir: `${HOME}/workspace/middle`, body: "done" });
     queue.upsert({ id: "A1", category: "permission", workspaceId: "W2", workspaceDir: `${HOME}/workspace/agent-triage`, body: "approve?" });
     const { groups: after } = queue.grouped();
     assert.deepEqual(after.map((g) => g.title), ["~/workspace/agent-triage", "~/workspace/middle", "~/workspace/my-project"]);
@@ -236,7 +235,7 @@ describe("Queue", () => {
       body: "",
     });
     queue.upsert({ id: "A2", category: "running", workspaceId: "W2", workspaceDir: `${HOME}/workspace/agent-triage`, body: "" });
-    queue.upsert({ id: "M1", category: "error", workspaceId: "W3", workspaceDir: `${HOME}/workspace/middle`, body: "boom" });
+    queue.upsert({ id: "M1", category: "permission", workspaceId: "W3", workspaceDir: `${HOME}/workspace/middle`, body: "boom" });
     const { groups } = queue.grouped();
 
     assert.deepEqual(groups.map((g) => g.title), ["~/workspace/agent-triage", "~/workspace/middle", "Agent Triage Dashboard Host"]);

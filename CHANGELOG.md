@@ -5,6 +5,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.69.0] - 2026-11-23
+
+### Changed
+
+- Workspace cards now take their status from cmux's live Claude state instead of the latest notification. Four statuses remain: **permission** (needs an approval or answer), **idle** (the agent has stopped, so it's your turn), **running**, and **terminal**. A finished session no longer flips to "waiting" a minute after it completes, and a card no longer keeps a stale status once its agent exits or starts working again.
+- A session with a background subagent still working shows as running, not idle.
+- A running card no longer shows the agent's previous reply. The header count of cards waiting on you now counts permission and idle cards.
+
+### Fixed
+
+- Claude sessions that report only through Claude Code's own `program_status` tag, such as a cloud session, show as agents instead of plain terminals.
+- A dismissed card comes back when its agent finishes or asks for approval, even if cmux sends no notification for it.
+
+### Removed
+
+- The `waiting`, `completion`, `error` and `unknown` card statuses. `waiting` and `completion` are now idle; `error` and `unknown` were never produced in practice.
+
 ## [1.68.0] - 2026-11-23
 
 ### Changed

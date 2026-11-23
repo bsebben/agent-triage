@@ -1,8 +1,8 @@
 // src/queue.js
 import { writeFile, readFile } from "node:fs/promises";
 
-const PRIORITY = { error: 0, permission: 1, waiting: 2, completion: 3, unknown: 4, running: 5, terminal: 6 };
-const NON_PENDING = new Set(["completion", "running", "terminal"]);
+const PRIORITY = { permission: 0, idle: 1, running: 2, terminal: 3 };
+const NON_PENDING = new Set(["running", "terminal"]);
 
 import { homedir } from "node:os";
 
@@ -170,7 +170,7 @@ export class Queue {
     return {
       total: active.length,
       pending: active.filter((i) => !NON_PENDING.has(i.category)).length,
-      completed: active.filter((i) => i.category === "completion").length,
+      idle: active.filter((i) => i.category === "idle").length,
       dismissed: dismissed.length,
     };
   }
