@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.68.0] - 2026-11-23
+
+### Changed
+
+- "Explain it" now writes a review-starter briefing for someone new to the codebase: what the PR does, why, and how; its impact; whether the description matches the code; and what evidence shows it works (manual testing, tests, CI). Unusual terms are defined, and the linked ticket and its parent story are read for context. The output aims for one screen.
+
 ## [1.67.9] - 2026-11-20
 
 ### Changed
